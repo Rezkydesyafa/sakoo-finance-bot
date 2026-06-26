@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+pydantic-settings
+SQLAlchemy
+alembic
+psycopg[binary]
+redis
+celery
+google-cloud-vision
+google-cloud-speech
+weasyprint
+python-multipart
+pytest
+httpx

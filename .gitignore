@@ -1,0 +1,47 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+env/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Docker and local runtime
+*.pid
+*.log
+docker-compose.override.yml
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Generated local storage
+storage/receipts/*
+storage/voice_notes/*
+storage/reports/*
+storage/temp/*
+!storage/receipts/.gitkeep
+!storage/voice_notes/.gitkeep
+!storage/reports/.gitkeep
+!storage/temp/.gitkeep
