@@ -45,3 +45,8 @@ storage/temp/*
 !storage/voice_notes/.gitkeep
 !storage/reports/.gitkeep
 !storage/temp/.gitkeep
+
+PRD_Personal_Finance_Assistant_Bot.md
+create_github_issues.py
+github_issues.json
+github_jobdesk.md
