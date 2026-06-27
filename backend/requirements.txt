@@ -1,6 +1,7 @@
 fastapi
 uvicorn[standard]
 pydantic-settings
+bcrypt
 SQLAlchemy
 alembic
 psycopg[binary]

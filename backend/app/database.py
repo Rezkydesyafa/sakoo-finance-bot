@@ -1,6 +1,7 @@
 from collections.abc import Generator
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.config import get_settings
@@ -8,8 +9,13 @@ from app.config import get_settings
 
 settings = get_settings()
 
-engine = create_engine(settings.database_url, pool_pre_ping=True)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+engine: Engine = create_engine(settings.database_url, pool_pre_ping=True)
+SessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine,
+    expire_on_commit=False,
+)
 
 
 class Base(DeclarativeBase):
@@ -22,3 +28,8 @@ def get_db() -> Generator[Session, None, None]:
         yield db
     finally:
         db.close()
+
+
+def check_database_connection() -> None:
+    with SessionLocal() as db:
+        db.execute(text("SELECT 1"))
