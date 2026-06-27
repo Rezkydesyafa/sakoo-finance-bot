@@ -11,5 +11,7 @@ google-cloud-vision
 google-cloud-speech
 weasyprint
 python-multipart
+scikit-learn
+joblib
 pytest
 httpx

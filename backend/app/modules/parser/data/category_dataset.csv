@@ -1,0 +1,201 @@
+text,category,type
+beli nasi padang,Makanan,expense
+beli kopi susu,Makanan,expense
+makan ayam geprek,Makanan,expense
+jajan bakso sore,Makanan,expense
+sarapan bubur ayam,Makanan,expense
+beli teh botol,Makanan,expense
+makan siang warung,Makanan,expense
+pesan gofood ayam,Makanan,expense
+beli roti dan susu,Makanan,expense
+makan malam nasi goreng,Makanan,expense
+minum kopi di cafe,Makanan,expense
+beli mie ayam,Makanan,expense
+bayar gojek kantor,Transportasi,expense
+beli bensin motor,Transportasi,expense
+isi bbm mobil,Transportasi,expense
+bayar parkir mall,Transportasi,expense
+ongkos angkot kampus,Transportasi,expense
+naik bus pulang,Transportasi,expense
+bayar tol harian,Transportasi,expense
+grab ke kantor,Transportasi,expense
+tiket kereta pulang,Transportasi,expense
+ojek online pagi,Transportasi,expense
+taksi bandara,Transportasi,expense
+transport meeting klien,Transportasi,expense
+bayar listrik rumah,Tagihan,expense
+tagihan internet bulanan,Tagihan,expense
+bayar pdam,Tagihan,expense
+beli pulsa hp,Tagihan,expense
+bayar paket data,Tagihan,expense
+bayar wifi rumah,Tagihan,expense
+bayar kos bulanan,Tagihan,expense
+cicilan motor bulan ini,Tagihan,expense
+bayar sewa kontrakan,Tagihan,expense
+tagihan air rumah,Tagihan,expense
+bayar kartu kredit,Tagihan,expense
+langganan cloud bulanan,Tagihan,expense
+belanja baju kerja,Belanja,expense
+beli sepatu baru,Belanja,expense
+checkout shopee,Belanja,expense
+belanja tokopedia barang,Belanja,expense
+beli tas kantor,Belanja,expense
+belanja supermarket,Belanja,expense
+beli skincare,Belanja,expense
+beli produk elektronik,Belanja,expense
+pesan barang lazada,Belanja,expense
+beli perlengkapan rumah,Belanja,expense
+belanja bulanan market,Belanja,expense
+beli celana jeans,Belanja,expense
+nonton bioskop,Hiburan,expense
+langganan netflix,Hiburan,expense
+bayar spotify,Hiburan,expense
+beli game steam,Hiburan,expense
+liburan akhir pekan,Hiburan,expense
+karaoke teman,Hiburan,expense
+tiket konser,Hiburan,expense
+main bowling,Hiburan,expense
+beli voucher game,Hiburan,expense
+nonton bola bareng,Hiburan,expense
+wisata pantai,Hiburan,expense
+hiburan keluarga,Hiburan,expense
+beli obat batuk,Kesehatan,expense
+bayar dokter,Kesehatan,expense
+periksa klinik,Kesehatan,expense
+beli vitamin,Kesehatan,expense
+bayar rumah sakit,Kesehatan,expense
+medical checkup,Kesehatan,expense
+tebus resep apotek,Kesehatan,expense
+konsultasi dokter gigi,Kesehatan,expense
+beli masker medis,Kesehatan,expense
+biaya laboratorium,Kesehatan,expense
+terapi fisioterapi,Kesehatan,expense
+bayar bpjs kesehatan,Kesehatan,expense
+beli buku kuliah,Pendidikan,expense
+bayar kursus online,Pendidikan,expense
+biaya sekolah anak,Pendidikan,expense
+bayar kuliah semester,Pendidikan,expense
+beli alat tulis,Pendidikan,expense
+kelas bahasa inggris,Pendidikan,expense
+workshop python,Pendidikan,expense
+kursus desain,Pendidikan,expense
+bayar sertifikasi,Pendidikan,expense
+fotokopi materi kuliah,Pendidikan,expense
+pendaftaran seminar,Pendidikan,expense
+beli modul belajar,Pendidikan,expense
+gaji masuk,Gaji,income
+terima salary bulan ini,Gaji,income
+bonus kantor,Gaji,income
+upah freelance,Gaji,income
+invoice proyek dibayar,Gaji,income
+pendapatan pekerjaan,Gaji,income
+honor mengajar,Gaji,income
+komisi penjualan,Gaji,income
+fee konsultasi,Gaji,income
+bayaran desain logo,Gaji,income
+gaji freelance masuk,Gaji,income
+pendapatan sampingan,Gaji,income
+nabung bulanan,Tabungan,income
+setoran tabungan,Tabungan,income
+transfer ke rekening tabungan,Tabungan,income
+hasil investasi,Tabungan,income
+deposit reksadana,Tabungan,income
+saving bulan ini,Tabungan,income
+topup dana darurat,Tabungan,income
+menabung dari gaji,Tabungan,income
+profit investasi saham,Tabungan,income
+bunga tabungan,Tabungan,income
+alokasi tabung nikah,Tabungan,income
+simpan uang bonus,Tabungan,income
+pengeluaran lain,Lainnya,expense
+biaya tak terduga,Lainnya,expense
+bayar administrasi,Lainnya,expense
+donasi acara,Lainnya,expense
+transfer keluarga,Lainnya,expense
+patungan kantor,Lainnya,expense
+biaya print dokumen,Lainnya,expense
+bayar denda kecil,Lainnya,expense
+pengeluaran random,Lainnya,expense
+biaya layanan aplikasi,Lainnya,expense
+tarik tunai,Lainnya,expense
+keperluan mendadak,Lainnya,expense
+pesan martabak malam,Makanan,expense
+beli pecel lele,Makanan,expense
+bayar katering kantor,Makanan,expense
+jajan cilok sekolah,Makanan,expense
+beli lauk warteg,Makanan,expense
+ngopi starbucks,Makanan,expense
+makan soto ayam,Makanan,expense
+beli cemilan minimarket,Makanan,expense
+ongkir gosend dokumen,Transportasi,expense
+isi e toll,Transportasi,expense
+topup kartu tol,Transportasi,expense
+naik mrt kantor,Transportasi,expense
+bayar travel bandung,Transportasi,expense
+servis ringan motor,Transportasi,expense
+sewa mobil harian,Transportasi,expense
+bayar maxim pulang,Transportasi,expense
+token listrik pln,Tagihan,expense
+bayar indihome rumah,Tagihan,expense
+bayar biznet bulanan,Tagihan,expense
+beli kuota internet,Tagihan,expense
+bayar asuransi bulanan,Tagihan,expense
+bayar iuran komplek,Tagihan,expense
+bayar netflix tagihan keluarga,Tagihan,expense
+bayar cicilan hp,Tagihan,expense
+checkout tiktok shop,Belanja,expense
+beli parfum online,Belanja,expense
+beli handuk rumah,Belanja,expense
+beli kabel charger,Belanja,expense
+belanja indomaret,Belanja,expense
+belanja alfamart,Belanja,expense
+beli kado ulang tahun,Belanja,expense
+beli perabot dapur,Belanja,expense
+tiket konser musik,Hiburan,expense
+langganan disney hotstar,Hiburan,expense
+bayar ps plus,Hiburan,expense
+topup game mobile,Hiburan,expense
+beli tiket wisata,Hiburan,expense
+main futsal teman,Hiburan,expense
+sewa lapangan badminton,Hiburan,expense
+nonton cgv,Hiburan,expense
+konsultasi halodoc,Kesehatan,expense
+bayar bpjs kesehatan keluarga,Kesehatan,expense
+beli suplemen gym,Kesehatan,expense
+periksa dokter gigi,Kesehatan,expense
+bayar rawat jalan,Kesehatan,expense
+tes darah laboratorium,Kesehatan,expense
+beli obat apotek,Kesehatan,expense
+biaya kacamata,Kesehatan,expense
+bayar spp sekolah,Pendidikan,expense
+bayar ukt kuliah,Pendidikan,expense
+beli buku anak,Pendidikan,expense
+bayar udemy course,Pendidikan,expense
+kelas coding bootcamp,Pendidikan,expense
+bayar les matematika,Pendidikan,expense
+beli seragam sekolah,Pendidikan,expense
+langganan aplikasi belajar,Pendidikan,expense
+payroll kantor masuk,Gaji,income
+thr lebaran,Gaji,income
+bonus performa,Gaji,income
+komisi affiliate,Gaji,income
+fee project website,Gaji,income
+honor pembicara,Gaji,income
+pembayaran invoice klien,Gaji,income
+royalti konten,Gaji,income
+deposito cair,Tabungan,income
+dividen saham,Tabungan,income
+profit reksadana,Tabungan,income
+setor dana darurat,Tabungan,income
+cashback investasi,Tabungan,income
+bunga deposito,Tabungan,income
+alokasi tabungan rumah,Tabungan,income
+topup rekening saving,Tabungan,income
+biaya admin bank,Lainnya,expense
+bayar materai,Lainnya,expense
+donasi masjid,Lainnya,expense
+uang kas kantor,Lainnya,expense
+transfer orang tua,Lainnya,expense
+biaya kirim paket,Lainnya,expense
+bayar parkir liar,Lainnya,expense
+pengeluaran miscellaneous,Lainnya,expense

@@ -6,7 +6,13 @@ from typing import Any
 
 
 SOURCE_WHATSAPP_TEXT = "whatsapp_text"
-CONFIRMATION_THRESHOLD = 0.75
+CONFIRMATION_THRESHOLD = 0.85
+INTENT_ADD_TRANSACTION = "add_transaction"
+INTENT_GET_REPORT = "get_report"
+INTENT_EXPORT_PDF = "export_pdf"
+INTENT_RECENT_TRANSACTIONS = "recent_transactions"
+INTENT_DELETE_LAST_TRANSACTION = "delete_last_transaction"
+INTENT_HELP = "help"
 
 AMOUNT_RE = re.compile(
     r"(?<!\w)(?P<prefix>rp\.?\s*)?"
@@ -19,6 +25,44 @@ DATE_PATTERNS: tuple[tuple[re.Pattern[str], int], ...] = (
     (re.compile(r"\b(kemarin|yesterday)\b", re.IGNORECASE), -1),
     (re.compile(r"\b(hari ini|today)\b", re.IGNORECASE), 0),
 )
+DATE_NUMERIC_RE = re.compile(
+    r"\b(?:tanggal\s+)?(?P<day>[0-3]?\d)[/-](?P<month>0?\d|1[0-2])"
+    r"(?:[/-](?P<year>\d{2,4}))?\b",
+    re.IGNORECASE,
+)
+DATE_MONTH_NAME_RE = re.compile(
+    r"\b(?:tanggal\s+)?(?P<day>[0-3]?\d)\s+"
+    r"(?P<month>jan(?:uari)?|feb(?:ruari)?|mar(?:et)?|apr(?:il)?|mei|"
+    r"jun(?:i)?|jul(?:i)?|agu(?:stus)?|sep(?:tember)?|okt(?:ober)?|"
+    r"nov(?:ember)?|des(?:ember)?)"
+    r"(?:\s+(?P<year>\d{2,4}))?\b",
+    re.IGNORECASE,
+)
+MONTH_ALIASES = {
+    "jan": 1,
+    "januari": 1,
+    "feb": 2,
+    "februari": 2,
+    "mar": 3,
+    "maret": 3,
+    "apr": 4,
+    "april": 4,
+    "mei": 5,
+    "jun": 6,
+    "juni": 6,
+    "jul": 7,
+    "juli": 7,
+    "agu": 8,
+    "agustus": 8,
+    "sep": 9,
+    "september": 9,
+    "okt": 10,
+    "oktober": 10,
+    "nov": 11,
+    "november": 11,
+    "des": 12,
+    "desember": 12,
+}
 
 INCOME_KEYWORDS = {
     "bonus",
@@ -37,11 +81,27 @@ EXPENSE_KEYWORDS = {
     "bayar",
     "beli",
     "belanja",
+    "biaya",
     "jajan",
     "keluar",
     "makan",
     "pengeluaran",
+    "topup",
 }
+HELP_KEYWORDS = {"bantuan", "help", "menu", "panduan"}
+REPORT_KEYWORDS = {"laporan", "rekap", "ringkasan"}
+EXPORT_KEYWORDS = {"download", "ekspor", "export", "pdf", "unduh"}
+RECENT_TRANSACTION_PHRASES = (
+    "riwayat transaksi",
+    "daftar transaksi",
+    "transaksi terbaru",
+    "transaksi terakhir",
+)
+DELETE_LAST_PHRASES = (
+    "hapus transaksi terakhir",
+    "delete transaksi terakhir",
+    "batalkan transaksi terakhir",
+)
 
 CATEGORY_KEYWORDS: tuple[tuple[str, str, set[str]], ...] = (
     (
@@ -152,6 +212,7 @@ class ParsedTransactionText:
     confidence: float
     need_confirmation: bool
     reasons: list[str]
+    period: str | None = None
 
     def to_log_payload(self) -> dict[str, Any]:
         return {
@@ -167,6 +228,7 @@ class ParsedTransactionText:
             "confidence": self.confidence,
             "need_confirmation": self.need_confirmation,
             "reasons": self.reasons,
+            "period": self.period,
         }
 
 
@@ -178,14 +240,46 @@ class AmountMatch:
     score: float
 
 
+@dataclass(frozen=True)
+class DateMatch:
+    value: date
+    start: int
+    end: int
+    explicit: bool
+
+
+@dataclass(frozen=True)
+class IntentMatch:
+    intent: str
+    period: str | None = None
+    confidence: float = 1.0
+
+
 def parse_transaction_text(text: str, today: date | None = None) -> ParsedTransactionText:
     current_date = today or date.today()
     normalized = _normalize_text(text)
+    intent_match = detect_intent(normalized)
+    if intent_match.intent != INTENT_ADD_TRANSACTION:
+        return ParsedTransactionText(
+            intent=intent_match.intent,
+            type=None,
+            amount=None,
+            category=None,
+            description=normalized or None,
+            transaction_date=current_date,
+            source=SOURCE_WHATSAPP_TEXT,
+            confidence=intent_match.confidence,
+            need_confirmation=False,
+            reasons=[],
+            period=intent_match.period,
+        )
+
     amount_match = _extract_amount(normalized)
     transaction_type, has_type_keyword = _detect_type(normalized)
     category, category_type, has_category_keyword = _detect_category(normalized)
-    transaction_date = _detect_date(normalized, current_date)
-    description = _build_description(normalized, amount_match)
+    date_match = _detect_date(normalized, current_date)
+    transaction_date = date_match.value if date_match else current_date
+    description = _build_description(normalized, amount_match, date_match)
     reasons: list[str] = []
 
     if amount_match is None:
@@ -203,7 +297,7 @@ def parse_transaction_text(text: str, today: date | None = None) -> ParsedTransa
         has_type_keyword=has_type_keyword,
         has_category_keyword=has_category_keyword,
         has_description=bool(description),
-        has_date=transaction_date is not None,
+        has_date=date_match is not None,
     )
     need_confirmation = (
         amount_match is None
@@ -223,6 +317,28 @@ def parse_transaction_text(text: str, today: date | None = None) -> ParsedTransa
         need_confirmation=need_confirmation,
         reasons=reasons,
     )
+
+
+def detect_intent(text: str) -> IntentMatch:
+    normalized = _normalize_text(text)
+    tokens = _tokenize(normalized)
+
+    if _looks_like_transaction_input(normalized):
+        return IntentMatch(intent=INTENT_ADD_TRANSACTION)
+    if tokens & HELP_KEYWORDS and len(tokens) <= 3:
+        return IntentMatch(intent=INTENT_HELP)
+
+    period = _detect_period(normalized)
+    if _contains_phrase(normalized, DELETE_LAST_PHRASES):
+        return IntentMatch(intent=INTENT_DELETE_LAST_TRANSACTION)
+    if (tokens & EXPORT_KEYWORDS) and (tokens & REPORT_KEYWORDS):
+        return IntentMatch(intent=INTENT_EXPORT_PDF, period=period)
+    if _contains_phrase(normalized, RECENT_TRANSACTION_PHRASES):
+        return IntentMatch(intent=INTENT_RECENT_TRANSACTIONS)
+    if tokens & REPORT_KEYWORDS:
+        return IntentMatch(intent=INTENT_GET_REPORT, period=period)
+
+    return IntentMatch(intent=INTENT_ADD_TRANSACTION)
 
 
 def _normalize_text(text: str) -> str:
@@ -309,17 +425,63 @@ def _detect_category(text: str) -> tuple[str | None, str | None, bool]:
     return None, None, False
 
 
-def _detect_date(text: str, current_date: date) -> date:
+def _detect_date(text: str, current_date: date) -> DateMatch | None:
+    numeric_match = DATE_NUMERIC_RE.search(text)
+    if numeric_match:
+        parsed_date = _build_date(
+            day=int(numeric_match.group("day")),
+            month=int(numeric_match.group("month")),
+            year=_parse_year(numeric_match.group("year"), current_date.year),
+        )
+        if parsed_date:
+            return DateMatch(
+                value=parsed_date,
+                start=numeric_match.start(),
+                end=numeric_match.end(),
+                explicit=True,
+            )
+
+    month_name_match = DATE_MONTH_NAME_RE.search(text)
+    if month_name_match:
+        month = MONTH_ALIASES[month_name_match.group("month").lower()]
+        parsed_date = _build_date(
+            day=int(month_name_match.group("day")),
+            month=month,
+            year=_parse_year(month_name_match.group("year"), current_date.year),
+        )
+        if parsed_date:
+            return DateMatch(
+                value=parsed_date,
+                start=month_name_match.start(),
+                end=month_name_match.end(),
+                explicit=True,
+            )
+
     for pattern, offset in DATE_PATTERNS:
-        if pattern.search(text):
-            return current_date + timedelta(days=offset)
-    return current_date
+        match = pattern.search(text)
+        if match:
+            return DateMatch(
+                value=current_date + timedelta(days=offset),
+                start=match.start(),
+                end=match.end(),
+                explicit=False,
+            )
+    return None
 
 
-def _build_description(text: str, amount_match: AmountMatch | None) -> str | None:
+def _build_description(
+    text: str,
+    amount_match: AmountMatch | None,
+    date_match: DateMatch | None,
+) -> str | None:
     description = text
-    if amount_match:
-        description = f"{text[:amount_match.start]} {text[amount_match.end:]}"
+    spans = [
+        (match.start, match.end)
+        for match in (amount_match, date_match)
+        if match is not None
+    ]
+    for start, end in sorted(spans, reverse=True):
+        description = f"{description[:start]} {description[end:]}"
 
     for pattern, _offset in DATE_PATTERNS:
         description = pattern.sub(" ", description)
@@ -352,3 +514,44 @@ def _calculate_confidence(
 
 def _tokenize(text: str) -> set[str]:
     return set(re.findall(r"[a-zA-Z\u00c0-\u024f]+", text.lower()))
+
+
+def _looks_like_transaction_input(text: str) -> bool:
+    amount_match = _extract_amount(text)
+    if amount_match is None:
+        return False
+    _transaction_type, has_type_keyword = _detect_type(text)
+    _category, _category_type, has_category_keyword = _detect_category(text)
+    return has_type_keyword or has_category_keyword
+
+
+def _contains_phrase(text: str, phrases: tuple[str, ...]) -> bool:
+    return any(phrase in text for phrase in phrases)
+
+
+def _detect_period(text: str) -> str | None:
+    if "bulan ini" in text:
+        return "month"
+    if "minggu ini" in text:
+        return "week"
+    if "hari ini" in text:
+        return "day"
+    if "kemarin" in text:
+        return "yesterday"
+    return None
+
+
+def _parse_year(raw_year: str | None, default_year: int) -> int:
+    if raw_year is None:
+        return default_year
+    year = int(raw_year)
+    if year < 100:
+        return 2000 + year
+    return year
+
+
+def _build_date(*, day: int, month: int, year: int) -> date | None:
+    try:
+        return date(year, month, day)
+    except ValueError:
+        return None
