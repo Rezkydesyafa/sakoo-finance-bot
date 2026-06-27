@@ -7,11 +7,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_name: str = "Sakoo Finance Bot"
     app_env: str = "local"
+    api_prefix: str = "/api"
     debug: bool = False
 
-    database_url: str = Field(
-        default="postgresql+psycopg://sakoo:sakoo@localhost:5432/sakoo_finance"
-    )
+    database_url: str = Field(..., description="PostgreSQL connection URL")
     redis_url: str = "redis://localhost:6379/0"
     celery_broker_url: str | None = None
     celery_result_backend: str | None = None
@@ -20,13 +19,16 @@ class Settings(BaseSettings):
     app_base_url: str = "http://localhost"
     storage_path: str = "storage"
 
-    jwt_secret: str = "change-me"
+    jwt_secret: str = ""
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
 
     telegram_bot_token: str = ""
-    waha_base_url: str = "http://localhost:3000"
+    waha_base_url: str = "http://localhost:3002"
     waha_api_key: str = ""
+    waha_session_name: str = "default"
+    waha_timeout_seconds: float = 10.0
+    waha_webhook_hmac_key: str = ""
     google_application_credentials: str = ""
 
     model_config = SettingsConfigDict(

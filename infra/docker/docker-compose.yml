@@ -6,11 +6,15 @@ services:
     env_file:
       - ../../.env
     environment:
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-sakoo}:${POSTGRES_PASSWORD:-change_me}@postgres:5432/${POSTGRES_DB:-sakoo_finance}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
       WAHA_BASE_URL: http://waha:3000
+      WAHA_API_KEY: ${WAHA_API_KEY:?WAHA_API_KEY is required}
+      WAHA_SESSION_NAME: ${WAHA_SESSION_NAME:-default}
+      WAHA_TIMEOUT_SECONDS: ${WAHA_TIMEOUT_SECONDS:-10}
+      WAHA_WEBHOOK_HMAC_KEY: ${WAHA_WEBHOOK_HMAC_KEY:-}
       STORAGE_PATH: /app/storage
     volumes:
       - ../../storage:/app/storage
@@ -35,9 +39,9 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-sakoo}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me}
-      POSTGRES_DB: ${POSTGRES_DB:-sakoo_finance}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -60,10 +64,14 @@ services:
     env_file:
       - ../../.env
     environment:
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-sakoo}:${POSTGRES_PASSWORD:-change_me}@postgres:5432/${POSTGRES_DB:-sakoo_finance}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
+      WAHA_BASE_URL: http://waha:3000
+      WAHA_API_KEY: ${WAHA_API_KEY:?WAHA_API_KEY is required}
+      WAHA_SESSION_NAME: ${WAHA_SESSION_NAME:-default}
+      WAHA_TIMEOUT_SECONDS: ${WAHA_TIMEOUT_SECONDS:-10}
       STORAGE_PATH: /app/storage
     volumes:
       - ../../storage:/app/storage
@@ -74,8 +82,18 @@ services:
   waha:
     image: devlikeapro/waha:latest
     restart: unless-stopped
+    env_file:
+      - ../../.env
     environment:
-      WAHA_API_KEY: ${WAHA_API_KEY:-}
+      WAHA_API_KEY: ${WAHA_API_KEY:?WAHA_API_KEY is required}
+      WAHA_DASHBOARD_USERNAME: ${WAHA_DASHBOARD_USERNAME:?WAHA_DASHBOARD_USERNAME is required}
+      WAHA_DASHBOARD_PASSWORD: ${WAHA_DASHBOARD_PASSWORD:?WAHA_DASHBOARD_PASSWORD is required}
+      WAHA_SESSION_NAME: ${WAHA_SESSION_NAME:-default}
+      WHATSAPP_HOOK_URL: ${WAHA_WEBHOOK_URL:-http://backend:8000/webhook/waha}
+      WHATSAPP_HOOK_EVENTS: ${WAHA_WEBHOOK_EVENTS:-message}
+      WHATSAPP_HOOK_HMAC_KEY: ${WAHA_WEBHOOK_HMAC_KEY:-}
+    volumes:
+      - waha_sessions:/app/.sessions
     ports:
       - "3002:3000"
 
@@ -93,3 +111,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  waha_sessions:
