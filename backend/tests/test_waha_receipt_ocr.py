@@ -16,9 +16,20 @@ os.environ["JWT_SECRET"] = "test-jwt-secret-minimum-32-characters"
 from app.config import get_settings
 from app.database import Base, get_db
 from app.main import app
-from app.models import Category, Job, MediaFile, Receipt, Transaction, User, UserPlatformAccount
-from app.modules.ocr.client import OcrResult, get_ocr_client
+from app.models import (
+    BotLog,
+    Category,
+    Job,
+    MediaFile,
+    Receipt,
+    Transaction,
+    User,
+    UserPlatformAccount,
+)
+from app.modules.jobs.service import get_receipt_ocr_enqueue
+from app.modules.ocr.client import OcrResult
 from app.modules.waha.client import DownloadedMedia, get_waha_client
+from app.workers.tasks import run_receipt_ocr_job
 
 
 class FakeWahaClient:
@@ -62,9 +73,19 @@ class FakeOcrClient:
 def test_client(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
-) -> Iterator[tuple[TestClient, sessionmaker[Session], FakeWahaClient, FakeOcrClient]]:
+) -> Iterator[
+    tuple[
+        TestClient,
+        sessionmaker[Session],
+        FakeWahaClient,
+        FakeOcrClient,
+        list[dict[str, Any]],
+    ]
+]:
     monkeypatch.setenv("STORAGE_PATH", str(tmp_path / "storage"))
     monkeypatch.setenv("MEDIA_RECEIPT_MAX_BYTES", "5242880")
+    monkeypatch.setenv("OCR_DAILY_LIMIT_PER_USER", "20")
+    monkeypatch.setenv("OCR_RATE_LIMIT_TIMEZONE", "Asia/Jakarta")
     get_settings.cache_clear()
 
     engine = create_engine(
@@ -86,6 +107,7 @@ def test_client(
 
     fake_waha_client = FakeWahaClient()
     fake_ocr_client = FakeOcrClient()
+    queued_jobs: list[dict[str, Any]] = []
 
     def override_get_db() -> Iterator[Session]:
         db = TestingSessionLocal()
@@ -94,12 +116,15 @@ def test_client(
         finally:
             db.close()
 
+    def fake_enqueue(**kwargs: Any) -> None:
+        queued_jobs.append(kwargs)
+
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_waha_client] = lambda: fake_waha_client
-    app.dependency_overrides[get_ocr_client] = lambda: fake_ocr_client
+    app.dependency_overrides[get_receipt_ocr_enqueue] = lambda: fake_enqueue
 
     with TestClient(app) as client:
-        yield client, TestingSessionLocal, fake_waha_client, fake_ocr_client
+        yield client, TestingSessionLocal, fake_waha_client, fake_ocr_client, queued_jobs
 
     app.dependency_overrides.clear()
     Base.metadata.drop_all(bind=engine)
@@ -107,10 +132,16 @@ def test_client(
     get_settings.cache_clear()
 
 
-def test_waha_receipt_image_is_ocr_processed_and_confirmed(
-    test_client: tuple[TestClient, sessionmaker[Session], FakeWahaClient, FakeOcrClient],
+def test_waha_receipt_image_is_queued_then_processed_and_confirmed(
+    test_client: tuple[
+        TestClient,
+        sessionmaker[Session],
+        FakeWahaClient,
+        FakeOcrClient,
+        list[dict[str, Any]],
+    ],
 ) -> None:
-    client, session_factory, fake_waha, fake_ocr = test_client
+    client, session_factory, fake_waha, fake_ocr, queued_jobs = test_client
     _create_linked_whatsapp_user(session_factory)
 
     image_response = client.post("/webhook/waha", json=_waha_image_update())
@@ -118,22 +149,34 @@ def test_waha_receipt_image_is_ocr_processed_and_confirmed(
     assert image_response.status_code == 200, image_response.text
     image_payload = image_response.json()
     assert image_payload["message_type"] == "receipt_ocr"
-    assert image_payload["transaction_status"] == "processed"
+    assert image_payload["transaction_status"] == "queued"
     assert image_payload["transaction_id"] is None
-    assert image_payload["receipt_id"] is not None
+    assert image_payload["receipt_id"] is None
     assert image_payload["job_id"] is not None
     assert image_payload["reply_status"] == "sent"
     assert fake_waha.downloaded_urls == ["https://waha.local/media/receipt-1"]
-    assert fake_ocr.calls == 1
-    assert "Ketik YA" in fake_waha.sent_messages[-1]["text"]
+    assert fake_ocr.calls == 0
+    assert "masuk antrean OCR" in fake_waha.sent_messages[-1]["text"]
 
     with session_factory() as db:
         media_file = db.scalar(select(MediaFile))
-        receipt = db.scalar(select(Receipt))
         job = db.scalar(select(Job))
         assert media_file is not None
         assert media_file.file_type == "receipt"
         assert media_file.source == "whatsapp_receipt"
+        assert job is not None
+        assert job.status == "queued"
+        assert job.result_id is None
+        assert db.scalar(select(Receipt)) is None
+
+    _run_queued_ocr_job(session_factory, fake_ocr, fake_waha, queued_jobs[0])
+
+    assert fake_ocr.calls == 1
+    assert "Ketik YA" in fake_waha.sent_messages[-1]["text"]
+
+    with session_factory() as db:
+        receipt = db.scalar(select(Receipt))
+        job = db.scalar(select(Job))
         assert receipt is not None
         assert receipt.merchant_name == "TOKO SAKOO"
         assert receipt.total_amount == Decimal("20000.00")
@@ -165,16 +208,25 @@ def test_waha_receipt_image_is_ocr_processed_and_confirmed(
         assert receipt.transaction_id == transaction.id
 
 
-def test_waha_receipt_total_can_be_edited_before_confirmation(
-    test_client: tuple[TestClient, sessionmaker[Session], FakeWahaClient, FakeOcrClient],
+def test_waha_receipt_total_can_be_edited_after_worker_confirmation(
+    test_client: tuple[
+        TestClient,
+        sessionmaker[Session],
+        FakeWahaClient,
+        FakeOcrClient,
+        list[dict[str, Any]],
+    ],
 ) -> None:
-    client, session_factory, fake_waha, fake_ocr = test_client
+    client, session_factory, fake_waha, fake_ocr, queued_jobs = test_client
     _create_linked_whatsapp_user(session_factory)
     fake_ocr.text = "TOKO SAKOO\nKopi Rp 12.000\nRoti Rp 8.000"
 
     image_response = client.post("/webhook/waha", json=_waha_image_update())
     assert image_response.status_code == 200, image_response.text
-    assert image_response.json()["transaction_status"] == "manual_input_required"
+    assert image_response.json()["transaction_status"] == "queued"
+
+    _run_queued_ocr_job(session_factory, fake_ocr, fake_waha, queued_jobs[0])
+
     assert "edit total" in fake_waha.sent_messages[-1]["text"].lower()
 
     edit_response = client.post("/webhook/waha", json=_waha_text_update("edit total 21000"))
@@ -194,6 +246,68 @@ def test_waha_receipt_total_can_be_edited_before_confirmation(
         assert receipt is not None
         assert receipt.status == "confirmed"
         assert receipt.transaction_id == transaction.id
+
+
+def test_waha_receipt_image_returns_limit_message_before_second_queue(
+    test_client: tuple[
+        TestClient,
+        sessionmaker[Session],
+        FakeWahaClient,
+        FakeOcrClient,
+        list[dict[str, Any]],
+    ],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, session_factory, fake_waha, fake_ocr, queued_jobs = test_client
+    monkeypatch.setenv("OCR_DAILY_LIMIT_PER_USER", "1")
+    get_settings.cache_clear()
+    _create_linked_whatsapp_user(session_factory)
+
+    first_response = client.post("/webhook/waha", json=_waha_image_update())
+    second_response = client.post("/webhook/waha", json=_waha_image_update())
+
+    assert first_response.status_code == 200, first_response.text
+    assert second_response.status_code == 200, second_response.text
+    assert first_response.json()["transaction_status"] == "queued"
+    assert second_response.json()["transaction_status"] == "limit_reached"
+    assert fake_ocr.calls == 0
+    assert len(queued_jobs) == 1
+    assert "Batas OCR harian" in fake_waha.sent_messages[-1]["text"]
+
+    with session_factory() as db:
+        rate_limit_logs = db.scalars(
+            select(BotLog)
+            .where(
+                BotLog.message_type == "receipt_ocr",
+                BotLog.status.in_(("ocr_usage", "ocr_limit_reached")),
+            )
+            .order_by(BotLog.id)
+        ).all()
+        assert [log.status for log in rate_limit_logs] == [
+            "ocr_usage",
+            "ocr_limit_reached",
+        ]
+        assert db.scalar(select(Job).where(Job.status == "failed")) is None
+
+
+def _run_queued_ocr_job(
+    session_factory: sessionmaker[Session],
+    fake_ocr: FakeOcrClient,
+    fake_waha: FakeWahaClient,
+    queued_job: dict[str, Any],
+) -> None:
+    with session_factory() as db:
+        run_receipt_ocr_job(
+            db,
+            job_id=queued_job["job_id"],
+            user_id=queued_job["user_id"],
+            media_id=queued_job["media_id"],
+            source=queued_job["source"],
+            ocr_client=fake_ocr,
+            waha_client=fake_waha,
+            notify_chat_id=queued_job["notify_chat_id"],
+            notify_session=queued_job["notify_session"],
+        )
 
 
 def _create_linked_whatsapp_user(session_factory: sessionmaker[Session]) -> None:
