@@ -2,6 +2,7 @@ from fastapi import status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.models import MediaFile, Receipt
 from app.modules.media.service import (
     MediaStorageError,
@@ -9,6 +10,11 @@ from app.modules.media.service import (
     resolve_media_file_path,
 )
 from app.modules.ocr.client import OcrClient, OcrClientError
+from app.modules.ocr.rate_limit import (
+    OcrRateLimitExceeded,
+    enforce_ocr_daily_limit,
+    log_ocr_usage,
+)
 from app.modules.ocr.receipt_parser import parse_receipt_text
 
 
@@ -32,19 +38,60 @@ def process_receipt_ocr(
     user_id: int,
     media_id: int,
     ocr_client: OcrClient,
+    source: str = "dashboard",
+    enforce_rate_limit: bool = True,
+    log_usage: bool = True,
 ) -> Receipt:
-    media_file = _get_receipt_media_file(db, user_id=user_id, media_id=media_id)
+    media_file = get_receipt_media_file(db, user_id=user_id, media_id=media_id)
+    settings = get_settings()
+    rate_limit_state = None
+    if enforce_rate_limit:
+        try:
+            rate_limit_state = enforce_ocr_daily_limit(
+                db,
+                user_id=user_id,
+                limit=settings.ocr_daily_limit_per_user,
+                timezone_name=settings.ocr_rate_limit_timezone,
+                source=source,
+                media_id=media_file.id,
+            )
+        except OcrRateLimitExceeded as exc:
+            raise ReceiptOcrError(exc.detail, exc.status_code) from exc
+
     receipt = _get_or_create_receipt(db, user_id=user_id, media_file_id=media_file.id)
 
     try:
         file_path = resolve_media_file_path(media_file)
-        result = ocr_client.extract_text(file_path.read_bytes())
     except MediaStorageError as exc:
         _mark_receipt_error(db, receipt)
         raise ReceiptOcrError(exc.detail, exc.status_code) from exc
-    except OcrClientError:
+    image_content = file_path.read_bytes()
+
+    try:
+        result = ocr_client.extract_text(image_content)
+    except OcrClientError as exc:
+        if log_usage and rate_limit_state is not None:
+            log_ocr_usage(
+                db,
+                user_id=user_id,
+                source=source,
+                media_id=media_file.id,
+                receipt_id=receipt.id,
+                state=rate_limit_state,
+                error_message=exc.detail,
+            )
         _mark_receipt_error(db, receipt)
         raise
+
+    if log_usage and rate_limit_state is not None:
+        log_ocr_usage(
+            db,
+            user_id=user_id,
+            source=source,
+            media_id=media_file.id,
+            receipt_id=receipt.id,
+            state=rate_limit_state,
+        )
 
     parse_result = parse_receipt_text(result.text)
     receipt.ocr_text = result.text
@@ -58,7 +105,7 @@ def process_receipt_ocr(
     return receipt
 
 
-def _get_receipt_media_file(db: Session, *, user_id: int, media_id: int) -> MediaFile:
+def get_receipt_media_file(db: Session, *, user_id: int, media_id: int) -> MediaFile:
     media_file = get_user_media_file(db, user_id=user_id, media_id=media_id)
     if media_file is None:
         raise ReceiptOcrError("Receipt media file not found", status.HTTP_404_NOT_FOUND)

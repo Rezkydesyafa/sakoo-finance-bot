@@ -3,6 +3,8 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict
 
+from app.modules.jobs.schemas import JobResponse
+
 
 class ReceiptOcrResponse(BaseModel):
     id: int
@@ -17,3 +19,8 @@ class ReceiptOcrResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ReceiptOcrJobResponse(BaseModel):
+    job: JobResponse
+    message: str = "Receipt OCR job queued"

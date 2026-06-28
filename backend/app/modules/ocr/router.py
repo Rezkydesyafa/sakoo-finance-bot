@@ -1,34 +1,43 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Receipt, User
+from app.models import User
 from app.modules.auth.dependencies import get_current_user
-from app.modules.ocr.client import OcrClient, OcrClientError, get_ocr_client
-from app.modules.ocr.schemas import ReceiptOcrResponse
-from app.modules.ocr.service import ReceiptOcrError, process_receipt_ocr
+from app.modules.jobs.service import (
+    JobQueueError,
+    ReceiptOcrEnqueue,
+    get_receipt_ocr_enqueue,
+    queue_receipt_ocr_job,
+)
+from app.modules.ocr.schemas import ReceiptOcrJobResponse
 
 
 router = APIRouter(prefix="/ocr", tags=["ocr"])
 
 
-@router.post("/receipts/{media_id}", response_model=ReceiptOcrResponse)
+@router.post(
+    "/receipts/{media_id}",
+    response_model=ReceiptOcrJobResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
 def run_receipt_ocr(
     media_id: int,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
-    ocr_client: Annotated[OcrClient, Depends(get_ocr_client)],
-) -> Receipt:
+    enqueue: Annotated[ReceiptOcrEnqueue, Depends(get_receipt_ocr_enqueue)],
+) -> ReceiptOcrJobResponse:
     try:
-        return process_receipt_ocr(
+        job = queue_receipt_ocr_job(
             db,
             user_id=current_user.id,
             media_id=media_id,
-            ocr_client=ocr_client,
+            source="dashboard",
+            enqueue=enqueue,
         )
-    except ReceiptOcrError as exc:
+    except JobQueueError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
-    except OcrClientError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+    return ReceiptOcrJobResponse(job=job)
