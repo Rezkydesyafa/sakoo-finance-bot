@@ -6,6 +6,7 @@ from app.config import get_settings
 from app.database import check_database_connection
 from app.modules.auth.router import router as auth_router
 from app.modules.telegram.router import router as telegram_router
+from app.modules.waha.health import router as waha_health_router
 from app.modules.transactions.router import router as transactions_router
 from app.modules.waha.router import router as waha_router
 
@@ -26,6 +27,7 @@ def create_app() -> FastAPI:
 
     app.include_router(api_router, prefix=settings.api_prefix)
     app.include_router(auth_router, prefix=settings.api_prefix)
+    app.include_router(waha_health_router)
     app.include_router(transactions_router, prefix=settings.api_prefix)
     app.include_router(waha_router)
     app.include_router(telegram_router)
