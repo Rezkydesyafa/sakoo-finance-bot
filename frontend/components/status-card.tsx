@@ -1,29 +1,28 @@
-type StatusTone = "green" | "blue" | "amber";
+type StatusTone = "green" | "blue" | "amber" | "slate";
 
 type StatusCardProps = {
   label: string;
   value: string;
   tone: StatusTone;
+  detail?: string;
 };
 
 const toneClassName: Record<StatusTone, string> = {
-  green: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  blue: "border-sky-200 bg-sky-50 text-sky-700",
-  amber: "border-amber-200 bg-amber-50 text-amber-700",
+  green: "bg-emerald-500",
+  blue: "bg-sky-500",
+  amber: "bg-amber-500",
+  slate: "bg-slate-400",
 };
 
-export function StatusCard({ label, value, tone }: StatusCardProps) {
+export function StatusCard({ label, value, tone, detail }: StatusCardProps) {
   return (
     <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
       <p className="text-sm font-medium text-slate-500">{label}</p>
-      <div className="mt-4 flex items-center justify-between gap-3">
-        <p className="text-lg font-semibold text-slate-950">{value}</p>
-        <span
-          className={`rounded-md border px-2 py-1 text-xs font-semibold ${toneClassName[tone]}`}
-        >
-          Ready
-        </span>
+      <div className="mt-4 flex items-center gap-3">
+        <span className={`h-2.5 w-2.5 rounded-full ${toneClassName[tone]}`} />
+        <p className="text-base font-semibold text-slate-950">{value}</p>
       </div>
+      {detail ? <p className="mt-3 text-sm text-slate-500">{detail}</p> : null}
     </article>
   );
 }
