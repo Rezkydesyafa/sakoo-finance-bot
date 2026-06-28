@@ -30,11 +30,7 @@ Untuk menjalankan bot WhatsApp end-to-end, jalankan backend, database, Redis, da
 docker compose -f infra/docker/docker-compose.yml up -d --build backend celery_worker postgres redis waha
 ```
 
-Jalankan migration:
-
-```bash
-docker compose -f infra/docker/docker-compose.yml exec backend alembic upgrade head
-```
+Backend container menjalankan migration otomatis sebelum API start.
 
 Jika hanya ingin menjalankan service WAHA:
 
@@ -182,11 +178,19 @@ curl -X POST \
 
 ## Account Linking via WhatsApp
 
-User menghubungkan akun dashboard ke WhatsApp dengan kode linking dari dashboard.
+User menghubungkan akun dashboard/API ke WhatsApp dengan kode linking.
 
 Flow:
 
-1. User login dashboard dan membuat kode linking.
+1. User register/login via API lalu membuat kode linking:
+
+```bash
+curl -X POST http://localhost:8000/api/auth/linking-codes \
+  -H "Authorization: Bearer <JWT_TOKEN>"
+```
+
+Response berisi `command`, misalnya `hubungkan ABC123`.
+
 2. User mengirim pesan WhatsApp ke bot:
 
 ```text
@@ -204,7 +208,7 @@ hubungkan KODE
 5. Backend menandai `account_linking_codes.used_at`.
 6. Backend membalas sukses atau gagal melalui WAHA.
 
-Jika nomor belum terhubung dan pesan bukan command `hubungkan KODE`, bot akan membalas instruksi agar user membuat kode linking di dashboard.
+Jika nomor belum terhubung dan pesan bukan command `hubungkan KODE`, bot akan membalas instruksi agar user membuat kode linking.
 
 Kode invalid, sudah digunakan, atau expired akan ditolak dan dicatat di `bot_logs`.
 
@@ -278,6 +282,59 @@ Setelah user membalas `YA`, backend menyimpan transaksi dengan `source=receipt_o
 
 OCR dibatasi per user per hari memakai `OCR_DAILY_LIMIT_PER_USER` dan window harian `OCR_RATE_LIMIT_TIMEZONE`. Jika limit tercapai, backend tidak memanggil Google Vision dan bot membalas bahwa batas OCR harian sudah tercapai. Setiap pemakaian OCR dan kejadian limit tercapai dicatat ke `bot_logs` dengan `message_type=receipt_ocr`.
 
+## STT Voice Note via WhatsApp
+
+Nomor WhatsApp yang sudah linked dapat mengirim voice note/audio langsung ke bot. Backend akan:
+
+1. Menerima event audio dari WAHA.
+2. Menolak durasi di atas `STT_MAX_DURATION_SECONDS` jika metadata durasi tersedia.
+3. Mengunduh media dari URL WAHA.
+4. Menyimpan file sebagai `media_files` dengan `file_type=audio` dan `source=whatsapp_voice`.
+5. Mengecek ulang durasi dari file audio sebelum membuat job.
+6. Membuat row `jobs` dengan `job_type=voice_stt` dan status `queued`.
+7. Worker memanggil Google Speech-to-Text, menyimpan transcript ke `voice_notes.transcript_text`, lalu menjalankan parser dengan `source=voice_note`.
+8. Worker membalas hasil transkripsi atau pesan error ke WhatsApp.
+
+Balasan awal saat voice note diterima:
+
+```text
+Voice note diterima dan masuk antrean transkripsi. Saya akan kirim hasilnya setelah selesai diproses.
+```
+
+Jika audio lebih dari 30 detik:
+
+```text
+Voice note terlalu panjang. Kirim voice note maksimal 30 detik.
+```
+
+## Export PDF Laporan via WhatsApp
+
+Nomor WhatsApp yang sudah linked dapat meminta laporan PDF dengan pesan:
+
+```text
+export laporan bulan ini
+```
+
+Backend akan:
+
+1. Menerima pesan teks di `POST /webhook/waha`.
+2. Mendeteksi intent `export_pdf` dan periode laporan.
+3. Membuat job `report_pdf` status `queued`.
+4. Worker membuat PDF laporan dengan WeasyPrint, menyimpan file ke `media_files`, dan mencatat metadata laporan di `reports`.
+5. Worker mengirim file ke WhatsApp lewat WAHA `sendFile`.
+
+Balasan awal:
+
+```text
+Permintaan export PDF laporan bulan ini sudah masuk antrean. Bot akan mengirim file PDF setelah selesai dibuat.
+```
+
+Jika PDF gagal dibuat, bot membalas:
+
+```text
+Maaf, PDF laporan gagal dibuat. Coba lagi beberapa saat lagi atau gunakan periode yang berbeda.
+```
+
 ## Checklist End-to-End WhatsApp Bot
 
 1. Isi `.env`:
@@ -295,6 +352,9 @@ WAHA_WEBHOOK_URL=http://backend:8000/webhook/waha
 WAHA_WEBHOOK_EVENTS=message
 OCR_DAILY_LIMIT_PER_USER=20
 OCR_RATE_LIMIT_TIMEZONE=Asia/Jakarta
+GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/google-service-account.json
+STT_LANGUAGE_CODE=id-ID
+STT_MAX_DURATION_SECONDS=30
 ```
 
 2. Jalankan service:
@@ -303,34 +363,28 @@ OCR_RATE_LIMIT_TIMEZONE=Asia/Jakarta
 docker compose -f infra/docker/docker-compose.yml up -d --build backend celery_worker postgres redis waha
 ```
 
-3. Jalankan migration:
-
-```bash
-docker compose -f infra/docker/docker-compose.yml exec backend alembic upgrade head
-```
-
-4. Buka dashboard WAHA:
+3. Buka dashboard WAHA:
 
 ```text
 http://localhost:3002/dashboard
 ```
 
-5. Start session `default`.
-6. Scan QR dari WhatsApp mobile.
-7. Pastikan status session `WORKING`.
-8. Hubungkan nomor WhatsApp ke akun dashboard:
+4. Start session `default`.
+5. Scan QR dari WhatsApp mobile.
+6. Pastikan status session `WORKING`.
+7. Hubungkan nomor WhatsApp ke akun dashboard:
 
 ```text
 hubungkan KODE
 ```
 
-9. Kirim transaksi:
+8. Kirim transaksi:
 
 ```text
 beli makan 20 ribu
 ```
 
-10. Cek transaksi tersimpan di database dengan `source=whatsapp_text`.
+9. Cek transaksi tersimpan di database dengan `source=whatsapp_text`.
 
 ## Restart dan Recovery Session
 

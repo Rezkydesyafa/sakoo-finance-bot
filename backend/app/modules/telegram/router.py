@@ -9,6 +9,14 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.database import get_db
 from app.models import BotLog, UserPlatformAccount
+from app.modules.jobs.service import (
+    ReportPdfEnqueue,
+    VoiceSttEnqueue,
+    get_report_pdf_enqueue,
+    get_voice_stt_enqueue,
+)
+from app.modules.reports.bot_pdf import ReportPdfFlowResult, handle_report_pdf_command
+from app.modules.stt.flow import VoiceSttFlowResult
 from app.modules.telegram.client import (
     TelegramClient,
     TelegramClientError,
@@ -19,6 +27,7 @@ from app.modules.telegram.parser import (
     parse_telegram_update,
     telegram_identifier_candidates,
 )
+from app.modules.telegram.voice_stt import handle_telegram_voice_note
 from app.modules.transactions.service import (
     TextTransactionResult,
     handle_telegram_text_transaction,
@@ -36,6 +45,8 @@ class TelegramWebhookResponse(BaseModel):
     linking_status: str | None = None
     transaction_status: str | None = None
     transaction_id: int | None = None
+    voice_note_id: int | None = None
+    job_id: int | None = None
     reply_status: str | None = None
 
 
@@ -48,6 +59,8 @@ async def receive_telegram_webhook(
     ),
     db: Session = Depends(get_db),
     telegram_client: TelegramClient = Depends(get_telegram_client),
+    stt_enqueue: VoiceSttEnqueue = Depends(get_voice_stt_enqueue),
+    pdf_enqueue: ReportPdfEnqueue = Depends(get_report_pdf_enqueue),
 ) -> TelegramWebhookResponse:
     _verify_webhook_secret(x_telegram_bot_api_secret_token)
 
@@ -80,31 +93,73 @@ async def receive_telegram_webhook(
         parsed=parsed,
         current_user_id=user_id,
     )
-    transaction_result = _handle_text_transaction_if_needed(
+    linked_user_id = linking_result.user_id or user_id
+    voice_result = _handle_voice_stt_if_needed(
         db=db,
-        parsed_message_type=parsed.message_type,
-        parsed_text=parsed.text,
+        parsed=parsed,
         linking_action=linking_result.action,
-        linked_user_id=linking_result.user_id or user_id,
+        linked_user_id=linked_user_id,
+        telegram_client=telegram_client,
+        enqueue=stt_enqueue,
     )
-    reply_text = transaction_result.reply_text if transaction_result else linking_result.reply_text
+    report_pdf_result = None
+    if voice_result is None:
+        report_pdf_result = _handle_report_pdf_if_needed(
+            db=db,
+            parsed=parsed,
+            linking_action=linking_result.action,
+            linked_user_id=linked_user_id,
+            enqueue=pdf_enqueue,
+        )
+    transaction_result = None
+    if voice_result is None and report_pdf_result is None:
+        transaction_result = _handle_text_transaction_if_needed(
+            db=db,
+            parsed_message_type=parsed.message_type,
+            parsed_text=parsed.text,
+            linking_action=linking_result.action,
+            linked_user_id=linked_user_id,
+        )
+    reply_text = _resolve_reply_text(
+        voice_result=voice_result,
+        report_pdf_result=report_pdf_result,
+        transaction_result=transaction_result,
+        linking_reply_text=linking_result.reply_text,
+    )
 
     bot_log = BotLog(
-        user_id=linking_result.user_id or user_id,
+        user_id=linked_user_id,
         platform="telegram",
-        message_type="command" if linking_result.action == "link" else parsed.message_type,
+        message_type=_resolve_bot_log_message_type(
+            parsed_message_type=parsed.message_type,
+            linking_action=linking_result.action,
+            voice_result=voice_result,
+            report_pdf_result=report_pdf_result,
+        ),
         raw_message=parsed.text,
         parsed_result={
             **parsed.to_log_payload(),
             "linking": linking_result.to_log_payload(),
+            "voice_stt": voice_result.to_log_payload() if voice_result else None,
+            "report_pdf": report_pdf_result.to_log_payload()
+            if report_pdf_result
+            else None,
             "transaction": transaction_result.to_log_payload()
             if transaction_result
             else None,
         },
-        status=_resolve_bot_log_status(linking_result.status, transaction_result),
-        error_message=transaction_result.error_message
-        if transaction_result
-        else linking_result.error_message,
+        status=_resolve_bot_log_status(
+            linking_result.status,
+            voice_result,
+            report_pdf_result,
+            transaction_result,
+        ),
+        error_message=_resolve_error_message(
+            linking_result.error_message,
+            voice_result,
+            report_pdf_result,
+            transaction_result,
+        ),
     )
     db.add(bot_log)
     db.commit()
@@ -124,8 +179,17 @@ async def receive_telegram_webhook(
         bot_log_id=bot_log.id,
         user_id=bot_log.user_id,
         linking_status=linking_result.status,
-        transaction_status=transaction_result.status if transaction_result else None,
-        transaction_id=transaction_result.transaction_id if transaction_result else None,
+        transaction_status=_resolve_response_transaction_status(
+            voice_result,
+            report_pdf_result,
+            transaction_result,
+        ),
+        transaction_id=_resolve_response_transaction_id(
+            voice_result,
+            transaction_result,
+        ),
+        voice_note_id=voice_result.voice_note_id if voice_result else None,
+        job_id=_resolve_response_job_id(voice_result, report_pdf_result),
         reply_status=reply_status,
     )
 
@@ -167,15 +231,147 @@ def _handle_text_transaction_if_needed(
     )
 
 
+def _handle_voice_stt_if_needed(
+    *,
+    db: Session,
+    parsed: Any,
+    linking_action: str,
+    linked_user_id: int | None,
+    telegram_client: TelegramClient,
+    enqueue: VoiceSttEnqueue,
+) -> VoiceSttFlowResult | None:
+    if linking_action != "ignored" or not linked_user_id:
+        return None
+
+    if parsed.message_type == "audio":
+        return handle_telegram_voice_note(
+            db=db,
+            user_id=linked_user_id,
+            parsed=parsed,
+            telegram_client=telegram_client,
+            enqueue=enqueue,
+        )
+
+    return None
+
+
+def _handle_report_pdf_if_needed(
+    *,
+    db: Session,
+    parsed: Any,
+    linking_action: str,
+    linked_user_id: int | None,
+    enqueue: ReportPdfEnqueue,
+) -> ReportPdfFlowResult | None:
+    if linking_action != "ignored" or not linked_user_id:
+        return None
+    if parsed.message_type != "text" or not parsed.text:
+        return None
+
+    return handle_report_pdf_command(
+        db=db,
+        user_id=linked_user_id,
+        text=parsed.text,
+        platform="telegram",
+        enqueue=enqueue,
+        notify_chat_id=parsed.chat_id,
+    )
+
+
+def _resolve_reply_text(
+    *,
+    voice_result: VoiceSttFlowResult | None,
+    report_pdf_result: ReportPdfFlowResult | None,
+    transaction_result: TextTransactionResult | None,
+    linking_reply_text: str | None,
+) -> str | None:
+    if voice_result:
+        return voice_result.reply_text
+    if report_pdf_result:
+        return report_pdf_result.reply_text
+    if transaction_result:
+        return transaction_result.reply_text
+    return linking_reply_text
+
+
+def _resolve_bot_log_message_type(
+    *,
+    parsed_message_type: str,
+    linking_action: str,
+    voice_result: VoiceSttFlowResult | None,
+    report_pdf_result: ReportPdfFlowResult | None,
+) -> str:
+    if voice_result:
+        return "voice_stt"
+    if report_pdf_result:
+        return "report_pdf"
+    if linking_action == "link":
+        return "command"
+    return parsed_message_type
+
+
 def _resolve_bot_log_status(
     linking_status: str,
+    voice_result: VoiceSttFlowResult | None,
+    report_pdf_result: ReportPdfFlowResult | None,
     transaction_result: TextTransactionResult | None,
 ) -> str:
+    if voice_result:
+        return f"voice_stt_{voice_result.status}"
+    if report_pdf_result:
+        return f"report_pdf_{report_pdf_result.status}"
     if transaction_result:
         return f"transaction_{transaction_result.status}"
     if linking_status == "success":
         return "linked"
     return "received"
+
+
+def _resolve_error_message(
+    linking_error: str | None,
+    voice_result: VoiceSttFlowResult | None,
+    report_pdf_result: ReportPdfFlowResult | None,
+    transaction_result: TextTransactionResult | None,
+) -> str | None:
+    if voice_result and voice_result.error_message:
+        return voice_result.error_message
+    if report_pdf_result and report_pdf_result.error_message:
+        return report_pdf_result.error_message
+    if transaction_result and transaction_result.error_message:
+        return transaction_result.error_message
+    return linking_error
+
+
+def _resolve_response_transaction_status(
+    voice_result: VoiceSttFlowResult | None,
+    report_pdf_result: ReportPdfFlowResult | None,
+    transaction_result: TextTransactionResult | None,
+) -> str | None:
+    if voice_result:
+        return voice_result.status
+    if report_pdf_result:
+        return report_pdf_result.status
+    return transaction_result.status if transaction_result else None
+
+
+def _resolve_response_transaction_id(
+    voice_result: VoiceSttFlowResult | None,
+    transaction_result: TextTransactionResult | None,
+) -> int | None:
+    if voice_result and voice_result.transaction_id:
+        return voice_result.transaction_id
+    return transaction_result.transaction_id if transaction_result else None
+
+
+def _resolve_response_job_id(
+    voice_result: VoiceSttFlowResult | None,
+    report_pdf_result: ReportPdfFlowResult | None,
+) -> int | None:
+    if voice_result and voice_result.job_id:
+        return voice_result.job_id
+    if report_pdf_result and report_pdf_result.job_id:
+        return report_pdf_result.job_id
+    return None
 
 
 def _send_reply_if_needed(

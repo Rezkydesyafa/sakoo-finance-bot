@@ -8,6 +8,8 @@ from app.modules.auth.router import router as auth_router
 from app.modules.jobs.router import router as jobs_router
 from app.modules.media.router import router as media_router
 from app.modules.ocr.router import router as ocr_router
+from app.modules.reports.router import router as reports_router
+from app.modules.stt.router import router as stt_router
 from app.modules.telegram.router import router as telegram_router
 from app.modules.transactions.router import router as transactions_router
 from app.modules.waha.health import router as waha_health_router
@@ -33,6 +35,8 @@ def create_app() -> FastAPI:
     app.include_router(jobs_router, prefix=settings.api_prefix)
     app.include_router(media_router, prefix=settings.api_prefix)
     app.include_router(ocr_router, prefix=settings.api_prefix)
+    app.include_router(reports_router, prefix=settings.api_prefix)
+    app.include_router(stt_router, prefix=settings.api_prefix)
     app.include_router(transactions_router, prefix=settings.api_prefix)
     app.include_router(waha_router)
     app.include_router(waha_health_router)

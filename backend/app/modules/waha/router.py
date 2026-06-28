@@ -11,7 +11,16 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.database import get_db
 from app.models import BotLog, UserPlatformAccount
-from app.modules.jobs.service import ReceiptOcrEnqueue, get_receipt_ocr_enqueue
+from app.modules.jobs.service import (
+    ReceiptOcrEnqueue,
+    ReportPdfEnqueue,
+    VoiceSttEnqueue,
+    get_report_pdf_enqueue,
+    get_receipt_ocr_enqueue,
+    get_voice_stt_enqueue,
+)
+from app.modules.reports.bot_pdf import ReportPdfFlowResult, handle_report_pdf_command
+from app.modules.stt.flow import VoiceSttFlowResult
 from app.modules.transactions.service import (
     TextTransactionResult,
     handle_whatsapp_text_transaction,
@@ -24,6 +33,7 @@ from app.modules.waha.receipt_ocr import (
     handle_whatsapp_receipt_confirmation,
     handle_whatsapp_receipt_image,
 )
+from app.modules.waha.voice_stt import handle_whatsapp_voice_note
 
 
 router = APIRouter(prefix="/webhook", tags=["webhook"])
@@ -38,6 +48,7 @@ class WahaWebhookResponse(BaseModel):
     transaction_status: str | None = None
     transaction_id: int | None = None
     receipt_id: int | None = None
+    voice_note_id: int | None = None
     job_id: int | None = None
     reply_status: str | None = None
 
@@ -50,6 +61,8 @@ async def receive_waha_webhook(
     db: Session = Depends(get_db),
     waha_client: WahaClient = Depends(get_waha_client),
     enqueue: ReceiptOcrEnqueue = Depends(get_receipt_ocr_enqueue),
+    stt_enqueue: VoiceSttEnqueue = Depends(get_voice_stt_enqueue),
+    pdf_enqueue: ReportPdfEnqueue = Depends(get_report_pdf_enqueue),
 ) -> WahaWebhookResponse:
     raw_body = await request.body()
     _verify_webhook_signature(raw_body, x_webhook_hmac, x_webhook_hmac_algorithm)
@@ -84,8 +97,27 @@ async def receive_waha_webhook(
         waha_client=waha_client,
         enqueue=enqueue,
     )
-    transaction_result = None
+    voice_result = None
     if receipt_result is None:
+        voice_result = _handle_voice_stt_if_needed(
+            db=db,
+            parsed=parsed,
+            linking_action=linking_result.action,
+            linked_user_id=linked_user_id,
+            waha_client=waha_client,
+            enqueue=stt_enqueue,
+        )
+    report_pdf_result = None
+    if receipt_result is None and voice_result is None:
+        report_pdf_result = _handle_report_pdf_if_needed(
+            db=db,
+            parsed=parsed,
+            linking_action=linking_result.action,
+            linked_user_id=linked_user_id,
+            enqueue=pdf_enqueue,
+        )
+    transaction_result = None
+    if receipt_result is None and voice_result is None and report_pdf_result is None:
         transaction_result = _handle_text_transaction_if_needed(
             db=db,
             parsed_message_type=parsed.message_type,
@@ -95,6 +127,8 @@ async def receive_waha_webhook(
         )
     reply_text = _resolve_reply_text(
         receipt_result=receipt_result,
+        voice_result=voice_result,
+        report_pdf_result=report_pdf_result,
         transaction_result=transaction_result,
         linking_reply_text=linking_result.reply_text,
     )
@@ -105,12 +139,18 @@ async def receive_waha_webhook(
             parsed_message_type=parsed.message_type,
             linking_action=linking_result.action,
             receipt_result=receipt_result,
+            voice_result=voice_result,
+            report_pdf_result=report_pdf_result,
         ),
         raw_message=parsed.text,
         parsed_result={
             **parsed.to_log_payload(),
             "linking": linking_result.to_log_payload(),
             "receipt_ocr": receipt_result.to_log_payload() if receipt_result else None,
+            "voice_stt": voice_result.to_log_payload() if voice_result else None,
+            "report_pdf": report_pdf_result.to_log_payload()
+            if report_pdf_result
+            else None,
             "transaction": transaction_result.to_log_payload()
             if transaction_result
             else None,
@@ -118,11 +158,15 @@ async def receive_waha_webhook(
         status=_resolve_bot_log_status(
             linking_status=linking_result.status,
             receipt_result=receipt_result,
+            voice_result=voice_result,
+            report_pdf_result=report_pdf_result,
             transaction_result=transaction_result,
         ),
         error_message=_resolve_error_message(
             linking_error=linking_result.error_message,
             receipt_result=receipt_result,
+            voice_result=voice_result,
+            report_pdf_result=report_pdf_result,
             transaction_result=transaction_result,
         ),
     )
@@ -146,11 +190,22 @@ async def receive_waha_webhook(
         linking_status=linking_result.status,
         transaction_status=_resolve_response_transaction_status(
             receipt_result,
+            voice_result,
+            report_pdf_result,
             transaction_result,
         ),
-        transaction_id=_resolve_response_transaction_id(receipt_result, transaction_result),
+        transaction_id=_resolve_response_transaction_id(
+            receipt_result,
+            voice_result,
+            transaction_result,
+        ),
         receipt_id=receipt_result.receipt_id if receipt_result else None,
-        job_id=receipt_result.job_id if receipt_result else None,
+        voice_note_id=voice_result.voice_note_id if voice_result else None,
+        job_id=_resolve_response_job_id(
+            receipt_result,
+            voice_result,
+            report_pdf_result,
+        ),
         reply_status=reply_status,
     )
 
@@ -224,14 +279,68 @@ def _handle_receipt_ocr_if_needed(
     return None
 
 
+def _handle_voice_stt_if_needed(
+    *,
+    db: Session,
+    parsed: Any,
+    linking_action: str,
+    linked_user_id: int | None,
+    waha_client: WahaClient,
+    enqueue: VoiceSttEnqueue,
+) -> VoiceSttFlowResult | None:
+    if linking_action != "ignored" or not linked_user_id:
+        return None
+
+    if parsed.message_type == "audio":
+        return handle_whatsapp_voice_note(
+            db=db,
+            user_id=linked_user_id,
+            parsed=parsed,
+            waha_client=waha_client,
+            enqueue=enqueue,
+        )
+
+    return None
+
+
+def _handle_report_pdf_if_needed(
+    *,
+    db: Session,
+    parsed: Any,
+    linking_action: str,
+    linked_user_id: int | None,
+    enqueue: ReportPdfEnqueue,
+) -> ReportPdfFlowResult | None:
+    if linking_action != "ignored" or not linked_user_id:
+        return None
+    if parsed.message_type != "text" or not parsed.text:
+        return None
+
+    return handle_report_pdf_command(
+        db=db,
+        user_id=linked_user_id,
+        text=parsed.text,
+        platform="whatsapp",
+        enqueue=enqueue,
+        notify_chat_id=parsed.chat_id,
+        notify_session=parsed.session,
+    )
+
+
 def _resolve_reply_text(
     *,
     receipt_result: ReceiptOcrFlowResult | None,
+    voice_result: VoiceSttFlowResult | None,
+    report_pdf_result: ReportPdfFlowResult | None,
     transaction_result: TextTransactionResult | None,
     linking_reply_text: str | None,
 ) -> str | None:
     if receipt_result:
         return receipt_result.reply_text
+    if voice_result:
+        return voice_result.reply_text
+    if report_pdf_result:
+        return report_pdf_result.reply_text
     if transaction_result:
         return transaction_result.reply_text
     return linking_reply_text
@@ -242,9 +351,15 @@ def _resolve_bot_log_message_type(
     parsed_message_type: str,
     linking_action: str,
     receipt_result: ReceiptOcrFlowResult | None,
+    voice_result: VoiceSttFlowResult | None,
+    report_pdf_result: ReportPdfFlowResult | None,
 ) -> str:
     if receipt_result:
         return "receipt_ocr"
+    if voice_result:
+        return "voice_stt"
+    if report_pdf_result:
+        return "report_pdf"
     if linking_action == "link":
         return "command"
     return parsed_message_type
@@ -253,10 +368,16 @@ def _resolve_bot_log_message_type(
 def _resolve_bot_log_status(
     linking_status: str,
     receipt_result: ReceiptOcrFlowResult | None,
+    voice_result: VoiceSttFlowResult | None,
+    report_pdf_result: ReportPdfFlowResult | None,
     transaction_result: TextTransactionResult | None,
 ) -> str:
     if receipt_result:
         return f"receipt_ocr_{receipt_result.status}"
+    if voice_result:
+        return f"voice_stt_{voice_result.status}"
+    if report_pdf_result:
+        return f"report_pdf_{report_pdf_result.status}"
     if transaction_result:
         return f"transaction_{transaction_result.status}"
     if linking_status == "success":
@@ -268,10 +389,16 @@ def _resolve_error_message(
     *,
     linking_error: str | None,
     receipt_result: ReceiptOcrFlowResult | None,
+    voice_result: VoiceSttFlowResult | None,
+    report_pdf_result: ReportPdfFlowResult | None,
     transaction_result: TextTransactionResult | None,
 ) -> str | None:
     if receipt_result and receipt_result.error_message:
         return receipt_result.error_message
+    if voice_result and voice_result.error_message:
+        return voice_result.error_message
+    if report_pdf_result and report_pdf_result.error_message:
+        return report_pdf_result.error_message
     if transaction_result and transaction_result.error_message:
         return transaction_result.error_message
     return linking_error
@@ -279,20 +406,43 @@ def _resolve_error_message(
 
 def _resolve_response_transaction_status(
     receipt_result: ReceiptOcrFlowResult | None,
+    voice_result: VoiceSttFlowResult | None,
+    report_pdf_result: ReportPdfFlowResult | None,
     transaction_result: TextTransactionResult | None,
 ) -> str | None:
     if receipt_result:
         return receipt_result.status
+    if voice_result:
+        return voice_result.status
+    if report_pdf_result:
+        return report_pdf_result.status
     return transaction_result.status if transaction_result else None
 
 
 def _resolve_response_transaction_id(
     receipt_result: ReceiptOcrFlowResult | None,
+    voice_result: VoiceSttFlowResult | None,
     transaction_result: TextTransactionResult | None,
 ) -> int | None:
     if receipt_result and receipt_result.transaction_id:
         return receipt_result.transaction_id
+    if voice_result and voice_result.transaction_id:
+        return voice_result.transaction_id
     return transaction_result.transaction_id if transaction_result else None
+
+
+def _resolve_response_job_id(
+    receipt_result: ReceiptOcrFlowResult | None,
+    voice_result: VoiceSttFlowResult | None,
+    report_pdf_result: ReportPdfFlowResult | None,
+) -> int | None:
+    if receipt_result and receipt_result.job_id:
+        return receipt_result.job_id
+    if voice_result and voice_result.job_id:
+        return voice_result.job_id
+    if report_pdf_result and report_pdf_result.job_id:
+        return report_pdf_result.job_id
+    return None
 
 
 def _send_reply_if_needed(
