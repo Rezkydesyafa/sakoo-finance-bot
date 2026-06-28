@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     jwt_secret: str = ""
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
+    account_linking_code_ttl_minutes: int = 10
 
     telegram_bot_token: str = ""
     telegram_base_url: str = "https://api.telegram.org"
@@ -37,6 +38,9 @@ class Settings(BaseSettings):
     google_application_credentials: str = ""
     ocr_daily_limit_per_user: int = 20
     ocr_rate_limit_timezone: str = "Asia/Jakarta"
+    stt_language_code: str = "id-ID"
+    stt_max_duration_seconds: int = 30
+    stt_enable_automatic_punctuation: bool = True
 
     model_config = SettingsConfigDict(
         env_file=(".env", "../.env"),

@@ -30,6 +30,18 @@ def test_parser_reads_relative_dates_and_transaction_type_rules() -> None:
     assert income_result.category == "Gaji"
 
 
+def test_parser_reads_indonesian_amount_words() -> None:
+    today = date(2026, 6, 27)
+
+    result = parse_transaction_text("beli makan dua puluh ribu", today=today)
+
+    assert result.intent == "add_transaction"
+    assert result.type == "expense"
+    assert result.amount == Decimal("20000")
+    assert result.category == "Makanan"
+    assert result.description == "beli makan"
+
+
 def test_parser_reads_explicit_numeric_and_month_name_dates() -> None:
     today = date(2026, 6, 27)
 

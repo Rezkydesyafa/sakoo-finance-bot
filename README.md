@@ -100,13 +100,9 @@ WAHA_DASHBOARD_PASSWORD=local_waha_dashboard_password
 docker compose -f infra/docker/docker-compose.yml up -d --build
 ```
 
-4. Jalankan migration database:
+Backend container menjalankan `alembic upgrade head` otomatis sebelum Uvicorn start.
 
-```bash
-docker compose -f infra/docker/docker-compose.yml exec backend alembic upgrade head
-```
-
-5. Cek aplikasi:
+4. Cek aplikasi:
 
 ```bash
 curl http://localhost/health
@@ -157,7 +153,7 @@ Lihat log semua service:
 docker compose -f infra/docker/docker-compose.yml logs -f
 ```
 
-Jalankan migration:
+Jalankan migration manual jika perlu re-run/debug:
 
 ```bash
 docker compose -f infra/docker/docker-compose.yml exec backend alembic upgrade head
@@ -218,6 +214,7 @@ Daftar variable tersedia di [.env.example](.env.example). Jangan commit file `.e
 | `JWT_SECRET` | Ya | Backend Auth | `local_jwt_secret_min_32_chars` | Secret JWT. Buat nilai acak dan jangan commit. |
 | `JWT_ALGORITHM` | Tidak | Backend Auth | `HS256` | Algoritma JWT. |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Tidak | Backend Auth | `60` | Masa berlaku token. |
+| `ACCOUNT_LINKING_CODE_TTL_MINUTES` | Tidak | Backend Auth | `10` | Masa berlaku kode linking WhatsApp/Telegram. |
 | `TELEGRAM_BOT_TOKEN` | Tidak | Telegram | `123:abc` | Kosongkan jika belum memakai Telegram. |
 | `TELEGRAM_BASE_URL` | Tidak | Backend Telegram | `https://api.telegram.org` | Base URL Telegram Bot API. |
 | `TELEGRAM_TIMEOUT_SECONDS` | Tidak | Backend Telegram | `10` | Timeout request backend ke Telegram Bot API. |
@@ -232,9 +229,12 @@ Daftar variable tersedia di [.env.example](.env.example). Jangan commit file `.e
 | `WAHA_WEBHOOK_URL` | Tidak | WAHA | `http://backend:8000/webhook/waha` | URL webhook dari container WAHA ke backend. |
 | `WAHA_WEBHOOK_EVENTS` | Tidak | WAHA | `message` | Event WAHA yang dikirim ke backend. |
 | `WAHA_WEBHOOK_HMAC_KEY` | Tidak | Backend/WAHA | `local_webhook_secret` | Opsional. Jika diisi, backend validasi HMAC webhook. |
-| `GOOGLE_APPLICATION_CREDENTIALS` | Tidak | OCR/STT | `/path/to/key.json` | Diperlukan saat OCR/STT Google dipakai. |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Tidak | OCR/STT | `/app/credentials/google-service-account.json` | Diperlukan saat OCR/STT Google dipakai. Di Docker, taruh file JSON di folder `credentials/`. |
 | `OCR_DAILY_LIMIT_PER_USER` | Tidak | Backend OCR | `20` | Batas pemanggilan Google Vision per user per hari. |
 | `OCR_RATE_LIMIT_TIMEZONE` | Tidak | Backend OCR | `Asia/Jakarta` | Timezone window harian OCR. |
+| `STT_LANGUAGE_CODE` | Tidak | Backend STT | `id-ID` | Bahasa transkripsi Google Speech-to-Text. |
+| `STT_MAX_DURATION_SECONDS` | Tidak | Backend STT | `30` | Batas durasi voice note. Audio di atas batas ditolak sebelum STT. |
+| `STT_ENABLE_AUTOMATIC_PUNCTUATION` | Tidak | Backend STT | `true` | Mengaktifkan automatic punctuation Google Speech-to-Text. |
 | `STORAGE_PATH` | Tidak | Backend | `storage` | Lokasi file lokal. Di Docker dioverride ke `/app/storage`. |
 | `MEDIA_RECEIPT_MAX_BYTES` | Tidak | Backend | `5242880` | Batas upload struk. Default 5 MB. |
 | `MEDIA_DEFAULT_MAX_BYTES` | Tidak | Backend | `10485760` | Batas upload audio dan PDF. Default 10 MB. |
@@ -346,6 +346,7 @@ Auth dashboard:
 POST /api/auth/register
 POST /api/auth/login
 GET /api/auth/me
+POST /api/auth/linking-codes
 ```
 
 Transactions:
@@ -389,6 +390,65 @@ GET /api/jobs/{job_id}
 
 Endpoint OCR wajib JWT, hanya membaca media receipt milik user yang sedang login, lalu membuat row `jobs` status `queued` dan mengirim task ke Celery/Redis. Response utama adalah HTTP `202`, sehingga request tidak menunggu Google Vision. Worker mengubah status job menjadi `processing`, memanggil Google Vision, menyimpan raw text ke `receipts.ocr_text`, lalu mengubah status menjadi `completed` atau `failed`. Dashboard dapat polling `GET /api/jobs/{job_id}`. Pemanggilan Google Vision dibatasi oleh `OCR_DAILY_LIMIT_PER_USER`; jika limit tercapai backend mengembalikan HTTP `429` dan tidak membuat task. Pemakaian dan limit tercapai dicatat di `bot_logs` dengan `message_type=receipt_ocr`. Parser receipt juga mencoba mengisi `total_amount`, `merchant_name`, `receipt_date`, `confidence`, dan status `processed`, `needs_confirmation`, atau `manual_input_required`. Set `GOOGLE_APPLICATION_CREDENTIALS` ke path file service account Google Cloud di environment lokal/server; credential tidak ditulis di source code.
 
+Reports:
+
+```text
+GET /api/reports/summary
+GET /api/reports/category
+POST /api/reports/pdf/generate
+```
+
+Kedua endpoint report wajib JWT dan hanya menghitung transaksi milik user token. Query period:
+
+```text
+period=day|week|month|custom
+date=YYYY-MM-DD
+start_date=YYYY-MM-DD
+end_date=YYYY-MM-DD
+```
+
+Untuk `day`, `week`, dan `month`, parameter `date` menjadi anchor periode dan default ke tanggal hari ini jika tidak diisi. `week` memakai Senin-Minggu. Untuk `custom`, `start_date` dan `end_date` wajib. `GET /api/reports/summary` mengembalikan `total_income`, `total_expense`, `net_balance`, jumlah transaksi, dan daftar transaksi paginated (`limit`, `offset`, `has_next`) untuk dashboard atau PDF. `GET /api/reports/category` mengembalikan breakdown kategori; optional `type=income|expense` dapat dipakai untuk chart pengeluaran/pemasukan.
+
+`POST /api/reports/pdf/generate` menerima JSON seperti:
+
+```json
+{
+  "period": "month",
+  "date": "2026-06-15",
+  "generated_from": "dashboard"
+}
+```
+
+Untuk custom period:
+
+```json
+{
+  "period": "custom",
+  "start_date": "2026-06-01",
+  "end_date": "2026-06-30"
+}
+```
+
+Endpoint ini membuat HTML laporan, merender PDF dengan WeasyPrint, menyimpan file ke `media_files` dengan `file_type=pdf`, membuat row `reports`, dan mengembalikan `download_url` yang dapat diunduh lewat endpoint media protected. Dockerfile backend sudah memasang dependency native WeasyPrint (`cairo`, `pango`, `harfbuzz`, dan `shared-mime-info`). Jika menjalankan manual di host, pastikan native dependency WeasyPrint tersedia.
+
+WhatsApp dan Telegram dapat memicu export PDF dari pesan natural seperti:
+
+```text
+export laporan bulan ini
+```
+
+Jika akun platform sudah linked, webhook membuat job `report_pdf` dengan status `queued`. Worker membuat PDF menggunakan report service, menyimpan file ke `media_files` dan row metadata ke `reports`, lalu mengirim lampiran PDF melalui WAHA `sendFile` atau Telegram `sendDocument`. Jika PDF gagal dibuat, bot membalas pesan error ke chat yang sama.
+
+STT voice note:
+
+```text
+POST /api/stt/transcribe/{media_id}
+POST /api/stt/transcribe
+GET /api/jobs/{job_id}
+```
+
+Endpoint STT wajib JWT dan hanya membaca `media_files` milik user dengan `file_type=audio`. Backend mengecek durasi audio maksimal `STT_MAX_DURATION_SECONDS` sebelum membuat job; audio di atas 30 detik default ditolak dengan HTTP `413`. Worker memanggil Google Speech-to-Text, menyimpan hasil ke `voice_notes.transcript_text`, lalu meneruskan transcript ke parser transaksi dengan `source=voice_note`. Jika parser yakin, transaksi disimpan dan `voice_notes.transaction_id` diisi. Jika Google STT error, job menjadi `failed` dan voice note berstatus `error`.
+
 Webhook WAHA:
 
 ```text
@@ -406,6 +466,26 @@ POST /webhook/telegram
 
 `POST /api/auth/login` mengembalikan JWT bearer token. Set `JWT_SECRET` sebelum memakai login dan endpoint private.
 
+Untuk menghubungkan WhatsApp atau Telegram ke user dashboard/API:
+
+```text
+POST /api/auth/linking-codes
+```
+
+Endpoint ini wajib JWT dan mengembalikan kode serta command, misalnya:
+
+```json
+{
+  "id": 1,
+  "code": "ABC123",
+  "command": "hubungkan ABC123",
+  "expired_at": "2026-06-28T12:10:00Z",
+  "created_at": "2026-06-28T12:00:00Z"
+}
+```
+
+Kirim command itu ke bot WhatsApp atau Telegram dari akun yang ingin ditautkan. Kode aktif lama untuk user yang sama otomatis dibuat expired ketika kode baru dibuat.
+
 ## Setup Telegram Bot
 
 Telegram bot memakai endpoint `POST /webhook/telegram`, validasi secret header `X-Telegram-Bot-Api-Secret-Token`, account linking dengan command `hubungkan KODE`, dan transaksi teks dengan source `telegram_text`.
@@ -419,6 +499,10 @@ WAHA berjalan sebagai service `waha` di Docker Compose dan memakai volume `waha_
 Panduan scan QR, webhook, account linking, transaksi teks WhatsApp, cek status session, restart session, dan recovery tersedia di [docs/waha.md](docs/waha.md).
 
 WAHA juga mendukung foto struk: user mengirim image, backend mengunduh media, membuat job `receipt_ocr`, menjalankan OCR Google Vision, membalas ringkasan struk, lalu menyimpan transaksi setelah user membalas `YA`. Koreksi total dapat dikirim dengan format `edit total 21000`.
+
+WAHA dan Telegram juga mendukung voice note/audio: backend mengunduh media, menyimpan `media_files.file_type=audio`, membuat job `voice_stt`, menolak durasi di atas `STT_MAX_DURATION_SECONDS`, menjalankan Google Speech-to-Text di worker, menyimpan transcript ke `voice_notes`, lalu memproses transcript sebagai transaksi `source=voice_note`.
+
+User juga dapat meminta export PDF lewat WhatsApp atau Telegram dengan pesan `export laporan bulan ini`. Backend membuat job `report_pdf`; worker menghasilkan PDF laporan dan mengirim file ke chat lewat WAHA atau Telegram. Jika render/generate PDF gagal, bot mengirim pesan kegagalan yang jelas.
 
 ## Troubleshooting
 
@@ -492,6 +576,10 @@ Warning juga disimpan ke tabel `bot_logs` dengan `platform=system`, `message_typ
 **OCR Google Vision gagal karena credential atau quota**
 
 Pastikan `GOOGLE_APPLICATION_CREDENTIALS` mengarah ke file service account yang tersedia di container/host, Vision API sudah aktif di Google Cloud project, dan service account punya akses Vision API. Jangan commit file JSON credential. Jika response menyebut quota, cek quota Google Vision API di Google Cloud Console.
+
+**STT Google Speech-to-Text gagal atau voice note ditolak**
+
+Pastikan `GOOGLE_APPLICATION_CREDENTIALS` mengarah ke service account yang punya akses Speech-to-Text API, `STT_LANGUAGE_CODE` sesuai bahasa input, dan durasi voice note tidak melebihi `STT_MAX_DURATION_SECONDS`. Untuk voice note WhatsApp/Telegram, format `audio/ogg`/Opus diproses langsung; format lain membutuhkan metadata durasi yang bisa dibaca backend.
 
 **Install WeasyPrint manual gagal**
 

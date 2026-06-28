@@ -17,6 +17,7 @@ class ParsedWahaMessage:
     media_url: str | None
     media_mimetype: str | None
     media_filename: str | None
+    duration_seconds: float | None
     from_me: bool | None
     timestamp: int | str | None
 
@@ -63,6 +64,14 @@ def parse_waha_message(data: dict[str, Any]) -> ParsedWahaMessage:
         data_media.get("filename"),
         data_media.get("fileName"),
     )
+    duration_seconds = _first_float(
+        media.get("duration"),
+        media.get("seconds"),
+        data_media.get("duration"),
+        data_media.get("seconds"),
+        payload.get("duration"),
+        payload.get("seconds"),
+    )
     has_media = bool(payload.get("hasMedia") or media or media_url or media_mimetype)
 
     return ParsedWahaMessage(
@@ -79,6 +88,7 @@ def parse_waha_message(data: dict[str, Any]) -> ParsedWahaMessage:
         media_url=media_url,
         media_mimetype=media_mimetype,
         media_filename=media_filename,
+        duration_seconds=duration_seconds,
         from_me=payload.get("fromMe") if isinstance(payload.get("fromMe"), bool) else None,
         timestamp=payload.get("timestamp") or data.get("timestamp"),
     )
@@ -134,6 +144,17 @@ def _first_string(*values: Any) -> str | None:
     for value in values:
         if isinstance(value, str) and value.strip():
             return value.strip()
+    return None
+
+
+def _first_float(*values: Any) -> float | None:
+    for value in values:
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            continue
+        if number > 0:
+            return number
     return None
 
 

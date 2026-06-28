@@ -17,6 +17,8 @@ Telegram User
   -> balas user via sendMessage
 ```
 
+Voice note memakai flow yang sama setelah akun linked, tetapi media diunduh lebih dulu dari Telegram Bot API, disimpan sebagai `media_files.file_type=audio`, lalu diproses worker `voice_stt` dengan Google Speech-to-Text.
+
 Endpoint backend:
 
 ```text
@@ -77,6 +79,9 @@ TELEGRAM_BASE_URL=https://api.telegram.org
 TELEGRAM_TIMEOUT_SECONDS=10
 TELEGRAM_WEBHOOK_URL=https://your-public-domain.com/webhook/telegram
 TELEGRAM_WEBHOOK_SECRET=<long-random-secret>
+GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/google-service-account.json
+STT_LANGUAGE_CODE=id-ID
+STT_MAX_DURATION_SECONDS=30
 ```
 
 `TELEGRAM_WEBHOOK_SECRET` dipakai untuk validasi header Telegram:
@@ -107,11 +112,7 @@ Jalankan service dengan Docker Compose:
 docker compose -f infra/docker/docker-compose.yml up -d --build backend postgres redis
 ```
 
-Jalankan migration:
-
-```bash
-docker compose -f infra/docker/docker-compose.yml exec backend alembic upgrade head
-```
+Backend container menjalankan migration otomatis sebelum API start.
 
 Cek health:
 
@@ -192,16 +193,23 @@ Sebelum transaksi bisa disimpan, akun Telegram harus terhubung ke user dashboard
 
 Flow:
 
-1. User login dashboard.
-2. Dashboard membuat kode linking di tabel `account_linking_codes`.
-3. User mengirim pesan ke bot Telegram:
+1. User register/login via API lalu membuat kode linking:
+
+```bash
+curl -X POST http://localhost:8000/api/auth/linking-codes \
+  -H "Authorization: Bearer <JWT_TOKEN>"
+```
+
+Response berisi `command`, misalnya `hubungkan ABC123`.
+
+2. User mengirim pesan ke bot Telegram:
 
 ```text
 hubungkan KODE
 ```
 
-4. Backend memvalidasi kode.
-5. Jika valid, backend menyimpan atau memperbarui `user_platform_accounts`:
+3. Backend memvalidasi kode.
+4. Jika valid, backend menyimpan atau memperbarui `user_platform_accounts`:
 
 ```text
 platform=telegram
@@ -210,7 +218,7 @@ chat_id=<telegram_chat_id>
 is_active=true
 ```
 
-6. Backend membalas:
+5. Backend membalas:
 
 ```text
 Akun Telegram berhasil terhubung ke akun dashboard.
@@ -250,6 +258,48 @@ beli makan
 ```
 
 Bot tidak menyimpan transaksi dan membalas agar user mengirim ulang dengan format lebih jelas.
+
+## Flow Voice Note Telegram
+
+Setelah akun linked, user dapat mengirim voice note maksimal 30 detik. Backend akan:
+
+1. Menerima update Telegram dengan field `voice` atau `audio`.
+2. Menolak durasi di atas `STT_MAX_DURATION_SECONDS`.
+3. Mengunduh file dengan `getFile` dan endpoint file Telegram.
+4. Menyimpan file sebagai `media_files` dengan `file_type=audio` dan `source=telegram_voice`.
+5. Membuat job `voice_stt` status `queued`.
+6. Worker memanggil Google Speech-to-Text, menyimpan transcript ke `voice_notes.transcript_text`, lalu menjalankan parser dengan `source=voice_note`.
+7. Bot membalas hasil transkripsi atau pesan error yang jelas.
+
+Jika Google STT gagal atau audio tidak jelas, job ditandai `failed`/`manual_input_required` dan user diminta mengirim ulang voice note yang lebih jelas.
+
+## Flow Export PDF Telegram
+
+Setelah akun linked, user dapat meminta laporan PDF dengan pesan:
+
+```text
+export laporan bulan ini
+```
+
+Backend akan:
+
+1. Menerima update teks di `POST /webhook/telegram`.
+2. Mendeteksi intent `export_pdf` dan periode laporan.
+3. Membuat job `report_pdf` status `queued`.
+4. Worker membuat PDF laporan dengan WeasyPrint, menyimpan file ke `media_files`, dan mencatat metadata laporan di `reports`.
+5. Worker mengirim dokumen PDF via Telegram Bot API `sendDocument`.
+
+Balasan awal:
+
+```text
+Permintaan export PDF laporan bulan ini sudah masuk antrean. Bot akan mengirim file PDF setelah selesai dibuat.
+```
+
+Jika PDF gagal dibuat, bot membalas:
+
+```text
+Maaf, PDF laporan gagal dibuat. Coba lagi beberapa saat lagi atau gunakan periode yang berbeda.
+```
 
 ## Test Manual Webhook
 

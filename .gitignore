@@ -30,6 +30,10 @@ pnpm-debug.log*
 *.log
 docker-compose.override.yml
 
+# Local credentials
+credentials/*
+!credentials/.gitkeep
+
 # OS / editor
 .DS_Store
 Thumbs.db

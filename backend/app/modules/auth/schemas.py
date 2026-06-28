@@ -62,3 +62,11 @@ class UserResponse(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class AccountLinkingCodeResponse(BaseModel):
+    id: int
+    code: str
+    command: str
+    expired_at: datetime
+    created_at: datetime

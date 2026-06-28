@@ -1,5 +1,6 @@
 import os
 from collections.abc import Iterator
+from datetime import datetime, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -13,7 +14,7 @@ os.environ["JWT_SECRET"] = "test-jwt-secret-minimum-32-characters"
 from app.config import get_settings
 from app.database import Base, get_db
 from app.main import app
-from app.models import Transaction, User
+from app.models import AccountLinkingCode, Transaction, User
 from app.modules.auth.security import verify_password
 
 
@@ -143,6 +144,52 @@ def test_private_transaction_endpoint_requires_token(
     assert response.status_code in {401, 403}
 
 
+def test_create_linking_code_requires_token(
+    test_client: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    client, _session_factory = test_client
+
+    response = client.post("/api/auth/linking-codes")
+
+    assert response.status_code in {401, 403}
+
+
+def test_create_linking_code_returns_command_and_expires_previous_code(
+    test_client: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    client, session_factory = test_client
+    token = _register_and_login(client, "linking@example.com")
+
+    first_response = client.post(
+        "/api/auth/linking-codes",
+        headers=_auth_headers(token),
+    )
+    second_response = client.post(
+        "/api/auth/linking-codes",
+        headers=_auth_headers(token),
+    )
+
+    assert first_response.status_code == 201, first_response.text
+    assert second_response.status_code == 201, second_response.text
+    first_payload = first_response.json()
+    second_payload = second_response.json()
+    assert len(first_payload["code"]) == 6
+    assert first_payload["command"] == f"hubungkan {first_payload['code']}"
+    assert len(second_payload["code"]) == 6
+    assert second_payload["command"] == f"hubungkan {second_payload['code']}"
+    assert first_payload["code"] != second_payload["code"]
+
+    with session_factory() as db:
+        codes = list(
+            db.scalars(
+                select(AccountLinkingCode).order_by(AccountLinkingCode.created_at)
+            )
+        )
+        assert len(codes) == 2
+        assert _as_utc(codes[0].expired_at) <= datetime.now(timezone.utc)
+        assert _as_utc(codes[1].expired_at) > datetime.now(timezone.utc)
+
+
 def _register_and_login(client: TestClient, email: str) -> str:
     password = "super-secret-password"
     register_response = client.post(
@@ -165,3 +212,9 @@ def _register_and_login(client: TestClient, email: str) -> str:
 
 def _auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
+
+
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
