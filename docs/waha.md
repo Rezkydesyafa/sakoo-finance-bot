@@ -27,7 +27,7 @@ Di dalam Docker network, backend memakai `WAHA_BASE_URL=http://waha:3000` melalu
 Untuk menjalankan bot WhatsApp end-to-end, jalankan backend, database, Redis, dan WAHA:
 
 ```bash
-docker compose -f infra/docker/docker-compose.yml up -d --build backend postgres redis waha
+docker compose -f infra/docker/docker-compose.yml up -d --build backend celery_worker postgres redis waha
 ```
 
 Jalankan migration:
@@ -245,11 +245,18 @@ Nomor WhatsApp yang sudah linked dapat mengirim foto struk langsung ke bot. Back
 1. Menerima event image dari WAHA.
 2. Mengunduh media dari URL WAHA.
 3. Menyimpan file sebagai `media_files` dengan `file_type=receipt` dan `source=whatsapp_receipt`.
-4. Membuat row `jobs` dengan `job_type=receipt_ocr`.
-5. Menjalankan Google Vision OCR dan parser struk.
-6. Membalas hasil OCR ke WhatsApp dan meminta konfirmasi.
+4. Membuat row `jobs` dengan `job_type=receipt_ocr` dan status `queued`.
+5. Mengirim task ke Celery worker melalui Redis.
+6. Worker mengubah status job menjadi `processing`, menjalankan Google Vision OCR dan parser struk, lalu mengubah status menjadi `completed` atau `failed`.
+7. Worker membalas hasil OCR ke WhatsApp dan meminta konfirmasi.
 
-Contoh balasan bot:
+Balasan awal saat foto diterima:
+
+```text
+Foto struk diterima dan masuk antrean OCR. Saya akan kirim hasilnya setelah selesai diproses.
+```
+
+Contoh balasan worker setelah OCR selesai:
 
 ```text
 Foto struk sudah diproses OCR. Merchant: TOKO SAKOO. Tanggal: 2026-06-27. Total: Rp20.000. Confidence: 100%. Ketik YA untuk menyimpan transaksi, atau edit total 20000 untuk koreksi.
@@ -267,7 +274,9 @@ Koreksi total:
 edit total 21000
 ```
 
-Setelah user membalas `YA`, backend menyimpan transaksi dengan `source=receipt_ocr`, `type=expense`, kategori default `Lainnya`, dan menghubungkan `receipts.transaction_id` ke transaksi tersebut.
+Setelah user membalas `YA`, backend menyimpan transaksi dengan `source=receipt_ocr`, `type=expense`, kategori default `Lainnya`, dan menghubungkan `receipts.transaction_id` ke transaksi tersebut. Pastikan service `celery_worker` berjalan; tanpa worker, job akan tetap `queued`.
+
+OCR dibatasi per user per hari memakai `OCR_DAILY_LIMIT_PER_USER` dan window harian `OCR_RATE_LIMIT_TIMEZONE`. Jika limit tercapai, backend tidak memanggil Google Vision dan bot membalas bahwa batas OCR harian sudah tercapai. Setiap pemakaian OCR dan kejadian limit tercapai dicatat ke `bot_logs` dengan `message_type=receipt_ocr`.
 
 ## Checklist End-to-End WhatsApp Bot
 
@@ -284,12 +293,14 @@ WAHA_DASHBOARD_PASSWORD=<long-random-password>
 WAHA_SESSION_NAME=default
 WAHA_WEBHOOK_URL=http://backend:8000/webhook/waha
 WAHA_WEBHOOK_EVENTS=message
+OCR_DAILY_LIMIT_PER_USER=20
+OCR_RATE_LIMIT_TIMEZONE=Asia/Jakarta
 ```
 
 2. Jalankan service:
 
 ```bash
-docker compose -f infra/docker/docker-compose.yml up -d --build backend postgres redis waha
+docker compose -f infra/docker/docker-compose.yml up -d --build backend celery_worker postgres redis waha
 ```
 
 3. Jalankan migration:

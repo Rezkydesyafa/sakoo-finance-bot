@@ -35,6 +35,8 @@ class Settings(BaseSettings):
     waha_timeout_seconds: float = 10.0
     waha_webhook_hmac_key: str = ""
     google_application_credentials: str = ""
+    ocr_daily_limit_per_user: int = 20
+    ocr_rate_limit_timezone: str = "Asia/Jakarta"
 
     model_config = SettingsConfigDict(
         env_file=(".env", "../.env"),

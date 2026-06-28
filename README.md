@@ -233,6 +233,8 @@ Daftar variable tersedia di [.env.example](.env.example). Jangan commit file `.e
 | `WAHA_WEBHOOK_EVENTS` | Tidak | WAHA | `message` | Event WAHA yang dikirim ke backend. |
 | `WAHA_WEBHOOK_HMAC_KEY` | Tidak | Backend/WAHA | `local_webhook_secret` | Opsional. Jika diisi, backend validasi HMAC webhook. |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Tidak | OCR/STT | `/path/to/key.json` | Diperlukan saat OCR/STT Google dipakai. |
+| `OCR_DAILY_LIMIT_PER_USER` | Tidak | Backend OCR | `20` | Batas pemanggilan Google Vision per user per hari. |
+| `OCR_RATE_LIMIT_TIMEZONE` | Tidak | Backend OCR | `Asia/Jakarta` | Timezone window harian OCR. |
 | `STORAGE_PATH` | Tidak | Backend | `storage` | Lokasi file lokal. Di Docker dioverride ke `/app/storage`. |
 | `MEDIA_RECEIPT_MAX_BYTES` | Tidak | Backend | `5242880` | Batas upload struk. Default 5 MB. |
 | `MEDIA_DEFAULT_MAX_BYTES` | Tidak | Backend | `10485760` | Batas upload audio dan PDF. Default 10 MB. |
@@ -291,6 +293,12 @@ Frontend manual tersedia di `http://localhost:3000`. Jika memakai Docker Compose
 ```bash
 cd backend
 celery -A app.workers.celery_app.celery_app worker --loglevel=info --concurrency=1
+```
+
+Untuk Docker Compose, jalankan service `celery_worker` bersama backend dan Redis:
+
+```bash
+docker compose -f infra/docker/docker-compose.yml up -d --build backend celery_worker redis
 ```
 
 ## Migrasi dan Seed Database
@@ -376,9 +384,10 @@ OCR struk:
 
 ```text
 POST /api/ocr/receipts/{media_id}
+GET /api/jobs/{job_id}
 ```
 
-Endpoint OCR wajib JWT, hanya membaca media receipt milik user yang sedang login, memanggil Google Vision API untuk image receipt, lalu menyimpan raw text ke `receipts.ocr_text`. Parser receipt juga mencoba mengisi `total_amount`, `merchant_name`, `receipt_date`, `confidence`, dan status `processed`, `needs_confirmation`, atau `manual_input_required`. Set `GOOGLE_APPLICATION_CREDENTIALS` ke path file service account Google Cloud di environment lokal/server; credential tidak ditulis di source code.
+Endpoint OCR wajib JWT, hanya membaca media receipt milik user yang sedang login, lalu membuat row `jobs` status `queued` dan mengirim task ke Celery/Redis. Response utama adalah HTTP `202`, sehingga request tidak menunggu Google Vision. Worker mengubah status job menjadi `processing`, memanggil Google Vision, menyimpan raw text ke `receipts.ocr_text`, lalu mengubah status menjadi `completed` atau `failed`. Dashboard dapat polling `GET /api/jobs/{job_id}`. Pemanggilan Google Vision dibatasi oleh `OCR_DAILY_LIMIT_PER_USER`; jika limit tercapai backend mengembalikan HTTP `429` dan tidak membuat task. Pemakaian dan limit tercapai dicatat di `bot_logs` dengan `message_type=receipt_ocr`. Parser receipt juga mencoba mengisi `total_amount`, `merchant_name`, `receipt_date`, `confidence`, dan status `processed`, `needs_confirmation`, atau `manual_input_required`. Set `GOOGLE_APPLICATION_CREDENTIALS` ke path file service account Google Cloud di environment lokal/server; credential tidak ditulis di source code.
 
 Webhook WAHA:
 
