@@ -24,7 +24,19 @@ Di dalam Docker network, backend memakai `WAHA_BASE_URL=http://waha:3000` melalu
 
 ## Menjalankan WAHA
 
-Jalankan semua service:
+Untuk menjalankan bot WhatsApp end-to-end, jalankan backend, database, Redis, dan WAHA:
+
+```bash
+docker compose -f infra/docker/docker-compose.yml up -d --build backend postgres redis waha
+```
+
+Jalankan migration:
+
+```bash
+docker compose -f infra/docker/docker-compose.yml exec backend alembic upgrade head
+```
+
+Jika hanya ingin menjalankan service WAHA:
 
 ```bash
 docker compose -f infra/docker/docker-compose.yml up -d waha
@@ -43,6 +55,12 @@ http://localhost:3002/dashboard
 ```
 
 Login ke dashboard memakai `WAHA_DASHBOARD_USERNAME` dan `WAHA_DASHBOARD_PASSWORD`, lalu connect ke server memakai `WAHA_API_KEY`.
+
+Cek log WAHA dan backend:
+
+```bash
+docker compose -f infra/docker/docker-compose.yml logs -f waha backend
+```
 
 ## Session WhatsApp dan Scan QR
 
@@ -70,12 +88,64 @@ Status yang diharapkan setelah scan QR berhasil:
 {"status":"WORKING"}
 ```
 
+## Health Check Backend
+
+Backend menyediakan endpoint health check WAHA supaya status session bisa dipantau tanpa Grafana:
+
+```bash
+curl http://localhost:8000/health/waha
+```
+
+Response sehat:
+
+```json
+{
+  "status": "ok",
+  "healthy": true,
+  "session": "default",
+  "session_status": "WORKING",
+  "warning": null,
+  "checked_at": "2026-06-27T12:00:00+00:00",
+  "raw": {
+    "status": "WORKING"
+  }
+}
+```
+
+Jika session logout, stopped, butuh scan QR, atau WAHA API tidak bisa diakses, endpoint mengembalikan HTTP `503`:
+
+```json
+{
+  "detail": {
+    "status": "error",
+    "healthy": false,
+    "session": "default",
+    "session_status": "STOPPED",
+    "warning": "WAHA session is not active. session=default, status=STOPPED",
+    "checked_at": "2026-06-27T12:00:00+00:00",
+    "raw": {
+      "status": "STOPPED"
+    }
+  }
+}
+```
+
+Setiap warning health check dicatat ke `bot_logs` dengan `platform=system`, `message_type=waha_health`, dan `status=waha_unhealthy`. Field `warning` pada response bisa dipakai untuk alert sederhana ke admin/dev.
+
 ## Webhook Backend
 
 WAHA dikonfigurasi melalui Docker Compose untuk mengirim event `message` ke backend:
 
 ```text
 http://backend:8000/webhook/waha
+```
+
+Variable yang mengatur webhook WAHA:
+
+```env
+WAHA_WEBHOOK_URL=http://backend:8000/webhook/waha
+WAHA_WEBHOOK_EVENTS=message
+WAHA_WEBHOOK_HMAC_KEY=<optional-long-random-webhook-secret>
 ```
 
 Jika akses melalui Nginx dari luar container, URL publiknya:
@@ -168,6 +238,89 @@ Nominal yang didukung untuk MVP:
 
 Jika parser belum yakin, misalnya nominal tidak terbaca, transaksi tidak disimpan dan bot meminta user mengirim ulang dengan format lebih jelas.
 
+## OCR Foto Struk via WhatsApp
+
+Nomor WhatsApp yang sudah linked dapat mengirim foto struk langsung ke bot. Backend akan:
+
+1. Menerima event image dari WAHA.
+2. Mengunduh media dari URL WAHA.
+3. Menyimpan file sebagai `media_files` dengan `file_type=receipt` dan `source=whatsapp_receipt`.
+4. Membuat row `jobs` dengan `job_type=receipt_ocr`.
+5. Menjalankan Google Vision OCR dan parser struk.
+6. Membalas hasil OCR ke WhatsApp dan meminta konfirmasi.
+
+Contoh balasan bot:
+
+```text
+Foto struk sudah diproses OCR. Merchant: TOKO SAKOO. Tanggal: 2026-06-27. Total: Rp20.000. Confidence: 100%. Ketik YA untuk menyimpan transaksi, atau edit total 20000 untuk koreksi.
+```
+
+Konfirmasi:
+
+```text
+YA
+```
+
+Koreksi total:
+
+```text
+edit total 21000
+```
+
+Setelah user membalas `YA`, backend menyimpan transaksi dengan `source=receipt_ocr`, `type=expense`, kategori default `Lainnya`, dan menghubungkan `receipts.transaction_id` ke transaksi tersebut.
+
+## Checklist End-to-End WhatsApp Bot
+
+1. Isi `.env`:
+
+```env
+POSTGRES_USER=sakoo
+POSTGRES_PASSWORD=<password>
+POSTGRES_DB=sakoo_finance
+JWT_SECRET=<long-random-jwt-secret>
+WAHA_API_KEY=<long-random-api-key>
+WAHA_DASHBOARD_USERNAME=admin
+WAHA_DASHBOARD_PASSWORD=<long-random-password>
+WAHA_SESSION_NAME=default
+WAHA_WEBHOOK_URL=http://backend:8000/webhook/waha
+WAHA_WEBHOOK_EVENTS=message
+```
+
+2. Jalankan service:
+
+```bash
+docker compose -f infra/docker/docker-compose.yml up -d --build backend postgres redis waha
+```
+
+3. Jalankan migration:
+
+```bash
+docker compose -f infra/docker/docker-compose.yml exec backend alembic upgrade head
+```
+
+4. Buka dashboard WAHA:
+
+```text
+http://localhost:3002/dashboard
+```
+
+5. Start session `default`.
+6. Scan QR dari WhatsApp mobile.
+7. Pastikan status session `WORKING`.
+8. Hubungkan nomor WhatsApp ke akun dashboard:
+
+```text
+hubungkan KODE
+```
+
+9. Kirim transaksi:
+
+```text
+beli makan 20 ribu
+```
+
+10. Cek transaksi tersimpan di database dengan `source=whatsapp_text`.
+
 ## Restart dan Recovery Session
 
 Restart container WAHA tanpa menghapus session:
@@ -215,9 +368,9 @@ curl -X POST \
 
 ## Test Kirim File PDF
 
-`send_file` pada backend memakai endpoint WAHA `POST /api/sendFile`. File dapat dikirim sebagai URL publik/internal backend atau data base64.
+`send_file` pada backend memakai endpoint WAHA `POST /api/sendFile`. File PDF yang disimpan di local storage dapat diunduh user melalui endpoint protected `GET /api/media/{media_id}/download` memakai JWT. Untuk mengirim PDF ke WAHA dari backend tanpa membuka file sebagai URL publik, gunakan payload data base64 atau helper `WahaClient.send_file(file_data=...)`.
 
-Contoh via URL:
+Contoh via data base64:
 
 ```bash
 curl -X POST \
@@ -229,7 +382,7 @@ curl -X POST \
     "session": "default",
     "caption": "Laporan keuangan",
     "file": {
-      "url": "http://backend:8000/files/1/download",
+      "data": "<base64-pdf-content>",
       "mimetype": "application/pdf",
       "filename": "laporan.pdf"
     }

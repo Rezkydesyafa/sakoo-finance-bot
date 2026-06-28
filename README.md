@@ -111,6 +111,7 @@ docker compose -f infra/docker/docker-compose.yml exec backend alembic upgrade h
 ```bash
 curl http://localhost/health
 curl http://localhost:8000/health/db
+curl http://localhost:8000/health/waha
 ```
 
 Response health yang diharapkan:
@@ -218,6 +219,10 @@ Daftar variable tersedia di [.env.example](.env.example). Jangan commit file `.e
 | `JWT_ALGORITHM` | Tidak | Backend Auth | `HS256` | Algoritma JWT. |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Tidak | Backend Auth | `60` | Masa berlaku token. |
 | `TELEGRAM_BOT_TOKEN` | Tidak | Telegram | `123:abc` | Kosongkan jika belum memakai Telegram. |
+| `TELEGRAM_BASE_URL` | Tidak | Backend Telegram | `https://api.telegram.org` | Base URL Telegram Bot API. |
+| `TELEGRAM_TIMEOUT_SECONDS` | Tidak | Backend Telegram | `10` | Timeout request backend ke Telegram Bot API. |
+| `TELEGRAM_WEBHOOK_URL` | Tidak | Telegram | `http://backend:8000/webhook/telegram` | URL webhook Telegram ke backend. |
+| `TELEGRAM_WEBHOOK_SECRET` | Tidak | Backend Telegram | `local_telegram_webhook_secret` | Jika diisi, backend validasi header `X-Telegram-Bot-Api-Secret-Token`. |
 | `WAHA_BASE_URL` | Tidak | Backend host | `http://localhost:3002` | Di Docker dioverride menjadi `http://waha:3000`. |
 | `WAHA_API_KEY` | Ya | Backend/WAHA | `local_waha_api_key_min_32_chars` | Wajib untuk WAHA API. |
 | `WAHA_DASHBOARD_USERNAME` | Ya | WAHA | `admin` | Login dashboard WAHA. |
@@ -229,6 +234,8 @@ Daftar variable tersedia di [.env.example](.env.example). Jangan commit file `.e
 | `WAHA_WEBHOOK_HMAC_KEY` | Tidak | Backend/WAHA | `local_webhook_secret` | Opsional. Jika diisi, backend validasi HMAC webhook. |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Tidak | OCR/STT | `/path/to/key.json` | Diperlukan saat OCR/STT Google dipakai. |
 | `STORAGE_PATH` | Tidak | Backend | `storage` | Lokasi file lokal. Di Docker dioverride ke `/app/storage`. |
+| `MEDIA_RECEIPT_MAX_BYTES` | Tidak | Backend | `5242880` | Batas upload struk. Default 5 MB. |
+| `MEDIA_DEFAULT_MAX_BYTES` | Tidak | Backend | `10485760` | Batas upload audio dan PDF. Default 10 MB. |
 
 Membuat secret lokal cepat:
 
@@ -322,6 +329,7 @@ Health:
 ```bash
 curl http://localhost:8000/health
 curl http://localhost:8000/health/db
+curl http://localhost:8000/health/waha
 ```
 
 Auth dashboard:
@@ -355,19 +363,53 @@ offset=0
 
 Response list berisi `items`, `total`, `limit`, `offset`, dan `has_next`. Sort default adalah transaksi terbaru berdasarkan `transaction_date DESC, id DESC`.
 
+Media:
+
+```text
+POST /api/media
+GET /api/media/{media_id}/download
+```
+
+`POST /api/media` memakai `multipart/form-data` dengan field `file`, `file_type=receipt|audio|pdf`, dan `source`. File disimpan di `STORAGE_PATH/user_{id}/...`, metadata disimpan di `media_files`, dan file tidak disajikan sebagai static public file. Download wajib memakai JWT dan hanya berhasil jika `media_files.user_id` sama dengan user token.
+
+OCR struk:
+
+```text
+POST /api/ocr/receipts/{media_id}
+```
+
+Endpoint OCR wajib JWT, hanya membaca media receipt milik user yang sedang login, memanggil Google Vision API untuk image receipt, lalu menyimpan raw text ke `receipts.ocr_text`. Parser receipt juga mencoba mengisi `total_amount`, `merchant_name`, `receipt_date`, `confidence`, dan status `processed`, `needs_confirmation`, atau `manual_input_required`. Set `GOOGLE_APPLICATION_CREDENTIALS` ke path file service account Google Cloud di environment lokal/server; credential tidak ditulis di source code.
+
 Webhook WAHA:
 
 ```text
 POST /webhook/waha
+GET /health/waha
+```
+
+`GET /health/waha` mengembalikan `200` jika session WAHA berstatus `WORKING`. Jika WAHA logout, stopped, butuh scan QR, atau API WAHA tidak bisa diakses, endpoint mengembalikan `503` dan mencatat warning ke `bot_logs`.
+
+Webhook Telegram:
+
+```text
+POST /webhook/telegram
 ```
 
 `POST /api/auth/login` mengembalikan JWT bearer token. Set `JWT_SECRET` sebelum memakai login dan endpoint private.
+
+## Setup Telegram Bot
+
+Telegram bot memakai endpoint `POST /webhook/telegram`, validasi secret header `X-Telegram-Bot-Api-Secret-Token`, account linking dengan command `hubungkan KODE`, dan transaksi teks dengan source `telegram_text`.
+
+Panduan membuat bot lewat BotFather, set webhook, account linking, test pesan, dan troubleshooting tersedia di [docs/telegram.md](docs/telegram.md).
 
 ## Setup WAHA WhatsApp Gateway
 
 WAHA berjalan sebagai service `waha` di Docker Compose dan memakai volume `waha_sessions` agar session WhatsApp tetap tersimpan setelah restart container. Isi `WAHA_API_KEY`, `WAHA_DASHBOARD_USERNAME`, dan `WAHA_DASHBOARD_PASSWORD` di `.env` sebelum menjalankan service.
 
 Panduan scan QR, webhook, account linking, transaksi teks WhatsApp, cek status session, restart session, dan recovery tersedia di [docs/waha.md](docs/waha.md).
+
+WAHA juga mendukung foto struk: user mengirim image, backend mengunduh media, membuat job `receipt_ocr`, menjalankan OCR Google Vision, membalas ringkasan struk, lalu menyimpan transaksi setelah user membalas `YA`. Koreksi total dapat dikirim dengan format `edit total 21000`.
 
 ## Troubleshooting
 
@@ -427,6 +469,20 @@ docker compose -f infra/docker/docker-compose.yml logs -f waha backend
 **Session WhatsApp hilang setelah restart**
 
 Jangan jalankan `docker compose down -v` jika ingin mempertahankan session. Session disimpan di volume `waha_sessions`.
+
+**`/health/waha` mengembalikan 503**
+
+Session WAHA kemungkinan belum `WORKING`, logout, perlu scan QR ulang, atau API WAHA tidak bisa diakses backend. Cek dashboard WAHA, lalu cek log:
+
+```bash
+docker compose -f infra/docker/docker-compose.yml logs -f waha backend
+```
+
+Warning juga disimpan ke tabel `bot_logs` dengan `platform=system`, `message_type=waha_health`, dan `status=waha_unhealthy`.
+
+**OCR Google Vision gagal karena credential atau quota**
+
+Pastikan `GOOGLE_APPLICATION_CREDENTIALS` mengarah ke file service account yang tersedia di container/host, Vision API sudah aktif di Google Cloud project, dan service account punya akses Vision API. Jangan commit file JSON credential. Jika response menyebut quota, cek quota Google Vision API di Google Cloud Console.
 
 **Install WeasyPrint manual gagal**
 
