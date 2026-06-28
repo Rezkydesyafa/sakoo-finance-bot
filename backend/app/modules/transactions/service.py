@@ -32,7 +32,36 @@ def handle_whatsapp_text_transaction(
     user_id: int,
     text: str,
 ) -> TextTransactionResult:
-    parse_result = parse_message(text, source="whatsapp_text")
+    return handle_text_transaction(
+        db=db,
+        user_id=user_id,
+        text=text,
+        source="whatsapp_text",
+    )
+
+
+def handle_telegram_text_transaction(
+    *,
+    db: Session,
+    user_id: int,
+    text: str,
+) -> TextTransactionResult:
+    return handle_text_transaction(
+        db=db,
+        user_id=user_id,
+        text=text,
+        source="telegram_text",
+    )
+
+
+def handle_text_transaction(
+    *,
+    db: Session,
+    user_id: int,
+    text: str,
+    source: str,
+) -> TextTransactionResult:
+    parse_result = parse_message(text, source=source)
     if parse_result.intent != INTENT_ADD_TRANSACTION:
         return TextTransactionResult(
             status=parse_result.intent,

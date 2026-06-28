@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 60
 
     telegram_bot_token: str = ""
+    telegram_base_url: str = "https://api.telegram.org"
+    telegram_timeout_seconds: float = 10.0
+    telegram_webhook_secret: str = ""
     waha_base_url: str = "http://localhost:3002"
     waha_api_key: str = ""
     waha_session_name: str = "default"
