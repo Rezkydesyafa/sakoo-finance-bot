@@ -2,6 +2,7 @@ from base64 import b64encode
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -106,6 +107,10 @@ class WahaClient:
             content_type=response.headers.get("content-type"),
             filename=_filename_from_url(str(response.url)),
         )
+
+    def get_session_status(self, session: str | None = None) -> dict[str, Any]:
+        session_name = session or self.session
+        return self._request("GET", f"/api/sessions/{quote(session_name, safe='')}")
 
     def _request(self, method: str, url: str, **kwargs: Any) -> dict[str, Any]:
         response = self._raw_request(method, url, **kwargs)

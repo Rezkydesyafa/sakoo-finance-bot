@@ -41,6 +41,7 @@ storage/receipts/*
 storage/voice_notes/*
 storage/reports/*
 storage/temp/*
+storage/user_*/
 !storage/receipts/.gitkeep
 !storage/voice_notes/.gitkeep
 !storage/reports/.gitkeep

@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.database import get_db
 from app.models import BotLog, UserPlatformAccount
+from app.modules.jobs.service import ReceiptOcrEnqueue, get_receipt_ocr_enqueue
 from app.modules.transactions.service import (
     TextTransactionResult,
     handle_whatsapp_text_transaction,
@@ -18,6 +19,11 @@ from app.modules.transactions.service import (
 from app.modules.waha.client import WahaClient, WahaClientError, get_waha_client
 from app.modules.waha.linking import handle_account_linking
 from app.modules.waha.parser import parse_waha_message, whatsapp_identifier_candidates
+from app.modules.waha.receipt_ocr import (
+    ReceiptOcrFlowResult,
+    handle_whatsapp_receipt_confirmation,
+    handle_whatsapp_receipt_image,
+)
 
 
 router = APIRouter(prefix="/webhook", tags=["webhook"])
@@ -31,6 +37,8 @@ class WahaWebhookResponse(BaseModel):
     linking_status: str | None = None
     transaction_status: str | None = None
     transaction_id: int | None = None
+    receipt_id: int | None = None
+    job_id: int | None = None
     reply_status: str | None = None
 
 
@@ -41,6 +49,7 @@ async def receive_waha_webhook(
     x_webhook_hmac_algorithm: str | None = Header(default=None),
     db: Session = Depends(get_db),
     waha_client: WahaClient = Depends(get_waha_client),
+    enqueue: ReceiptOcrEnqueue = Depends(get_receipt_ocr_enqueue),
 ) -> WahaWebhookResponse:
     raw_body = await request.body()
     _verify_webhook_signature(raw_body, x_webhook_hmac, x_webhook_hmac_algorithm)
@@ -66,30 +75,56 @@ async def receive_waha_webhook(
         parsed=parsed,
         current_user_id=user_id,
     )
-    transaction_result = _handle_text_transaction_if_needed(
+    linked_user_id = linking_result.user_id or user_id
+    receipt_result = _handle_receipt_ocr_if_needed(
         db=db,
-        parsed_message_type=parsed.message_type,
-        parsed_text=parsed.text,
+        parsed=parsed,
         linking_action=linking_result.action,
-        linked_user_id=linking_result.user_id or user_id,
+        linked_user_id=linked_user_id,
+        waha_client=waha_client,
+        enqueue=enqueue,
     )
-    reply_text = transaction_result.reply_text if transaction_result else linking_result.reply_text
+    transaction_result = None
+    if receipt_result is None:
+        transaction_result = _handle_text_transaction_if_needed(
+            db=db,
+            parsed_message_type=parsed.message_type,
+            parsed_text=parsed.text,
+            linking_action=linking_result.action,
+            linked_user_id=linked_user_id,
+        )
+    reply_text = _resolve_reply_text(
+        receipt_result=receipt_result,
+        transaction_result=transaction_result,
+        linking_reply_text=linking_result.reply_text,
+    )
     bot_log = BotLog(
-        user_id=linking_result.user_id or user_id,
+        user_id=linked_user_id,
         platform="whatsapp",
-        message_type="command" if linking_result.action == "link" else parsed.message_type,
+        message_type=_resolve_bot_log_message_type(
+            parsed_message_type=parsed.message_type,
+            linking_action=linking_result.action,
+            receipt_result=receipt_result,
+        ),
         raw_message=parsed.text,
         parsed_result={
             **parsed.to_log_payload(),
             "linking": linking_result.to_log_payload(),
+            "receipt_ocr": receipt_result.to_log_payload() if receipt_result else None,
             "transaction": transaction_result.to_log_payload()
             if transaction_result
             else None,
         },
-        status=_resolve_bot_log_status(linking_result.status, transaction_result),
-        error_message=transaction_result.error_message
-        if transaction_result
-        else linking_result.error_message,
+        status=_resolve_bot_log_status(
+            linking_status=linking_result.status,
+            receipt_result=receipt_result,
+            transaction_result=transaction_result,
+        ),
+        error_message=_resolve_error_message(
+            linking_error=linking_result.error_message,
+            receipt_result=receipt_result,
+            transaction_result=transaction_result,
+        ),
     )
     db.add(bot_log)
     db.commit()
@@ -109,8 +144,13 @@ async def receive_waha_webhook(
         bot_log_id=bot_log.id,
         user_id=bot_log.user_id,
         linking_status=linking_result.status,
-        transaction_status=transaction_result.status if transaction_result else None,
-        transaction_id=transaction_result.transaction_id if transaction_result else None,
+        transaction_status=_resolve_response_transaction_status(
+            receipt_result,
+            transaction_result,
+        ),
+        transaction_id=_resolve_response_transaction_id(receipt_result, transaction_result),
+        receipt_id=receipt_result.receipt_id if receipt_result else None,
+        job_id=receipt_result.job_id if receipt_result else None,
         reply_status=reply_status,
     )
 
@@ -153,15 +193,106 @@ def _handle_text_transaction_if_needed(
     )
 
 
+def _handle_receipt_ocr_if_needed(
+    *,
+    db: Session,
+    parsed: Any,
+    linking_action: str,
+    linked_user_id: int | None,
+    waha_client: WahaClient,
+    enqueue: ReceiptOcrEnqueue,
+) -> ReceiptOcrFlowResult | None:
+    if linking_action != "ignored" or not linked_user_id:
+        return None
+
+    if parsed.message_type == "image":
+        return handle_whatsapp_receipt_image(
+            db=db,
+            user_id=linked_user_id,
+            parsed=parsed,
+            waha_client=waha_client,
+            enqueue=enqueue,
+        )
+
+    if parsed.message_type == "text":
+        return handle_whatsapp_receipt_confirmation(
+            db=db,
+            user_id=linked_user_id,
+            text=parsed.text,
+        )
+
+    return None
+
+
+def _resolve_reply_text(
+    *,
+    receipt_result: ReceiptOcrFlowResult | None,
+    transaction_result: TextTransactionResult | None,
+    linking_reply_text: str | None,
+) -> str | None:
+    if receipt_result:
+        return receipt_result.reply_text
+    if transaction_result:
+        return transaction_result.reply_text
+    return linking_reply_text
+
+
+def _resolve_bot_log_message_type(
+    *,
+    parsed_message_type: str,
+    linking_action: str,
+    receipt_result: ReceiptOcrFlowResult | None,
+) -> str:
+    if receipt_result:
+        return "receipt_ocr"
+    if linking_action == "link":
+        return "command"
+    return parsed_message_type
+
+
 def _resolve_bot_log_status(
     linking_status: str,
+    receipt_result: ReceiptOcrFlowResult | None,
     transaction_result: TextTransactionResult | None,
 ) -> str:
+    if receipt_result:
+        return f"receipt_ocr_{receipt_result.status}"
     if transaction_result:
         return f"transaction_{transaction_result.status}"
     if linking_status == "success":
         return "linked"
     return "received"
+
+
+def _resolve_error_message(
+    *,
+    linking_error: str | None,
+    receipt_result: ReceiptOcrFlowResult | None,
+    transaction_result: TextTransactionResult | None,
+) -> str | None:
+    if receipt_result and receipt_result.error_message:
+        return receipt_result.error_message
+    if transaction_result and transaction_result.error_message:
+        return transaction_result.error_message
+    return linking_error
+
+
+def _resolve_response_transaction_status(
+    receipt_result: ReceiptOcrFlowResult | None,
+    transaction_result: TextTransactionResult | None,
+) -> str | None:
+    if receipt_result:
+        return receipt_result.status
+    return transaction_result.status if transaction_result else None
+
+
+def _resolve_response_transaction_id(
+    receipt_result: ReceiptOcrFlowResult | None,
+    transaction_result: TextTransactionResult | None,
+) -> int | None:
+    if receipt_result and receipt_result.transaction_id:
+        return receipt_result.transaction_id
+    return transaction_result.transaction_id if transaction_result else None
 
 
 def _send_reply_if_needed(

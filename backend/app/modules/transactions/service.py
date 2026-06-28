@@ -6,14 +6,17 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import Category, Transaction
-from app.modules.parser.transaction_text import ParsedTransactionText, parse_transaction_text
+from app.modules.parser.service import ParsedMessage, parse_message
+from app.modules.parser.transaction_text import (
+    INTENT_ADD_TRANSACTION,
+)
 
 
 @dataclass(frozen=True)
 class TextTransactionResult:
     status: str
     reply_text: str
-    parse_result: ParsedTransactionText
+    parse_result: ParsedMessage
     transaction_id: int | None = None
     error_message: str | None = None
 
@@ -29,7 +32,43 @@ def handle_whatsapp_text_transaction(
     user_id: int,
     text: str,
 ) -> TextTransactionResult:
-    parse_result = parse_transaction_text(text)
+    return handle_text_transaction(
+        db=db,
+        user_id=user_id,
+        text=text,
+        source="whatsapp_text",
+    )
+
+
+def handle_telegram_text_transaction(
+    *,
+    db: Session,
+    user_id: int,
+    text: str,
+) -> TextTransactionResult:
+    return handle_text_transaction(
+        db=db,
+        user_id=user_id,
+        text=text,
+        source="telegram_text",
+    )
+
+
+def handle_text_transaction(
+    *,
+    db: Session,
+    user_id: int,
+    text: str,
+    source: str,
+) -> TextTransactionResult:
+    parse_result = parse_message(text, source=source)
+    if parse_result.intent != INTENT_ADD_TRANSACTION:
+        return TextTransactionResult(
+            status=parse_result.intent,
+            reply_text=_format_command_response(parse_result),
+            parse_result=parse_result,
+        )
+
     if parse_result.need_confirmation:
         return TextTransactionResult(
             status="needs_confirmation",
@@ -88,6 +127,35 @@ def _find_category(
     return None
 
 
+def _format_command_response(parse_result: ParsedMessage) -> str:
+    period = _format_period(parse_result.period)
+
+    if parse_result.intent == "get_report":
+        return f"Perintah laporan {period} terdeteksi. Report service akan memproses permintaan ini."
+    if parse_result.intent == "export_pdf":
+        return f"Perintah export PDF laporan {period} terdeteksi. PDF service akan memproses permintaan ini."
+    if parse_result.intent == "recent_transactions":
+        return "Perintah riwayat transaksi terdeteksi. Bot akan menampilkan transaksi terbaru."
+    if parse_result.intent == "delete_last_transaction":
+        return "Perintah hapus transaksi terakhir terdeteksi. Bot akan meminta konfirmasi sebelum menghapus."
+    if parse_result.intent == "help":
+        return (
+            "Panduan: kirim transaksi seperti 'beli makan 20 ribu', "
+            "'gaji masuk 2 juta', 'laporan bulan ini', atau 'export laporan bulan ini'."
+        )
+    return "Perintah terdeteksi."
+
+
+def _format_period(period: str | None) -> str:
+    labels = {
+        "day": "hari ini",
+        "week": "minggu ini",
+        "month": "bulan ini",
+        "yesterday": "kemarin",
+    }
+    return labels.get(period or "", "default")
+
+
 def _format_saved_transaction(
     transaction: Transaction,
     category: Category | None,
@@ -101,7 +169,7 @@ def _format_saved_transaction(
     )
 
 
-def _format_confirmation_request(parse_result: ParsedTransactionText) -> str:
+def _format_confirmation_request(parse_result: ParsedMessage) -> str:
     amount = _format_rupiah(parse_result.amount) if parse_result.amount else "nominal belum terbaca"
     category = parse_result.category or "kategori belum terbaca"
     transaction_type = parse_result.type or "tipe belum terbaca"

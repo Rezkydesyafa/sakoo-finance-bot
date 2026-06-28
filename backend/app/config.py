@@ -18,18 +18,25 @@ class Settings(BaseSettings):
     frontend_origin: str = "http://localhost:3001"
     app_base_url: str = "http://localhost"
     storage_path: str = "storage"
+    media_receipt_max_bytes: int = 5 * 1024 * 1024
+    media_default_max_bytes: int = 10 * 1024 * 1024
 
     jwt_secret: str = ""
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
 
     telegram_bot_token: str = ""
+    telegram_base_url: str = "https://api.telegram.org"
+    telegram_timeout_seconds: float = 10.0
+    telegram_webhook_secret: str = ""
     waha_base_url: str = "http://localhost:3002"
     waha_api_key: str = ""
     waha_session_name: str = "default"
     waha_timeout_seconds: float = 10.0
     waha_webhook_hmac_key: str = ""
     google_application_credentials: str = ""
+    ocr_daily_limit_per_user: int = 20
+    ocr_rate_limit_timezone: str = "Asia/Jakarta"
 
     model_config = SettingsConfigDict(
         env_file=(".env", "../.env"),

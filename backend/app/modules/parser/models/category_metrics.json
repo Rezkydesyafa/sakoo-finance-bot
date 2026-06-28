@@ -1,0 +1,172 @@
+{
+  "trained_at": "2026-06-27T11:42:59.305774+00:00",
+  "dataset_path": "data/category_dataset.csv",
+  "model_path": "models/category_classifier.joblib",
+  "dataset_rows": 200,
+  "training_rows": 13260,
+  "train_rows": 9945,
+  "test_rows": 3315,
+  "labels": [
+    "Belanja",
+    "Gaji",
+    "Hiburan",
+    "Kesehatan",
+    "Lainnya",
+    "Makanan",
+    "Pendidikan",
+    "Tabungan",
+    "Tagihan",
+    "Transportasi"
+  ],
+  "label_distribution": {
+    "Belanja": 1260,
+    "Gaji": 1100,
+    "Hiburan": 1400,
+    "Kesehatan": 1400,
+    "Lainnya": 1400,
+    "Makanan": 1400,
+    "Pendidikan": 1400,
+    "Tabungan": 1100,
+    "Tagihan": 1400,
+    "Transportasi": 1400
+  },
+  "baseline_accuracy": 1.0,
+  "classification_report": {
+    "Belanja": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 315.0
+    },
+    "Gaji": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 275.0
+    },
+    "Hiburan": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 350.0
+    },
+    "Kesehatan": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 350.0
+    },
+    "Lainnya": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 350.0
+    },
+    "Makanan": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 350.0
+    },
+    "Pendidikan": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 350.0
+    },
+    "Tabungan": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 275.0
+    },
+    "Tagihan": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 350.0
+    },
+    "Transportasi": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 350.0
+    },
+    "accuracy": 1.0,
+    "macro avg": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 3315.0
+    },
+    "weighted avg": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 3315.0
+    }
+  },
+  "keyword_smoke_accuracy": 1.0,
+  "keyword_smoke_cases": [
+    {
+      "text": "makan ramen 45rb",
+      "expected": "Makanan",
+      "predicted": "Makanan",
+      "correct": true
+    },
+    {
+      "text": "ojol ke stasiun 20rb",
+      "expected": "Transportasi",
+      "predicted": "Transportasi",
+      "correct": true
+    },
+    {
+      "text": "pln prabayar 100rb",
+      "expected": "Tagihan",
+      "predicted": "Tagihan",
+      "correct": true
+    },
+    {
+      "text": "beli hoodie online",
+      "expected": "Belanja",
+      "predicted": "Belanja",
+      "correct": true
+    },
+    {
+      "text": "tiket dufan",
+      "expected": "Hiburan",
+      "predicted": "Hiburan",
+      "correct": true
+    },
+    {
+      "text": "cabut gigi dokter",
+      "expected": "Kesehatan",
+      "predicted": "Kesehatan",
+      "correct": true
+    },
+    {
+      "text": "spp anak bulan ini",
+      "expected": "Pendidikan",
+      "predicted": "Pendidikan",
+      "correct": true
+    },
+    {
+      "text": "salary remote job",
+      "expected": "Gaji",
+      "predicted": "Gaji",
+      "correct": true
+    },
+    {
+      "text": "dividen bca",
+      "expected": "Tabungan",
+      "predicted": "Tabungan",
+      "correct": true
+    },
+    {
+      "text": "uang kas komplek",
+      "expected": "Lainnya",
+      "predicted": "Lainnya",
+      "correct": true
+    }
+  ]
+}
