@@ -30,6 +30,7 @@ jobs:
       OCR_DAILY_LIMIT_PER_USER: 20
       OCR_RATE_LIMIT_TIMEZONE: Asia/Jakarta
       PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      PYTHONPATH: ${{ github.workspace }}/backend
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -47,7 +48,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run backend tests
-        run: pytest -q
+        run: python -m pytest -q
 
   frontend:
     name: Frontend Node.js 20
