@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     frontend_origin: str = "http://localhost:3001"
     app_base_url: str = "http://localhost"
     storage_path: str = "storage"
+    media_receipt_max_bytes: int = 5 * 1024 * 1024
+    media_default_max_bytes: int = 10 * 1024 * 1024
 
     jwt_secret: str = ""
     jwt_algorithm: str = "HS256"
