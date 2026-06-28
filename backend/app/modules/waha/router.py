@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.database import get_db
 from app.models import BotLog, UserPlatformAccount
-from app.modules.ocr.client import OcrClient, get_ocr_client
+from app.modules.jobs.service import ReceiptOcrEnqueue, get_receipt_ocr_enqueue
 from app.modules.transactions.service import (
     TextTransactionResult,
     handle_whatsapp_text_transaction,
@@ -49,7 +49,7 @@ async def receive_waha_webhook(
     x_webhook_hmac_algorithm: str | None = Header(default=None),
     db: Session = Depends(get_db),
     waha_client: WahaClient = Depends(get_waha_client),
-    ocr_client: OcrClient = Depends(get_ocr_client),
+    enqueue: ReceiptOcrEnqueue = Depends(get_receipt_ocr_enqueue),
 ) -> WahaWebhookResponse:
     raw_body = await request.body()
     _verify_webhook_signature(raw_body, x_webhook_hmac, x_webhook_hmac_algorithm)
@@ -82,7 +82,7 @@ async def receive_waha_webhook(
         linking_action=linking_result.action,
         linked_user_id=linked_user_id,
         waha_client=waha_client,
-        ocr_client=ocr_client,
+        enqueue=enqueue,
     )
     transaction_result = None
     if receipt_result is None:
@@ -200,7 +200,7 @@ def _handle_receipt_ocr_if_needed(
     linking_action: str,
     linked_user_id: int | None,
     waha_client: WahaClient,
-    ocr_client: OcrClient,
+    enqueue: ReceiptOcrEnqueue,
 ) -> ReceiptOcrFlowResult | None:
     if linking_action != "ignored" or not linked_user_id:
         return None
@@ -211,7 +211,7 @@ def _handle_receipt_ocr_if_needed(
             user_id=linked_user_id,
             parsed=parsed,
             waha_client=waha_client,
-            ocr_client=ocr_client,
+            enqueue=enqueue,
         )
 
     if parsed.message_type == "text":

@@ -1,16 +1,19 @@
 import re
 from dataclasses import asdict, dataclass
-from datetime import date, datetime, timezone
+from datetime import date
 from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import Category, Job, Receipt, Transaction
+from app.models import Category, Receipt, Transaction
+from app.modules.jobs.service import (
+    JobQueueError,
+    ReceiptOcrEnqueue,
+    queue_receipt_ocr_job,
+)
 from app.modules.media.service import MediaStorageError, save_media_bytes
-from app.modules.ocr.client import OcrClient, OcrClientError
-from app.modules.ocr.service import ReceiptOcrError, process_receipt_ocr
 from app.modules.parser.transaction_text import parse_transaction_text
 from app.modules.waha.client import WahaClient, WahaClientError
 from app.modules.waha.parser import ParsedWahaMessage
@@ -44,7 +47,7 @@ def handle_whatsapp_receipt_image(
     user_id: int,
     parsed: ParsedWahaMessage,
     waha_client: WahaClient,
-    ocr_client: OcrClient,
+    enqueue: ReceiptOcrEnqueue,
 ) -> ReceiptOcrFlowResult | None:
     if parsed.message_type != "image":
         return None
@@ -79,43 +82,45 @@ def handle_whatsapp_receipt_image(
             error_message=str(exc),
         )
 
-    job = Job(user_id=user_id, job_type="receipt_ocr", status="pending")
-    db.add(job)
-    db.flush()
-
     try:
-        receipt = process_receipt_ocr(
+        job = queue_receipt_ocr_job(
             db,
             user_id=user_id,
             media_id=media_file.id,
-            ocr_client=ocr_client,
+            source="whatsapp",
+            enqueue=enqueue,
+            notify_chat_id=parsed.chat_id,
+            notify_session=waha_client.session,
         )
-    except (ReceiptOcrError, OcrClientError) as exc:
-        _mark_job_failed(db, job, str(exc))
+    except JobQueueError as exc:
+        if exc.status_code == 429:
+            return ReceiptOcrFlowResult(
+                status="limit_reached",
+                media_file_id=media_file.id,
+                reply_text=(
+                    "Batas OCR harian kamu sudah tercapai. "
+                    "Coba lagi besok agar kuota Google Vision tetap terkendali."
+                ),
+                error_message=str(exc),
+            )
         return ReceiptOcrFlowResult(
-            status="ocr_failed",
+            status="queue_failed",
             media_file_id=media_file.id,
-            job_id=job.id,
             reply_text=(
-                "Foto struk sudah diterima, tetapi OCR gagal diproses. "
-                "Coba kirim ulang foto yang lebih jelas."
+                "Foto struk sudah diterima, tetapi job OCR gagal masuk antrean. "
+                "Coba lagi beberapa saat lagi."
             ),
             error_message=str(exc),
         )
 
-    job.status = "completed"
-    job.result_id = receipt.id
-    job.completed_at = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(job)
-    db.refresh(receipt)
-
     return ReceiptOcrFlowResult(
-        status=receipt.status,
+        status="queued",
         media_file_id=media_file.id,
-        receipt_id=receipt.id,
         job_id=job.id,
-        reply_text=_format_receipt_confirmation(receipt),
+        reply_text=(
+            "Foto struk diterima dan masuk antrean OCR. "
+            "Saya akan kirim hasilnya setelah selesai diproses."
+        ),
     )
 
 
@@ -269,14 +274,11 @@ def _format_receipt_confirmation(receipt: Receipt) -> str:
     )
 
 
+def format_receipt_confirmation(receipt: Receipt) -> str:
+    return _format_receipt_confirmation(receipt)
+
+
 def _format_rupiah(value: Decimal | None) -> str:
     if value is None:
         return "Rp0"
     return f"Rp{int(value):,}".replace(",", ".")
-
-
-def _mark_job_failed(db: Session, job: Job, error_message: str) -> None:
-    job.status = "failed"
-    job.error_message = error_message
-    job.completed_at = datetime.now(timezone.utc)
-    db.commit()
