@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     telegram_base_url: str = "https://api.telegram.org"
     telegram_timeout_seconds: float = 10.0
     telegram_webhook_secret: str = ""
+    telegram_register_commands_on_startup: bool = False
     waha_base_url: str = "http://localhost:3002"
     waha_api_key: str = ""
     waha_session_name: str = "default"
@@ -41,6 +42,14 @@ class Settings(BaseSettings):
     stt_language_code: str = "id-ID"
     stt_max_duration_seconds: int = 30
     stt_enable_automatic_punctuation: bool = True
+    llm_provider: str = "none"
+    gemini_api_key: str = ""
+    glm_api_key: str = ""
+    openrouter_api_key: str = ""
+    deepseek_api_key: str = ""
+    llm_timeout_seconds: float = 15.0
+    llm_max_request_per_user_per_day: int = 20
+    bot_reply_style: str = "friendly"
 
     model_config = SettingsConfigDict(
         env_file=(".env", "../.env"),
