@@ -178,6 +178,10 @@ function getAuthErrorMessage(error: unknown): string {
     if (error.status === 401) {
       return "Email atau password tidak sesuai.";
     }
+
+    if (error.status >= 500) {
+      return "Internal server error. Pastikan server backend FastAPI berjalan (localhost:8000).";
+    }
   }
 
   return "Proses autentikasi gagal.";
