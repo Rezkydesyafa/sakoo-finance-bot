@@ -1,0 +1,392 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>SAKOO AI - Laporan Keuangan - 01 Jun 2026 - 30 Jun 2026</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 16mm 15mm 20mm;
+      @bottom-right {
+        content: "Halaman " counter(page) " dari " counter(pages);
+        color: #6f6f6f;
+        font-size: 8.5px;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      background: #ffffff;
+      color: #111111;
+      font-family: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
+      font-size: 10.5px;
+      line-height: 1.45;
+      margin: 0;
+    }
+    .topline {
+      background: #111111;
+      height: 1.5px;
+      margin-bottom: 12px;
+      width: 100%;
+    }
+    .header {
+      border-bottom: 1px solid #d6d6d6;
+      margin-bottom: 14px;
+      padding-bottom: 14px;
+    }
+    .header-grid {
+      border-collapse: collapse;
+      width: 100%;
+    }
+    .header-grid td {
+      padding: 0;
+      vertical-align: top;
+    }
+    .brand-label {
+      color: #444444;
+      font-size: 8.5px;
+      font-weight: 700;
+      letter-spacing: .13em;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+    .brand-row {
+      margin-bottom: 8px;
+      white-space: nowrap;
+    }
+    .brand-mark {
+      border: 1px solid #111111;
+      display: inline-block;
+      font-size: 8px;
+      font-weight: 800;
+      height: 24px;
+      letter-spacing: .02em;
+      line-height: 24px;
+      margin-right: 8px;
+      text-align: center;
+      vertical-align: middle;
+      width: 24px;
+    }
+    .brand-name {
+      display: inline-block;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .01em;
+      vertical-align: middle;
+    }
+    .brand-subtitle {
+      color: #666666;
+      display: block;
+      font-size: 8.5px;
+      font-weight: 500;
+      margin-top: 1px;
+    }
+    h1 {
+      color: #000000;
+      font-size: 30px;
+      font-weight: 800;
+      letter-spacing: 0;
+      line-height: 1.08;
+      margin: 8px 0 10px;
+    }
+    .meta {
+      border-collapse: collapse;
+      color: #444444;
+      font-size: 9.5px;
+    }
+    .meta td {
+      padding: 1px 12px 1px 0;
+    }
+    .meta-label {
+      color: #666666;
+      font-weight: 700;
+    }
+    .header-note {
+      color: #555555;
+      font-size: 9px;
+      line-height: 1.5;
+      text-align: right;
+      white-space: nowrap;
+    }
+    .section {
+      margin-top: 14px;
+    }
+    .section-title {
+      color: #000000;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0;
+      margin: 0 0 8px;
+    }
+    .metrics {
+      border-collapse: separate;
+      border-spacing: 8px 0;
+      margin-left: -8px;
+      width: calc(100% + 16px);
+    }
+    .metric {
+      background: #ffffff;
+      border: 1px solid #b8b8b8;
+      border-radius: 8px;
+      padding: 12px 10px;
+      width: 25%;
+    }
+    .metric-label {
+      color: #555555;
+      font-size: 8px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .metric-value {
+      color: #000000;
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: 0;
+      margin-top: 5px;
+      white-space: nowrap;
+    }
+    .two-col {
+      border-collapse: separate;
+      border-spacing: 10px 0;
+      margin-left: -10px;
+      width: calc(100% + 20px);
+    }
+    .two-col td {
+      vertical-align: top;
+      width: 50%;
+    }
+    .panel {
+      background: #ffffff;
+      border: 1px solid #d2d2d2;
+      border-radius: 9px;
+      min-height: 112px;
+      padding: 12px;
+    }
+    .panel-title {
+      color: #000000;
+      font-size: 12px;
+      font-weight: 800;
+      margin-bottom: 10px;
+    }
+    .category-row {
+      margin-bottom: 12px;
+    }
+    .category-row:last-child {
+      margin-bottom: 0;
+    }
+    .category-head {
+      display: table;
+      width: 100%;
+    }
+    .category-name {
+      display: table-cell;
+      font-size: 10px;
+      font-weight: 800;
+      padding-right: 8px;
+    }
+    .category-total {
+      display: table-cell;
+      font-size: 10px;
+      font-weight: 800;
+      text-align: right;
+      white-space: nowrap;
+    }
+    .category-meta {
+      color: #666666;
+      font-size: 8.5px;
+      margin-top: 1px;
+    }
+    .bar {
+      background: #e8e8e8;
+      border-radius: 999px;
+      height: 5px;
+      margin-top: 6px;
+      overflow: hidden;
+      width: 100%;
+    }
+    .bar-fill {
+      background: #111111;
+      height: 5px;
+    }
+    table.data {
+      border-collapse: collapse;
+      width: 100%;
+    }
+    table.data thead {
+      display: table-header-group;
+    }
+    table.data tr {
+      page-break-inside: avoid;
+    }
+    table.data th {
+      background: #f1f1f1;
+      border-bottom: 1px solid #cfcfcf;
+      color: #333333;
+      font-size: 7.8px;
+      font-weight: 800;
+      letter-spacing: .07em;
+      padding: 8px 7px;
+      text-align: left;
+      text-transform: uppercase;
+    }
+    table.data td {
+      border-bottom: 1px solid #e3e3e3;
+      color: #111111;
+      padding: 9px 7px;
+      vertical-align: top;
+    }
+    table.data tbody tr:nth-child(even) td {
+      background: #fafafa;
+    }
+    .date-cell {
+      color: #333333;
+      white-space: nowrap;
+      width: 76px;
+    }
+    .note-cell {
+      min-width: 150px;
+    }
+    .note-main {
+      color: #111111;
+      font-weight: 700;
+    }
+    .note-source {
+      color: #777777;
+      display: block;
+      font-size: 8px;
+      margin-top: 1px;
+    }
+    .category-cell {
+      color: #222222;
+      font-weight: 700;
+      width: 86px;
+    }
+    .type-cell {
+      width: 82px;
+    }
+    .amount {
+      font-weight: 800;
+      text-align: right;
+      white-space: nowrap;
+      width: 92px;
+    }
+    .pill {
+      border-radius: 999px;
+      display: inline-block;
+      font-size: 7.8px;
+      font-weight: 800;
+      line-height: 1;
+      min-width: 58px;
+      padding: 4px 7px;
+      text-align: center;
+      white-space: nowrap;
+    }
+    .pill.income {
+      background: #ffffff;
+      border: 1px solid #111111;
+      color: #000000;
+    }
+    .pill.expense {
+      background: #eeeeee;
+      border: 1px solid #bdbdbd;
+      color: #000000;
+    }
+    .empty {
+      background: #fafafa;
+      border: 1px dashed #c8c8c8;
+      border-radius: 8px;
+      color: #666666;
+      padding: 16px;
+      text-align: center;
+    }
+    .footer-note {
+      border-top: 1px solid #d8d8d8;
+      color: #777777;
+      font-size: 8.3px;
+      margin-top: 18px;
+      padding-top: 9px;
+    }
+    .footer-brand {
+      color: #000000;
+      font-weight: 800;
+      margin-right: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="topline"></div>
+  <div class="header">
+    <table class="header-grid">
+      <tr>
+        <td>
+          <div class="brand-label">SAKOO AI FINANCE REPORT</div>
+          <div class="brand-row">
+            <span class="brand-mark">SA</span>
+            <span class="brand-name">SAKOO AI<span class="brand-subtitle">Finance Intelligence</span></span>
+          </div>
+          <h1>Laporan Keuangan</h1>
+          <table class="meta">
+            <tr>
+              <td class="meta-label">Pemilik</td>
+              <td><strong>Rezky</strong></td>
+            </tr>
+            <tr>
+              <td class="meta-label">Periode</td>
+              <td><strong>01 Jun 2026 - 30 Jun 2026</strong></td>
+            </tr>
+            <tr>
+              <td class="meta-label">Dibuat</td>
+              <td>29 Jun 2026 09:30</td>
+            </tr>
+          </table>
+        </td>
+        <td class="header-note">
+          Laporan otomatis<br>
+          Periode Jun 2026
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <table class="metrics">
+    <tr>
+      <td class="metric">
+        <div class="metric-label">Pemasukan</div>
+        <div class="metric-value">Rp700.000</div>
+      </td>
+      <td class="metric">
+        <div class="metric-label">Pengeluaran</div>
+        <div class="metric-value">Rp55.000</div>
+      </td>
+      <td class="metric">
+        <div class="metric-label">Saldo Bersih</div>
+        <div class="metric-value">Rp645.000</div>
+      </td>
+      <td class="metric">
+        <div class="metric-label">Transaksi</div>
+        <div class="metric-value">7</div>
+      </td>
+    </tr>
+  </table>
+
+  <div class="section">
+    <div class="section-title">Ringkasan Kategori</div>
+    <table class="two-col">
+      <tr>
+        <td><div class="panel"><div class="panel-title">Pengeluaran</div><div class="category-row"><div class="category-head"><div class="category-name">Makanan</div><div class="category-total">Rp35.000</div></div><div class="category-meta">3 transaksi - 63.64%</div><div class="bar"><div class="bar-fill" style="width: 63.64%"></div></div></div><div class="category-row"><div class="category-head"><div class="category-name">Belanja</div><div class="category-total">Rp20.000</div></div><div class="category-meta">2 transaksi - 36.36%</div><div class="bar"><div class="bar-fill" style="width: 36.36%"></div></div></div></div></td>
+        <td><div class="panel"><div class="panel-title">Pemasukan</div><div class="category-row"><div class="category-head"><div class="category-name">Gaji</div><div class="category-total">Rp700.000</div></div><div class="category-meta">2 transaksi - 100%</div><div class="bar"><div class="bar-fill" style="width: 100.00%"></div></div></div></div></td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Daftar Transaksi</div>
+    <table class="data"><thead><tr><th>Tanggal</th><th>Catatan</th><th>Kategori</th><th>Jenis</th><th class="amount">Nominal</th></tr></thead><tbody><tr><td class="date-cell">29 Jun 2026</td><td class="note-cell"><span class="note-main">saldo masuk</span><span class="note-source">telegram_text</span></td><td class="category-cell">Gaji</td><td class="type-cell"><span class="pill income">Pemasukan</span></td><td class="amount">Rp500.000</td></tr><tr><td class="date-cell">29 Jun 2026</td><td class="note-cell"><span class="note-main">beli kopi</span><span class="note-source">telegram_text</span></td><td class="category-cell">Makanan</td><td class="type-cell"><span class="pill expense">Pengeluaran</span></td><td class="amount">Rp15.000</td></tr><tr><td class="date-cell">28 Jun 2026</td><td class="note-cell"><span class="note-main">beli es teh</span><span class="note-source">telegram_text</span></td><td class="category-cell">Makanan</td><td class="type-cell"><span class="pill expense">Pengeluaran</span></td><td class="amount">Rp5.000</td></tr><tr><td class="date-cell">28 Jun 2026</td><td class="note-cell"><span class="note-main">beli ice cream</span><span class="note-source">telegram_text</span></td><td class="category-cell">Belanja</td><td class="type-cell"><span class="pill expense">Pengeluaran</span></td><td class="amount">Rp10.000</td></tr><tr><td class="date-cell">28 Jun 2026</td><td class="note-cell"><span class="note-main">transfer masuk</span><span class="note-source">telegram_text</span></td><td class="category-cell">Gaji</td><td class="type-cell"><span class="pill income">Pemasukan</span></td><td class="amount">Rp200.000</td></tr><tr><td class="date-cell">28 Jun 2026</td><td class="note-cell"><span class="note-main">beli seblak</span><span class="note-source">telegram_text</span></td><td class="category-cell">Belanja</td><td class="type-cell"><span class="pill expense">Pengeluaran</span></td><td class="amount">Rp10.000</td></tr><tr><td class="date-cell">28 Jun 2026</td><td class="note-cell"><span class="note-main">makan mie ayam</span><span class="note-source">telegram_text</span></td><td class="category-cell">Makanan</td><td class="type-cell"><span class="pill expense">Pengeluaran</span></td><td class="amount">Rp15.000</td></tr></tbody></table>
+  </div>
+
+  <div class="footer-note">
+    <span class="footer-brand">SAKOO AI</span>
+    Laporan ini dibuat otomatis oleh SAKOO AI berdasarkan data transaksi yang tersimpan.
+  </div>
+</body>
+</html>
