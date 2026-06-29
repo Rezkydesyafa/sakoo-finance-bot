@@ -44,61 +44,120 @@ def render_report_pdf_html(
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Laporan Keuangan - {escape(period_label)}</title>
+  <title>SAKOO AI - Laporan Keuangan - {escape(period_label)}</title>
   <style>
     @page {{
-      size: A4;
-      margin: 16mm 14mm 18mm;
+      size: A4 portrait;
+      margin: 16mm 15mm 20mm;
       @bottom-right {{
-        content: "Halaman " counter(page) " / " counter(pages);
-        color: #7b8794;
-        font-size: 9px;
+        content: "Halaman " counter(page) " dari " counter(pages);
+        color: #6f6f6f;
+        font-size: 8.5px;
       }}
     }}
     * {{ box-sizing: border-box; }}
     body {{
-      color: #172033;
-      font-family: Arial, Helvetica, sans-serif;
-      font-size: 11px;
+      background: #ffffff;
+      color: #111111;
+      font-family: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
+      font-size: 10.5px;
       line-height: 1.45;
       margin: 0;
     }}
     .topline {{
-      background: #1f7a5a;
-      height: 6px;
-      margin-bottom: 18px;
+      background: #111111;
+      height: 1.5px;
+      margin-bottom: 12px;
       width: 100%;
     }}
     .header {{
-      border-bottom: 1px solid #d8dee8;
-      margin-bottom: 18px;
-      padding-bottom: 16px;
+      border-bottom: 1px solid #d6d6d6;
+      margin-bottom: 14px;
+      padding-bottom: 14px;
     }}
-    .brand {{
-      color: #1f7a5a;
-      font-size: 11px;
+    .header-grid {{
+      border-collapse: collapse;
+      width: 100%;
+    }}
+    .header-grid td {{
+      padding: 0;
+      vertical-align: top;
+    }}
+    .brand-label {{
+      color: #444444;
+      font-size: 8.5px;
       font-weight: 700;
-      letter-spacing: .08em;
+      letter-spacing: .13em;
+      margin-bottom: 8px;
       text-transform: uppercase;
     }}
+    .brand-row {{
+      margin-bottom: 8px;
+      white-space: nowrap;
+    }}
+    .brand-mark {{
+      border: 1px solid #111111;
+      display: inline-block;
+      font-size: 8px;
+      font-weight: 800;
+      height: 24px;
+      letter-spacing: .02em;
+      line-height: 24px;
+      margin-right: 8px;
+      text-align: center;
+      vertical-align: middle;
+      width: 24px;
+    }}
+    .brand-name {{
+      display: inline-block;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .01em;
+      vertical-align: middle;
+    }}
+    .brand-subtitle {{
+      color: #666666;
+      display: block;
+      font-size: 8.5px;
+      font-weight: 500;
+      margin-top: 1px;
+    }}
     h1 {{
-      color: #111827;
-      font-size: 28px;
-      line-height: 1.15;
-      margin: 5px 0 8px;
+      color: #000000;
+      font-size: 30px;
+      font-weight: 800;
+      letter-spacing: 0;
+      line-height: 1.08;
+      margin: 8px 0 10px;
     }}
     .meta {{
-      color: #5d6675;
-      font-size: 10.5px;
+      border-collapse: collapse;
+      color: #444444;
+      font-size: 9.5px;
+    }}
+    .meta td {{
+      padding: 1px 12px 1px 0;
+    }}
+    .meta-label {{
+      color: #666666;
+      font-weight: 700;
+    }}
+    .header-note {{
+      color: #555555;
+      font-size: 9px;
+      line-height: 1.5;
+      text-align: right;
+      white-space: nowrap;
     }}
     .section {{
-      margin-top: 18px;
+      margin-top: 14px;
     }}
     .section-title {{
-      color: #111827;
+      color: #000000;
       font-size: 14px;
-      font-weight: 700;
-      margin: 0 0 9px;
+      font-weight: 800;
+      letter-spacing: 0;
+      margin: 0 0 8px;
     }}
     .metrics {{
       border-collapse: separate;
@@ -107,33 +166,26 @@ def render_report_pdf_html(
       width: calc(100% + 16px);
     }}
     .metric {{
-      background: #f6f8fb;
-      border: 1px solid #dce3ec;
-      border-radius: 6px;
-      padding: 12px 11px;
+      background: #ffffff;
+      border: 1px solid #b8b8b8;
+      border-radius: 8px;
+      padding: 12px 10px;
       width: 25%;
     }}
     .metric-label {{
-      color: #667085;
-      font-size: 9px;
-      font-weight: 700;
-      letter-spacing: .05em;
+      color: #555555;
+      font-size: 8px;
+      font-weight: 800;
+      letter-spacing: .08em;
       text-transform: uppercase;
     }}
     .metric-value {{
-      color: #111827;
-      font-size: 17px;
-      font-weight: 700;
-      margin-top: 4px;
+      color: #000000;
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: 0;
+      margin-top: 5px;
       white-space: nowrap;
-    }}
-    .metric-value.income {{ color: #147a50; }}
-    .metric-value.expense {{ color: #b42318; }}
-    .metric-value.balance {{ color: #164e8f; }}
-    .panel {{
-      border: 1px solid #dce3ec;
-      border-radius: 6px;
-      padding: 12px;
     }}
     .two-col {{
       border-collapse: separate;
@@ -145,42 +197,24 @@ def render_report_pdf_html(
       vertical-align: top;
       width: 50%;
     }}
-    table.data {{
-      border-collapse: collapse;
-      width: 100%;
+    .panel {{
+      background: #ffffff;
+      border: 1px solid #d2d2d2;
+      border-radius: 9px;
+      min-height: 112px;
+      padding: 12px;
     }}
-    table.data th {{
-      background: #f3f6fa;
-      border-bottom: 1px solid #dce3ec;
-      color: #475467;
-      font-size: 9px;
-      letter-spacing: .04em;
-      padding: 8px 7px;
-      text-align: left;
-      text-transform: uppercase;
-    }}
-    table.data td {{
-      border-bottom: 1px solid #edf1f6;
-      padding: 8px 7px;
-      vertical-align: top;
-    }}
-    .amount {{
-      font-weight: 700;
-      text-align: right;
-      white-space: nowrap;
-    }}
-    .muted {{ color: #667085; }}
-    .pill {{
-      border-radius: 999px;
-      display: inline-block;
-      font-size: 9px;
-      font-weight: 700;
-      padding: 2px 7px;
-    }}
-    .pill.income {{ background: #e6f4ee; color: #147a50; }}
-    .pill.expense {{ background: #fdecec; color: #b42318; }}
-    .category-row {{
+    .panel-title {{
+      color: #000000;
+      font-size: 12px;
+      font-weight: 800;
       margin-bottom: 10px;
+    }}
+    .category-row {{
+      margin-bottom: 12px;
+    }}
+    .category-row:last-child {{
+      margin-bottom: 0;
     }}
     .category-head {{
       display: table;
@@ -188,65 +222,187 @@ def render_report_pdf_html(
     }}
     .category-name {{
       display: table-cell;
-      font-weight: 700;
+      font-size: 10px;
+      font-weight: 800;
+      padding-right: 8px;
     }}
     .category-total {{
       display: table-cell;
-      font-weight: 700;
+      font-size: 10px;
+      font-weight: 800;
       text-align: right;
       white-space: nowrap;
     }}
+    .category-meta {{
+      color: #666666;
+      font-size: 8.5px;
+      margin-top: 1px;
+    }}
     .bar {{
-      background: #edf1f6;
+      background: #e8e8e8;
       border-radius: 999px;
-      height: 7px;
-      margin-top: 5px;
+      height: 5px;
+      margin-top: 6px;
       overflow: hidden;
+      width: 100%;
     }}
     .bar-fill {{
-      background: #1f7a5a;
-      height: 7px;
+      background: #111111;
+      height: 5px;
+    }}
+    table.data {{
+      border-collapse: collapse;
+      width: 100%;
+    }}
+    table.data thead {{
+      display: table-header-group;
+    }}
+    table.data tr {{
+      page-break-inside: avoid;
+    }}
+    table.data th {{
+      background: #f1f1f1;
+      border-bottom: 1px solid #cfcfcf;
+      color: #333333;
+      font-size: 7.8px;
+      font-weight: 800;
+      letter-spacing: .07em;
+      padding: 8px 7px;
+      text-align: left;
+      text-transform: uppercase;
+    }}
+    table.data td {{
+      border-bottom: 1px solid #e3e3e3;
+      color: #111111;
+      padding: 9px 7px;
+      vertical-align: top;
+    }}
+    table.data tbody tr:nth-child(even) td {{
+      background: #fafafa;
+    }}
+    .date-cell {{
+      color: #333333;
+      white-space: nowrap;
+      width: 76px;
+    }}
+    .note-cell {{
+      min-width: 150px;
+    }}
+    .note-main {{
+      color: #111111;
+      font-weight: 700;
+    }}
+    .note-source {{
+      color: #777777;
+      display: block;
+      font-size: 8px;
+      margin-top: 1px;
+    }}
+    .category-cell {{
+      color: #222222;
+      font-weight: 700;
+      width: 86px;
+    }}
+    .type-cell {{
+      width: 82px;
+    }}
+    .amount {{
+      font-weight: 800;
+      text-align: right;
+      white-space: nowrap;
+      width: 92px;
+    }}
+    .pill {{
+      border-radius: 999px;
+      display: inline-block;
+      font-size: 7.8px;
+      font-weight: 800;
+      line-height: 1;
+      min-width: 58px;
+      padding: 4px 7px;
+      text-align: center;
+      white-space: nowrap;
+    }}
+    .pill.income {{
+      background: #ffffff;
+      border: 1px solid #111111;
+      color: #000000;
+    }}
+    .pill.expense {{
+      background: #eeeeee;
+      border: 1px solid #bdbdbd;
+      color: #000000;
     }}
     .empty {{
-      background: #f8fafc;
-      border: 1px dashed #cbd5e1;
-      border-radius: 6px;
-      color: #667085;
-      padding: 18px;
+      background: #fafafa;
+      border: 1px dashed #c8c8c8;
+      border-radius: 8px;
+      color: #666666;
+      padding: 16px;
       text-align: center;
     }}
     .footer-note {{
-      color: #7b8794;
-      font-size: 9px;
-      margin-top: 16px;
+      border-top: 1px solid #d8d8d8;
+      color: #777777;
+      font-size: 8.3px;
+      margin-top: 18px;
+      padding-top: 9px;
+    }}
+    .footer-brand {{
+      color: #000000;
+      font-weight: 800;
+      margin-right: 10px;
     }}
   </style>
 </head>
 <body>
   <div class="topline"></div>
   <div class="header">
-    <div class="brand">Sakoo Finance Bot</div>
-    <h1>Laporan Keuangan</h1>
-    <div class="meta">
-      Pemilik: <strong>{escape(user_name)}</strong><br>
-      Periode: <strong>{escape(period_label)}</strong><br>
-      Dibuat: {escape(_format_datetime(generated_at))}
-    </div>
+    <table class="header-grid">
+      <tr>
+        <td>
+          <div class="brand-label">SAKOO AI FINANCE REPORT</div>
+          <div class="brand-row">
+            <span class="brand-mark">SA</span>
+            <span class="brand-name">SAKOO AI<span class="brand-subtitle">Finance Intelligence</span></span>
+          </div>
+          <h1>Laporan Keuangan</h1>
+          <table class="meta">
+            <tr>
+              <td class="meta-label">Pemilik</td>
+              <td><strong>{escape(user_name)}</strong></td>
+            </tr>
+            <tr>
+              <td class="meta-label">Periode</td>
+              <td><strong>{escape(period_label)}</strong></td>
+            </tr>
+            <tr>
+              <td class="meta-label">Dibuat</td>
+              <td>{escape(_format_datetime(generated_at))}</td>
+            </tr>
+          </table>
+        </td>
+        <td class="header-note">
+          Laporan otomatis<br>
+          Periode {escape(_short_period_label(summary))}
+        </td>
+      </tr>
+    </table>
   </div>
 
   <table class="metrics">
     <tr>
       <td class="metric">
         <div class="metric-label">Pemasukan</div>
-        <div class="metric-value income">{escape(_format_rupiah(summary.total_income))}</div>
+        <div class="metric-value">{escape(_format_rupiah(summary.total_income))}</div>
       </td>
       <td class="metric">
         <div class="metric-label">Pengeluaran</div>
-        <div class="metric-value expense">{escape(_format_rupiah(summary.total_expense))}</div>
+        <div class="metric-value">{escape(_format_rupiah(summary.total_expense))}</div>
       </td>
       <td class="metric">
         <div class="metric-label">Saldo Bersih</div>
-        <div class="metric-value balance">{escape(_format_rupiah(summary.net_balance))}</div>
+        <div class="metric-value">{escape(_format_rupiah(summary.net_balance))}</div>
       </td>
       <td class="metric">
         <div class="metric-label">Transaksi</div>
@@ -259,8 +415,8 @@ def render_report_pdf_html(
     <div class="section-title">Ringkasan Kategori</div>
     <table class="two-col">
       <tr>
-        <td><div class="panel"><div class="section-title">Pengeluaran</div>{expense_rows}</div></td>
-        <td><div class="panel"><div class="section-title">Pemasukan</div>{income_rows}</div></td>
+        <td><div class="panel"><div class="panel-title">Pengeluaran</div>{expense_rows}</div></td>
+        <td><div class="panel"><div class="panel-title">Pemasukan</div>{income_rows}</div></td>
       </tr>
     </table>
   </div>
@@ -271,7 +427,8 @@ def render_report_pdf_html(
   </div>
 
   <div class="footer-note">
-    Laporan ini dibuat otomatis dari data transaksi yang tersimpan di Sakoo Finance Bot.
+    <span class="footer-brand">SAKOO AI</span>
+    Laporan ini dibuat otomatis oleh SAKOO AI berdasarkan data transaksi yang tersimpan.
   </div>
 </body>
 </html>"""
@@ -285,19 +442,27 @@ def _render_transaction_rows(transactions: list[ReportTransactionItem]) -> str:
     for item in transactions:
         rows.append(
             "<tr>"
-            f"<td>{escape(_format_date(item.transaction_date))}</td>"
-            f"<td>{escape(item.description or '-')}<br>"
-            f"<span class=\"muted\">{escape(item.source)}</span></td>"
-            f"<td>{escape(item.category_name or 'Tanpa kategori')}</td>"
-            f"<td><span class=\"pill {escape(item.type)}\">{escape(_type_label(item.type))}</span></td>"
-            f"<td class=\"amount\">{escape(_format_rupiah(item.amount))}</td>"
+            f'<td class="date-cell">{escape(_format_date(item.transaction_date))}</td>'
+            '<td class="note-cell">'
+            f'<span class="note-main">{escape(item.description or "-")}</span>'
+            f'<span class="note-source">{escape(item.source)}</span>'
+            "</td>"
+            f'<td class="category-cell">{escape(item.category_name or "Tanpa kategori")}</td>'
+            f'<td class="type-cell"><span class="pill {escape(item.type)}">'
+            f"{escape(_type_label(item.type))}</span></td>"
+            f'<td class="amount">{escape(_format_rupiah(item.amount))}</td>'
             "</tr>"
         )
 
     return (
         '<table class="data">'
-        "<thead><tr><th>Tanggal</th><th>Catatan</th><th>Kategori</th>"
-        "<th>Jenis</th><th class=\"amount\">Nominal</th></tr></thead>"
+        "<thead><tr>"
+        "<th>Tanggal</th>"
+        "<th>Catatan</th>"
+        "<th>Kategori</th>"
+        "<th>Jenis</th>"
+        '<th class="amount">Nominal</th>'
+        "</tr></thead>"
         f"<tbody>{''.join(rows)}</tbody></table>"
     )
 
@@ -307,7 +472,7 @@ def _render_category_rows(category_response: ReportCategoryResponse) -> str:
         return '<div class="empty">Tidak ada data.</div>'
 
     rows = []
-    for item in category_response.items[:6]:
+    for item in category_response.items:
         width = max(0, min(float(item.percentage), 100))
         rows.append(
             '<div class="category-row">'
@@ -315,7 +480,9 @@ def _render_category_rows(category_response: ReportCategoryResponse) -> str:
             f'<div class="category-name">{escape(item.category_name)}</div>'
             f'<div class="category-total">{escape(_format_rupiah(item.total_amount))}</div>'
             "</div>"
-            f'<div class="muted">{item.transaction_count} transaksi - {item.percentage}%</div>'
+            '<div class="category-meta">'
+            f"{item.transaction_count} transaksi - {_format_percentage(item.percentage)}"
+            "</div>"
             '<div class="bar">'
             f'<div class="bar-fill" style="width: {width:.2f}%"></div>'
             "</div>"
@@ -330,6 +497,14 @@ def _period_label(summary: ReportSummaryResponse) -> str:
     return f"{_format_date(summary.period_start)} - {_format_date(summary.period_end)}"
 
 
+def _short_period_label(summary: ReportSummaryResponse) -> str:
+    if summary.period_start.year == summary.period_end.year and (
+        summary.period_start.month == summary.period_end.month
+    ):
+        return f"{MONTH_LABELS[summary.period_start.month]} {summary.period_start.year}"
+    return _period_label(summary)
+
+
 def _format_date(value) -> str:
     return f"{value.day:02d} {MONTH_LABELS[value.month]} {value.year}"
 
@@ -342,6 +517,13 @@ def _format_rupiah(value: Decimal) -> str:
     sign = "-" if value < 0 else ""
     number = f"{abs(int(value)):,}".replace(",", ".")
     return f"{sign}Rp{number}"
+
+
+def _format_percentage(value: Decimal) -> str:
+    normalized = value.quantize(Decimal("0.01"))
+    if normalized == normalized.to_integral_value():
+        return f"{int(normalized)}%"
+    return f"{normalized}%"
 
 
 def _type_label(value: str) -> str:
