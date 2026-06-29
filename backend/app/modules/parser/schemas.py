@@ -1,0 +1,129 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import date
+from decimal import Decimal
+from typing import Any
+
+
+SOURCE_WHATSAPP_TEXT = "whatsapp_text"
+CONFIRMATION_THRESHOLD = 0.85
+LLM_FALLBACK_THRESHOLD = 0.60
+
+INTENT_ADD_TRANSACTION = "add_transaction"
+INTENT_GET_BALANCE = "get_balance"
+INTENT_LIST_EXPENSE = "list_expense"
+INTENT_LIST_INCOME = "list_income"
+INTENT_GET_REPORT = "get_report"
+INTENT_EXPORT_PDF = "export_pdf"
+INTENT_HELP = "help"
+INTENT_LINK_ACCOUNT = "link_account"
+INTENT_UNKNOWN = "unknown"
+
+# Existing public intent kept for backward compatibility with earlier tests/flows.
+INTENT_RECENT_TRANSACTIONS = "recent_transactions"
+INTENT_DELETE_LAST_TRANSACTION = "delete_last_transaction"
+
+VALID_INTENTS = {
+    INTENT_ADD_TRANSACTION,
+    INTENT_GET_BALANCE,
+    INTENT_LIST_EXPENSE,
+    INTENT_LIST_INCOME,
+    INTENT_GET_REPORT,
+    INTENT_EXPORT_PDF,
+    INTENT_HELP,
+    INTENT_LINK_ACCOUNT,
+    INTENT_UNKNOWN,
+    INTENT_RECENT_TRANSACTIONS,
+    INTENT_DELETE_LAST_TRANSACTION,
+}
+
+TRANSACTION_TYPES = {"income", "expense", "none"}
+
+COMPACT_INTENT_MAP = {
+    "ADD": INTENT_ADD_TRANSACTION,
+    "BAL": INTENT_GET_BALANCE,
+    "EXP": INTENT_LIST_EXPENSE,
+    "INC": INTENT_LIST_INCOME,
+    "REP": INTENT_GET_REPORT,
+    "PDF": INTENT_EXPORT_PDF,
+    "HELP": INTENT_HELP,
+    "UNK": INTENT_UNKNOWN,
+}
+
+CATEGORY_CODE_MAP = {
+    "MKN": "Makanan",
+    "TRP": "Transportasi",
+    "TGH": "Tagihan",
+    "BLJ": "Belanja",
+    "HBR": "Hiburan",
+    "KSH": "Kesehatan",
+    "PDD": "Pendidikan",
+    "GJI": "Gaji",
+    "USK": "Uang Saku",
+    "LNY": "Lainnya",
+}
+
+DATE_CODE_MAP = {
+    "today": "day",
+    "yesterday": "yesterday",
+    "this_week": "week",
+    "this_month": "month",
+    "unknown": None,
+}
+
+
+@dataclass(frozen=True)
+class ParsedTransactionText:
+    intent: str
+    type: str | None
+    amount: Decimal | None
+    category: str | None
+    description: str | None
+    transaction_date: date | None
+    source: str
+    confidence: float
+    need_confirmation: bool
+    reasons: list[str]
+    period: str | None = None
+
+    def to_log_payload(self) -> dict[str, Any]:
+        return {
+            "intent": self.intent,
+            "type": self.type,
+            "amount": str(self.amount) if self.amount is not None else None,
+            "category": self.category,
+            "description": self.description,
+            "transaction_date": self.transaction_date.isoformat()
+            if self.transaction_date
+            else None,
+            "source": self.source,
+            "confidence": self.confidence,
+            "need_confirmation": self.need_confirmation,
+            "reasons": self.reasons,
+            "period": self.period,
+        }
+
+
+@dataclass(frozen=True)
+class AmountMatch:
+    value: Decimal
+    start: int
+    end: int
+    score: float
+
+
+@dataclass(frozen=True)
+class DateMatch:
+    value: date
+    start: int
+    end: int
+    explicit: bool
+    period_code: str | None = None
+
+
+@dataclass(frozen=True)
+class IntentMatch:
+    intent: str
+    period: str | None = None
+    confidence: float = 1.0

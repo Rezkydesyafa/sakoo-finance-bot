@@ -199,3 +199,96 @@ transfer orang tua,Lainnya,expense
 biaya kirim paket,Lainnya,expense
 bayar parkir liar,Lainnya,expense
 pengeluaran miscellaneous,Lainnya,expense
+abis buat kopi,Makanan,expense
+kopi susu kampus,Makanan,expense
+nugas di cafe,Makanan,expense
+nongkrong cafe,Makanan,expense
+jajan seblak,Makanan,expense
+warteg deket kos,Makanan,expense
+makan ayam geprek kampus,Makanan,expense
+beli es teh,Makanan,expense
+gofood nasi ayam,Makanan,expense
+grabfood burger,Makanan,expense
+beli cemilan buat nugas,Makanan,expense
+ngopi sambil belajar,Makanan,expense
+bayar parkir kampus,Transportasi,expense
+bensin motor kuliah,Transportasi,expense
+gojek ke kampus,Transportasi,expense
+grab bike pulang,Transportasi,expense
+ojol ke stasiun,Transportasi,expense
+naik krl kampus,Transportasi,expense
+tiket bus pulang kos,Transportasi,expense
+isi e money tol,Transportasi,expense
+topup e toll,Transportasi,expense
+duit kos,Tagihan,expense
+bayar kos bulanan mahasiswa,Tagihan,expense
+tagihan wifi kos,Tagihan,expense
+beli kuota zoom,Tagihan,expense
+pulsa buat paket data,Tagihan,expense
+token listrik kontrakan,Tagihan,expense
+iuran air kos,Tagihan,expense
+bayar indihome kos,Tagihan,expense
+top up dana,Belanja,expense
+topup gopay,Belanja,expense
+top up ovo,Belanja,expense
+topup shopeepay,Belanja,expense
+checkout shopee skincare,Belanja,expense
+tokopedia charger laptop,Belanja,expense
+tiktok shop baju,Belanja,expense
+beli hoodie online,Belanja,expense
+belanja indomaret kampus,Belanja,expense
+alfamart cemilan kos,Belanja,expense
+bayar netflix bareng,Hiburan,expense
+spotify family,Hiburan,expense
+topup valorant,Hiburan,expense
+top up mobile legends,Hiburan,expense
+nonton bioskop sama teman,Hiburan,expense
+tiket konser kampus,Hiburan,expense
+main billiard,Hiburan,expense
+sewa lapangan futsal,Hiburan,expense
+beli obat maag,Kesehatan,expense
+obat flu apotek,Kesehatan,expense
+periksa klinik kampus,Kesehatan,expense
+vitamin anak kos,Kesehatan,expense
+bayar bpjs mandiri,Kesehatan,expense
+konsultasi halodoc,Kesehatan,expense
+tambal gigi dokter,Kesehatan,expense
+bayar ukt semester,Pendidikan,expense
+fotokopi materi,Pendidikan,expense
+print tugas kuliah,Pendidikan,expense
+beli buku kuliah bekas,Pendidikan,expense
+kelas online coding,Pendidikan,expense
+kursus toefl,Pendidikan,expense
+bayar sertifikasi online,Pendidikan,expense
+seminar kampus,Pendidikan,expense
+gaji magang,Gaji,income
+fee freelance desain,Gaji,income
+honor asisten dosen,Gaji,income
+bayaran part time,Gaji,income
+bonus project kampus,Gaji,income
+invoice desain dibayar,Gaji,income
+komisi affiliate masuk,Gaji,income
+uang jajan nyokap,Uang Saku,income
+uang saku bulanan,Uang Saku,income
+dapet uang saku,Uang Saku,income
+dapat uang jajan,Uang Saku,income
+transfer ibu,Uang Saku,income
+transfer ayah,Uang Saku,income
+dikasih ortu,Uang Saku,income
+kiriman orang tua,Uang Saku,income
+uang makan dari rumah,Uang Saku,income
+bekal bulanan,Uang Saku,income
+cashback shopee,Tabungan,income
+cashback gopay,Tabungan,income
+refund tokopedia,Tabungan,income
+nabung dari sisa uang saku,Tabungan,income
+setor tabungan mahasiswa,Tabungan,income
+profit jualan kecil,Tabungan,income
+dividen reksadana,Tabungan,income
+uang kas kelas,Lainnya,expense
+patungan tugas kelompok,Lainnya,expense
+donasi kampus,Lainnya,expense
+biaya admin dana,Lainnya,expense
+biaya admin gopay,Lainnya,expense
+transfer teman,Lainnya,expense
+pengeluaran random anak kos,Lainnya,expense

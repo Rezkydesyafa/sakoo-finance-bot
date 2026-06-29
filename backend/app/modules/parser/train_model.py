@@ -39,8 +39,15 @@ SMOKE_EVALUATION_CASES: tuple[tuple[str, str], ...] = (
     ("cabut gigi dokter", "Kesehatan"),
     ("spp anak bulan ini", "Pendidikan"),
     ("salary remote job", "Gaji"),
+    ("uang jajan nyokap 200rb", "Uang Saku"),
+    ("dapet uang saku 100k", "Uang Saku"),
     ("dividen bca", "Tabungan"),
+    ("cashback gopay", "Tabungan"),
     ("uang kas komplek", "Lainnya"),
+    ("abis buat kopi 18k", "Makanan"),
+    ("nugas di cafe 35rb", "Makanan"),
+    ("top up dana 50k", "Belanja"),
+    ("duit kos 1.5jt", "Tagihan"),
 )
 
 

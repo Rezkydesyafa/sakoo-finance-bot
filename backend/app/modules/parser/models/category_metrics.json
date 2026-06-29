@@ -1,11 +1,11 @@
 {
-  "trained_at": "2026-06-27T11:42:59.305774+00:00",
+  "trained_at": "2026-06-29T01:15:12.250528+00:00",
   "dataset_path": "data/category_dataset.csv",
   "model_path": "models/category_classifier.joblib",
-  "dataset_rows": 200,
-  "training_rows": 13260,
-  "train_rows": 9945,
-  "test_rows": 3315,
+  "dataset_rows": 293,
+  "training_rows": 19145,
+  "train_rows": 14358,
+  "test_rows": 4787,
   "labels": [
     "Belanja",
     "Gaji",
@@ -16,19 +16,21 @@
     "Pendidikan",
     "Tabungan",
     "Tagihan",
-    "Transportasi"
+    "Transportasi",
+    "Uang Saku"
   ],
   "label_distribution": {
-    "Belanja": 1260,
-    "Gaji": 1100,
-    "Hiburan": 1400,
-    "Kesehatan": 1400,
-    "Lainnya": 1400,
-    "Makanan": 1400,
-    "Pendidikan": 1400,
-    "Tabungan": 1100,
-    "Tagihan": 1400,
-    "Transportasi": 1400
+    "Belanja": 1890,
+    "Gaji": 1485,
+    "Hiburan": 1960,
+    "Kesehatan": 1820,
+    "Lainnya": 1820,
+    "Makanan": 2240,
+    "Pendidikan": 1960,
+    "Tabungan": 1430,
+    "Tagihan": 1960,
+    "Transportasi": 2030,
+    "Uang Saku": 550
   },
   "baseline_accuracy": 1.0,
   "classification_report": {
@@ -36,74 +38,80 @@
       "precision": 1.0,
       "recall": 1.0,
       "f1-score": 1.0,
-      "support": 315.0
+      "support": 473.0
     },
     "Gaji": {
       "precision": 1.0,
       "recall": 1.0,
       "f1-score": 1.0,
-      "support": 275.0
+      "support": 371.0
     },
     "Hiburan": {
       "precision": 1.0,
       "recall": 1.0,
       "f1-score": 1.0,
-      "support": 350.0
+      "support": 490.0
     },
     "Kesehatan": {
       "precision": 1.0,
       "recall": 1.0,
       "f1-score": 1.0,
-      "support": 350.0
+      "support": 455.0
     },
     "Lainnya": {
       "precision": 1.0,
       "recall": 1.0,
       "f1-score": 1.0,
-      "support": 350.0
+      "support": 455.0
     },
     "Makanan": {
       "precision": 1.0,
       "recall": 1.0,
       "f1-score": 1.0,
-      "support": 350.0
+      "support": 560.0
     },
     "Pendidikan": {
       "precision": 1.0,
       "recall": 1.0,
       "f1-score": 1.0,
-      "support": 350.0
+      "support": 490.0
     },
     "Tabungan": {
       "precision": 1.0,
       "recall": 1.0,
       "f1-score": 1.0,
-      "support": 275.0
+      "support": 358.0
     },
     "Tagihan": {
       "precision": 1.0,
       "recall": 1.0,
       "f1-score": 1.0,
-      "support": 350.0
+      "support": 490.0
     },
     "Transportasi": {
       "precision": 1.0,
       "recall": 1.0,
       "f1-score": 1.0,
-      "support": 350.0
+      "support": 508.0
+    },
+    "Uang Saku": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 137.0
     },
     "accuracy": 1.0,
     "macro avg": {
       "precision": 1.0,
       "recall": 1.0,
       "f1-score": 1.0,
-      "support": 3315.0
+      "support": 4787.0
     },
     "weighted avg": {
       "precision": 1.0,
       "recall": 1.0,
       "f1-score": 1.0,
-      "support": 3315.0
+      "support": 4787.0
     }
   },
   "keyword_smoke_accuracy": 1.0,
@@ -157,7 +165,25 @@
       "correct": true
     },
     {
+      "text": "uang jajan nyokap 200rb",
+      "expected": "Uang Saku",
+      "predicted": "Uang Saku",
+      "correct": true
+    },
+    {
+      "text": "dapet uang saku 100k",
+      "expected": "Uang Saku",
+      "predicted": "Uang Saku",
+      "correct": true
+    },
+    {
       "text": "dividen bca",
+      "expected": "Tabungan",
+      "predicted": "Tabungan",
+      "correct": true
+    },
+    {
+      "text": "cashback gopay",
       "expected": "Tabungan",
       "predicted": "Tabungan",
       "correct": true
@@ -166,6 +192,30 @@
       "text": "uang kas komplek",
       "expected": "Lainnya",
       "predicted": "Lainnya",
+      "correct": true
+    },
+    {
+      "text": "abis buat kopi 18k",
+      "expected": "Makanan",
+      "predicted": "Makanan",
+      "correct": true
+    },
+    {
+      "text": "nugas di cafe 35rb",
+      "expected": "Makanan",
+      "predicted": "Makanan",
+      "correct": true
+    },
+    {
+      "text": "top up dana 50k",
+      "expected": "Belanja",
+      "predicted": "Belanja",
+      "correct": true
+    },
+    {
+      "text": "duit kos 1.5jt",
+      "expected": "Tagihan",
+      "predicted": "Tagihan",
       "correct": true
     }
   ]
