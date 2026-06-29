@@ -1,5 +1,6 @@
 import json
 from dataclasses import asdict, dataclass
+from datetime import date
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
@@ -11,10 +12,14 @@ from app.config import get_settings
 from app.database import get_db
 from app.models import BotLog, UserPlatformAccount
 from app.modules.jobs.service import (
+    JobQueueError,
+    ReceiptOcrEnqueue,
     ReportPdfEnqueue,
     VoiceSttEnqueue,
+    get_receipt_ocr_enqueue,
     get_report_pdf_enqueue,
     get_voice_stt_enqueue,
+    queue_report_pdf_job,
 )
 from app.modules.reports.bot_pdf import ReportPdfFlowResult, handle_report_pdf_command
 from app.modules.stt.flow import VoiceSttFlowResult
@@ -37,9 +42,18 @@ from app.modules.telegram.parser import (
     parse_telegram_update,
     telegram_identifier_candidates,
 )
+from app.modules.telegram.receipt_ocr import (
+    TelegramReceiptOcrFlowResult,
+    handle_telegram_receipt_photo,
+    handle_telegram_receipt_text,
+)
 from app.modules.telegram.voice_stt import handle_telegram_voice_note
 from app.modules.transactions.service import (
     TextTransactionResult,
+    build_balance_response,
+    build_recent_transactions_response,
+    build_report_summary_response,
+    build_transaction_list_response,
     handle_telegram_text_transaction,
 )
 
@@ -65,6 +79,9 @@ class TelegramMenuCommandResult:
     status: str
     reply_text: str
     reply_markup: dict[str, Any] | None = None
+    transaction_status: str | None = None
+    job_id: int | None = None
+    error_message: str | None = None
 
     def to_log_payload(self) -> dict[str, Any]:
         return asdict(self)
@@ -79,6 +96,7 @@ async def receive_telegram_webhook(
     ),
     db: Session = Depends(get_db),
     telegram_client: TelegramClient = Depends(get_telegram_client),
+    receipt_enqueue: ReceiptOcrEnqueue = Depends(get_receipt_ocr_enqueue),
     stt_enqueue: VoiceSttEnqueue = Depends(get_voice_stt_enqueue),
     pdf_enqueue: ReportPdfEnqueue = Depends(get_report_pdf_enqueue),
 ) -> TelegramWebhookResponse:
@@ -108,7 +126,12 @@ async def receive_telegram_webhook(
         ) from exc
 
     user_id = _resolve_telegram_user_id(db, parsed)
-    menu_command_result = _handle_menu_command_if_needed(parsed)
+    menu_command_result = _handle_menu_command_if_needed(
+        parsed,
+        db=db,
+        linked_user_id=user_id,
+        enqueue=pdf_enqueue,
+    )
     if menu_command_result is not None:
         bot_log = BotLog(
             user_id=user_id,
@@ -120,6 +143,7 @@ async def receive_telegram_webhook(
                 "menu_command": menu_command_result.to_log_payload(),
             },
             status=f"menu_{menu_command_result.status}",
+            error_message=menu_command_result.error_message,
         )
         db.add(bot_log)
         db.commit()
@@ -139,7 +163,11 @@ async def receive_telegram_webhook(
             bot_log_id=bot_log.id,
             user_id=bot_log.user_id,
             linking_status="linked" if user_id else "unlinked",
-            transaction_status=menu_command_result.status,
+            transaction_status=(
+                menu_command_result.transaction_status
+                or menu_command_result.status
+            ),
+            job_id=menu_command_result.job_id,
             reply_status=reply_status,
         )
 
@@ -192,8 +220,25 @@ async def receive_telegram_webhook(
         telegram_client=telegram_client,
         enqueue=stt_enqueue,
     )
-    report_pdf_result = None
+    receipt_result = None
     if voice_result is None:
+        receipt_result = _handle_receipt_ocr_if_needed(
+            db=db,
+            parsed=parsed,
+            linking_action=linking_result.action,
+            linked_user_id=linked_user_id,
+            telegram_client=telegram_client,
+            enqueue=receipt_enqueue,
+        )
+    if voice_result is None and receipt_result is None:
+        receipt_result = _handle_receipt_text_if_needed(
+            db=db,
+            parsed=parsed,
+            linking_action=linking_result.action,
+            linked_user_id=linked_user_id,
+        )
+    report_pdf_result = None
+    if voice_result is None and receipt_result is None:
         report_pdf_result = _handle_report_pdf_if_needed(
             db=db,
             parsed=parsed,
@@ -202,7 +247,7 @@ async def receive_telegram_webhook(
             enqueue=pdf_enqueue,
         )
     transaction_result = None
-    if voice_result is None and report_pdf_result is None:
+    if voice_result is None and receipt_result is None and report_pdf_result is None:
         transaction_result = _handle_text_transaction_if_needed(
             db=db,
             parsed_message_type=parsed.message_type,
@@ -212,6 +257,7 @@ async def receive_telegram_webhook(
         )
     reply_text = _resolve_reply_text(
         voice_result=voice_result,
+        receipt_result=receipt_result,
         report_pdf_result=report_pdf_result,
         transaction_result=transaction_result,
         linking_reply_text=linking_result.reply_text,
@@ -224,6 +270,7 @@ async def receive_telegram_webhook(
             parsed_message_type=parsed.message_type,
             linking_action=linking_result.action,
             voice_result=voice_result,
+            receipt_result=receipt_result,
             report_pdf_result=report_pdf_result,
         ),
         raw_message=parsed.text,
@@ -231,6 +278,9 @@ async def receive_telegram_webhook(
             **parsed.to_log_payload(),
             "linking": linking_result.to_log_payload(),
             "voice_stt": voice_result.to_log_payload() if voice_result else None,
+            "receipt_ocr": receipt_result.to_log_payload()
+            if receipt_result
+            else None,
             "report_pdf": report_pdf_result.to_log_payload()
             if report_pdf_result
             else None,
@@ -241,12 +291,14 @@ async def receive_telegram_webhook(
         status=_resolve_bot_log_status(
             linking_result.status,
             voice_result,
+            receipt_result,
             report_pdf_result,
             transaction_result,
         ),
         error_message=_resolve_error_message(
             linking_result.error_message,
             voice_result,
+            receipt_result,
             report_pdf_result,
             transaction_result,
         ),
@@ -271,6 +323,7 @@ async def receive_telegram_webhook(
         linking_status=linking_result.status,
         transaction_status=_resolve_response_transaction_status(
             voice_result,
+            receipt_result,
             report_pdf_result,
             transaction_result,
         ),
@@ -279,7 +332,7 @@ async def receive_telegram_webhook(
             transaction_result,
         ),
         voice_note_id=voice_result.voice_note_id if voice_result else None,
-        job_id=_resolve_response_job_id(voice_result, report_pdf_result),
+        job_id=_resolve_response_job_id(voice_result, receipt_result, report_pdf_result),
         reply_status=reply_status,
     )
 
@@ -351,6 +404,45 @@ def _handle_voice_stt_if_needed(
     return None
 
 
+def _handle_receipt_ocr_if_needed(
+    *,
+    db: Session,
+    parsed: Any,
+    linking_action: str,
+    linked_user_id: int | None,
+    telegram_client: TelegramClient,
+    enqueue: ReceiptOcrEnqueue,
+) -> TelegramReceiptOcrFlowResult | None:
+    if linking_action != "ignored" or not linked_user_id:
+        return None
+
+    return handle_telegram_receipt_photo(
+        db=db,
+        user_id=linked_user_id,
+        parsed=parsed,
+        telegram_client=telegram_client,
+        enqueue=enqueue,
+    )
+
+
+def _handle_receipt_text_if_needed(
+    *,
+    db: Session,
+    parsed: Any,
+    linking_action: str,
+    linked_user_id: int | None,
+) -> TelegramReceiptOcrFlowResult | None:
+    if linking_action != "ignored" or not linked_user_id:
+        return None
+    if parsed.message_type != "text" or not parsed.text:
+        return None
+    return handle_telegram_receipt_text(
+        db=db,
+        user_id=linked_user_id,
+        text=parsed.text,
+    )
+
+
 def _handle_report_pdf_if_needed(
     *,
     db: Session,
@@ -377,12 +469,15 @@ def _handle_report_pdf_if_needed(
 def _resolve_reply_text(
     *,
     voice_result: VoiceSttFlowResult | None,
+    receipt_result: TelegramReceiptOcrFlowResult | None,
     report_pdf_result: ReportPdfFlowResult | None,
     transaction_result: TextTransactionResult | None,
     linking_reply_text: str | None,
 ) -> str | None:
     if voice_result:
         return voice_result.reply_text
+    if receipt_result:
+        return receipt_result.reply_text
     if report_pdf_result:
         return report_pdf_result.reply_text
     if transaction_result:
@@ -395,10 +490,13 @@ def _resolve_bot_log_message_type(
     parsed_message_type: str,
     linking_action: str,
     voice_result: VoiceSttFlowResult | None,
+    receipt_result: TelegramReceiptOcrFlowResult | None,
     report_pdf_result: ReportPdfFlowResult | None,
 ) -> str:
     if voice_result:
         return "voice_stt"
+    if receipt_result:
+        return "receipt_ocr"
     if report_pdf_result:
         return "report_pdf"
     if linking_action == "link":
@@ -409,11 +507,14 @@ def _resolve_bot_log_message_type(
 def _resolve_bot_log_status(
     linking_status: str,
     voice_result: VoiceSttFlowResult | None,
+    receipt_result: TelegramReceiptOcrFlowResult | None,
     report_pdf_result: ReportPdfFlowResult | None,
     transaction_result: TextTransactionResult | None,
 ) -> str:
     if voice_result:
         return f"voice_stt_{voice_result.status}"
+    if receipt_result:
+        return f"receipt_ocr_{receipt_result.status}"
     if report_pdf_result:
         return f"report_pdf_{report_pdf_result.status}"
     if transaction_result:
@@ -426,11 +527,14 @@ def _resolve_bot_log_status(
 def _resolve_error_message(
     linking_error: str | None,
     voice_result: VoiceSttFlowResult | None,
+    receipt_result: TelegramReceiptOcrFlowResult | None,
     report_pdf_result: ReportPdfFlowResult | None,
     transaction_result: TextTransactionResult | None,
 ) -> str | None:
     if voice_result and voice_result.error_message:
         return voice_result.error_message
+    if receipt_result and receipt_result.error_message:
+        return receipt_result.error_message
     if report_pdf_result and report_pdf_result.error_message:
         return report_pdf_result.error_message
     if transaction_result and transaction_result.error_message:
@@ -440,11 +544,14 @@ def _resolve_error_message(
 
 def _resolve_response_transaction_status(
     voice_result: VoiceSttFlowResult | None,
+    receipt_result: TelegramReceiptOcrFlowResult | None,
     report_pdf_result: ReportPdfFlowResult | None,
     transaction_result: TextTransactionResult | None,
 ) -> str | None:
     if voice_result:
         return voice_result.status
+    if receipt_result:
+        return receipt_result.status
     if report_pdf_result:
         return report_pdf_result.status
     return transaction_result.status if transaction_result else None
@@ -461,10 +568,13 @@ def _resolve_response_transaction_id(
 
 def _resolve_response_job_id(
     voice_result: VoiceSttFlowResult | None,
+    receipt_result: TelegramReceiptOcrFlowResult | None,
     report_pdf_result: ReportPdfFlowResult | None,
 ) -> int | None:
     if voice_result and voice_result.job_id:
         return voice_result.job_id
+    if receipt_result and receipt_result.job_id:
+        return receipt_result.job_id
     if report_pdf_result and report_pdf_result.job_id:
         return report_pdf_result.job_id
     return None
@@ -518,11 +628,15 @@ def _append_error(existing: str | None, new_error: str) -> str:
 
 def _handle_menu_command_if_needed(
     parsed: Any,
+    *,
+    db: Session,
+    linked_user_id: int | None,
+    enqueue: ReportPdfEnqueue,
 ) -> TelegramMenuCommandResult | None:
     if parsed.message_type != "text" or not parsed.text:
         return None
 
-    command = parsed.text.strip().split(maxsplit=1)[0].lower()
+    command = parsed.text.strip().split(maxsplit=1)[0].lower().split("@", 1)[0]
     if command == "/start":
         return TelegramMenuCommandResult(
             status="start",
@@ -535,7 +649,124 @@ def _handle_menu_command_if_needed(
             reply_text=format_help_response(),
             reply_markup=build_main_menu(),
         )
+    if command not in {
+        "/saldo",
+        "/pengeluaran",
+        "/pemasukan",
+        "/laporan",
+        "/export",
+        "/riwayat",
+    }:
+        return None
+
+    if linked_user_id is None:
+        return TelegramMenuCommandResult(
+            status="unlinked",
+            reply_text=_link_instruction_text(),
+            reply_markup=build_main_menu(),
+        )
+
+    if command == "/saldo":
+        return TelegramMenuCommandResult(
+            status="balance",
+            transaction_status="balance",
+            reply_text=build_balance_response(db, linked_user_id),
+            reply_markup=build_main_menu(),
+        )
+    if command == "/pengeluaran":
+        return TelegramMenuCommandResult(
+            status="expense_list",
+            transaction_status="expense_list",
+            reply_text=build_transaction_list_response(
+                db,
+                linked_user_id,
+                transaction_type="expense",
+                period=None,
+            ),
+            reply_markup=build_main_menu(),
+        )
+    if command == "/pemasukan":
+        return TelegramMenuCommandResult(
+            status="income_list",
+            transaction_status="income_list",
+            reply_text=build_transaction_list_response(
+                db,
+                linked_user_id,
+                transaction_type="income",
+                period=None,
+            ),
+            reply_markup=build_main_menu(),
+        )
+    if command == "/laporan":
+        return TelegramMenuCommandResult(
+            status="report_month",
+            transaction_status="report",
+            reply_text=build_report_summary_response(db, linked_user_id, "month"),
+            reply_markup=build_main_menu(),
+        )
+    if command == "/riwayat":
+        return TelegramMenuCommandResult(
+            status="history",
+            transaction_status="history",
+            reply_text=build_recent_transactions_response(db, linked_user_id),
+            reply_markup=build_main_menu(),
+        )
+    if command == "/export":
+        return _handle_export_command(
+            db=db,
+            parsed=parsed,
+            linked_user_id=linked_user_id,
+            enqueue=enqueue,
+        )
     return None
+
+
+def _handle_export_command(
+    *,
+    db: Session,
+    parsed: Any,
+    linked_user_id: int,
+    enqueue: ReportPdfEnqueue,
+) -> TelegramMenuCommandResult:
+    try:
+        job = queue_report_pdf_job(
+            db,
+            user_id=linked_user_id,
+            period="month",
+            anchor_date=date.today(),
+            source="telegram_bot",
+            enqueue=enqueue,
+            notify_chat_id=parsed.chat_id,
+            notify_platform="telegram",
+        )
+    except JobQueueError as exc:
+        return TelegramMenuCommandResult(
+            status="export_queue_failed",
+            reply_text=(
+                "Maaf, permintaan PDF laporan belum bisa diproses. "
+                "Coba lagi beberapa saat lagi."
+            ),
+            reply_markup=build_main_menu(),
+            error_message=exc.detail,
+        )
+
+    return TelegramMenuCommandResult(
+        status="export_queued",
+        transaction_status="queued",
+        reply_text=(
+            "Permintaan export PDF laporan bulan ini sudah masuk antrean. "
+            "Bot akan mengirim file PDF setelah selesai dibuat."
+        ),
+        reply_markup=build_main_menu(),
+        job_id=job.id,
+    )
+
+
+def _link_instruction_text() -> str:
+    return (
+        "Akun Telegram ini belum terhubung ke dashboard.\n\n"
+        "Login ke dashboard, buat kode linking, lalu kirim: hubungkan KODE."
+    )
 
 
 def _consume_waiting_state_for_text(
@@ -546,7 +777,11 @@ def _consume_waiting_state_for_text(
 ) -> str | None:
     if text.lstrip().startswith("/"):
         return None
-    return consume_waiting_input_state(db, user_id=user_id)
+    return consume_waiting_input_state(
+        db,
+        user_id=user_id,
+        states={WAITING_EXPENSE_INPUT, WAITING_INCOME_INPUT},
+    )
 
 
 def _forced_type_from_waiting_state(waiting_state: str | None) -> str | None:
