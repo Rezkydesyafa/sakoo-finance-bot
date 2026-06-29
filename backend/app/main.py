@@ -1,22 +1,18 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import router as api_router
-from app.config import get_settings
-from app.database import check_database_connection
-from app.modules.auth.router import router as auth_router
-from app.modules.jobs.router import router as jobs_router
-from app.modules.media.router import router as media_router
-from app.modules.ocr.router import router as ocr_router
-from app.modules.reports.router import router as reports_router
-from app.modules.stt.router import router as stt_router
-from app.modules.telegram.router import router as telegram_router
-from app.modules.transactions.router import router as transactions_router
-from app.modules.waha.health import router as waha_health_router
-from app.modules.waha.router import router as waha_router
+from app.api.webhooks import router as webhook_router
+from app.core.config import get_settings
+from app.core.database import check_database_connection
+from app.modules.telegram.client import TelegramClientError
+from app.modules.telegram.commands import register_bot_commands
 
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 
 def create_app() -> FastAPI:
@@ -31,16 +27,16 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(api_router, prefix=settings.api_prefix)
-    app.include_router(auth_router, prefix=settings.api_prefix)
-    app.include_router(jobs_router, prefix=settings.api_prefix)
-    app.include_router(media_router, prefix=settings.api_prefix)
-    app.include_router(ocr_router, prefix=settings.api_prefix)
-    app.include_router(reports_router, prefix=settings.api_prefix)
-    app.include_router(stt_router, prefix=settings.api_prefix)
-    app.include_router(transactions_router, prefix=settings.api_prefix)
-    app.include_router(waha_router)
-    app.include_router(waha_health_router)
-    app.include_router(telegram_router)
+    app.include_router(webhook_router)
+
+    if settings.telegram_register_commands_on_startup:
+
+        @app.on_event("startup")
+        def register_telegram_command_menu() -> None:
+            try:
+                register_bot_commands()
+            except TelegramClientError as exc:
+                logger.warning("Failed to register Telegram bot commands: %s", exc)
 
     @app.get("/")
     def read_root() -> dict[str, str]:
