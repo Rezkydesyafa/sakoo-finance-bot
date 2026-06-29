@@ -7,7 +7,6 @@ from typing import Any
 
 from app.modules.parser.category_classifier import CategoryPrediction, predict_category
 from app.modules.parser.transaction_text import (
-    CONFIRMATION_THRESHOLD,
     INTENT_ADD_TRANSACTION,
     ParsedTransactionText,
     parse_transaction_text,
@@ -161,11 +160,9 @@ def _should_use_model_category(
         return False
     if model_prediction.category == "Lainnya":
         return False
-    return (
-        model_prediction.confidence >= CATEGORY_MODEL_MIN_CONFIDENCE
-        if has_rule_fallback
-        else model_prediction.confidence >= 0.75
-    )
+    if not has_rule_fallback:
+        return False
+    return model_prediction.confidence >= CATEGORY_MODEL_MIN_CONFIDENCE
 
 
 def _calculate_final_confidence(

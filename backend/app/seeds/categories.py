@@ -14,8 +14,10 @@ DEFAULT_CATEGORIES: tuple[dict[str, str], ...] = (
     {"name": "Kesehatan", "type": "expense"},
     {"name": "Pendidikan", "type": "expense"},
     {"name": "Gaji", "type": "income"},
+    {"name": "Uang Saku", "type": "income"},
     {"name": "Tabungan", "type": "income"},
     {"name": "Lainnya", "type": "expense"},
+    {"name": "Lainnya", "type": "income"},
 )
 
 

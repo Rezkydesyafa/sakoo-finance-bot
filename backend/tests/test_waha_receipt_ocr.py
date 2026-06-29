@@ -248,6 +248,39 @@ def test_waha_receipt_total_can_be_edited_after_worker_confirmation(
         assert receipt.transaction_id == transaction.id
 
 
+def test_waha_receipt_caption_is_used_when_ocr_total_is_missing(
+    test_client: tuple[
+        TestClient,
+        sessionmaker[Session],
+        FakeWahaClient,
+        FakeOcrClient,
+        list[dict[str, Any]],
+    ],
+) -> None:
+    client, session_factory, fake_waha, fake_ocr, queued_jobs = test_client
+    _create_linked_whatsapp_user(session_factory)
+    fake_ocr.text = "TOKO SAKOO\nKopi dan roti"
+
+    image_response = client.post(
+        "/webhook/waha",
+        json=_waha_image_update(caption="beli kopi 18 ribu"),
+    )
+    assert image_response.status_code == 200, image_response.text
+    assert "Aku lagi baca struknya" in fake_waha.sent_messages[-1]["text"]
+
+    _run_queued_ocr_job(session_factory, fake_ocr, fake_waha, queued_jobs[0])
+
+    assert "caption" in fake_waha.sent_messages[-1]["text"].lower()
+    assert "Rp18.000" in fake_waha.sent_messages[-1]["text"]
+
+    with session_factory() as db:
+        receipt = db.scalar(select(Receipt))
+        assert receipt is not None
+        assert receipt.caption_text == "beli kopi 18 ribu"
+        assert receipt.total_amount == Decimal("18000.00")
+        assert receipt.status == "needs_confirmation"
+
+
 def test_waha_receipt_image_returns_limit_message_before_second_queue(
     test_client: tuple[
         TestClient,
@@ -331,8 +364,8 @@ def _create_linked_whatsapp_user(session_factory: sessionmaker[Session]) -> None
         db.commit()
 
 
-def _waha_image_update() -> dict[str, Any]:
-    return {
+def _waha_image_update(caption: str | None = None) -> dict[str, Any]:
+    payload = {
         "event": "message",
         "session": "default",
         "payload": {
@@ -348,6 +381,9 @@ def _waha_image_update() -> dict[str, Any]:
             },
         },
     }
+    if caption:
+        payload["payload"]["caption"] = caption
+    return payload
 
 
 def _waha_text_update(text: str) -> dict[str, Any]:

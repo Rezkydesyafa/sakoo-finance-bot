@@ -26,12 +26,16 @@ from app.models import (
     User,
     UserPlatformAccount,
 )
+from app.modules.telegram.commands import BOT_COMMANDS, register_bot_commands
 from app.modules.telegram.client import get_telegram_client
 
 
 class FakeTelegramClient:
     def __init__(self) -> None:
-        self.sent_messages: list[dict[str, str]] = []
+        self.sent_messages: list[dict[str, Any]] = []
+        self.edited_messages: list[dict[str, Any]] = []
+        self.answered_callback_queries: list[dict[str, Any]] = []
+        self.commands: list[dict[str, str]] | None = None
 
     def send_message(
         self,
@@ -39,15 +43,57 @@ class FakeTelegramClient:
         chat_id: str,
         text: str,
         parse_mode: str | None = None,
+        reply_markup: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         self.sent_messages.append(
             {
                 "chat_id": chat_id,
                 "text": text,
                 "parse_mode": parse_mode or "",
+                "reply_markup": reply_markup,
             }
         )
         return {"ok": True, "result": {"message_id": len(self.sent_messages)}}
+
+    def edit_message_text(
+        self,
+        *,
+        chat_id: str,
+        message_id: int,
+        text: str,
+        parse_mode: str | None = None,
+        reply_markup: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        self.edited_messages.append(
+            {
+                "chat_id": chat_id,
+                "message_id": message_id,
+                "text": text,
+                "parse_mode": parse_mode or "",
+                "reply_markup": reply_markup,
+            }
+        )
+        return {"ok": True, "result": {"message_id": message_id}}
+
+    def answer_callback_query(
+        self,
+        *,
+        callback_query_id: str,
+        text: str | None = None,
+        show_alert: bool = False,
+    ) -> dict[str, Any]:
+        self.answered_callback_queries.append(
+            {
+                "callback_query_id": callback_query_id,
+                "text": text,
+                "show_alert": show_alert,
+            }
+        )
+        return {"ok": True, "result": True}
+
+    def set_my_commands(self, commands: list[dict[str, str]]) -> dict[str, Any]:
+        self.commands = commands
+        return {"ok": True, "result": True}
 
 
 @pytest.fixture()
@@ -72,6 +118,7 @@ def test_client() -> Iterator[tuple[TestClient, sessionmaker[Session], FakeTeleg
                 Category(name="Makanan", type="expense"),
                 Category(name="Gaji", type="income"),
                 Category(name="Lainnya", type="expense"),
+                Category(name="Uang Saku", type="income"),
             ]
         )
         db.commit()
@@ -133,6 +180,151 @@ def test_unlinked_telegram_user_gets_linking_instruction(
         assert log is not None
         assert log.platform == "telegram"
         assert log.status == "received"
+
+
+def test_register_bot_commands_uses_telegram_set_my_commands() -> None:
+    fake_telegram = FakeTelegramClient()
+
+    result = register_bot_commands(fake_telegram)  # type: ignore[arg-type]
+
+    assert result["ok"] is True
+    assert fake_telegram.commands == BOT_COMMANDS
+    assert fake_telegram.commands[0] == {
+        "command": "start",
+        "description": "Mulai Sakoo",
+    }
+
+
+def test_start_command_shows_main_menu_without_linking(
+    test_client: tuple[TestClient, sessionmaker[Session], FakeTelegramClient],
+) -> None:
+    client, _session_factory, fake_telegram = test_client
+
+    response = _post_telegram_update(client, text="/start")
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["message_type"] == "command"
+    assert payload["linking_status"] == "unlinked"
+    assert payload["transaction_status"] == "start"
+    assert payload["reply_status"] == "sent"
+    assert "Sakoo Finance Bot" in fake_telegram.sent_messages[0]["text"]
+    assert _keyboard_contains(fake_telegram.sent_messages[0]["reply_markup"], "MENU_BALANCE")
+    assert _keyboard_contains(fake_telegram.sent_messages[0]["reply_markup"], "MENU_ADD")
+
+
+def test_add_menu_callback_edits_message_without_transaction_parser(
+    test_client: tuple[TestClient, sessionmaker[Session], FakeTelegramClient],
+) -> None:
+    client, session_factory, fake_telegram = test_client
+
+    response = _post_telegram_callback(client, data="MENU_ADD")
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["message_type"] == "callback_query"
+    assert payload["transaction_status"] == "add_menu"
+    assert payload["reply_status"] == "sent"
+    assert fake_telegram.answered_callback_queries[0]["callback_query_id"] == "callback-1"
+    assert "Mau catat transaksi" in fake_telegram.edited_messages[0]["text"]
+    assert _keyboard_contains(fake_telegram.edited_messages[0]["reply_markup"], "ADD_EXPENSE")
+
+    with session_factory() as db:
+        assert db.scalar(select(Transaction)) is None
+
+
+def test_balance_callback_for_linked_user_uses_menu_handler(
+    test_client: tuple[TestClient, sessionmaker[Session], FakeTelegramClient],
+) -> None:
+    client, session_factory, fake_telegram = test_client
+    with session_factory() as db:
+        user = _create_user(db)
+        _link_telegram_user(db, user.id)
+        income_category = db.scalar(select(Category).where(Category.name == "Gaji"))
+        expense_category = db.scalar(select(Category).where(Category.name == "Makanan"))
+        db.add_all(
+            [
+                Transaction(
+                    user_id=user.id,
+                    type="income",
+                    amount=Decimal("100000.00"),
+                    category_id=income_category.id if income_category else None,
+                    description="gaji",
+                    transaction_date=datetime.now(timezone.utc).date(),
+                    source="telegram_text",
+                ),
+                Transaction(
+                    user_id=user.id,
+                    type="expense",
+                    amount=Decimal("20000.00"),
+                    category_id=expense_category.id if expense_category else None,
+                    description="makan",
+                    transaction_date=datetime.now(timezone.utc).date(),
+                    source="telegram_text",
+                ),
+            ]
+        )
+        db.commit()
+
+    response = _post_telegram_callback(client, data="MENU_BALANCE")
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["transaction_status"] == "balance"
+    assert "Sisa saldo: Rp80.000" in fake_telegram.edited_messages[0]["text"]
+    assert fake_telegram.answered_callback_queries
+
+
+def test_add_expense_callback_sets_state_and_next_text_saves_expense(
+    test_client: tuple[TestClient, sessionmaker[Session], FakeTelegramClient],
+) -> None:
+    client, session_factory, fake_telegram = test_client
+    with session_factory() as db:
+        user = _create_user(db)
+        _link_telegram_user(db, user.id)
+        db.commit()
+
+    callback_response = _post_telegram_callback(client, data="ADD_EXPENSE")
+
+    assert callback_response.status_code == 200, callback_response.text
+    assert callback_response.json()["transaction_status"] == "WAITING_EXPENSE_INPUT"
+    assert "Mode catat pengeluaran aktif" in fake_telegram.edited_messages[0]["text"]
+
+    text_response = _post_telegram_update(client, text="makan 20 ribu", update_id=1002)
+
+    assert text_response.status_code == 200, text_response.text
+    payload = text_response.json()
+    assert payload["transaction_status"] == "saved"
+    with session_factory() as db:
+        transaction = db.scalar(select(Transaction))
+        assert transaction is not None
+        assert transaction.type == "expense"
+        assert transaction.amount == Decimal("20000.00")
+
+
+def test_add_income_callback_forces_next_text_as_income(
+    test_client: tuple[TestClient, sessionmaker[Session], FakeTelegramClient],
+) -> None:
+    client, session_factory, _fake_telegram = test_client
+    with session_factory() as db:
+        user = _create_user(db)
+        _link_telegram_user(db, user.id)
+        db.commit()
+
+    callback_response = _post_telegram_callback(client, data="ADD_INCOME")
+
+    assert callback_response.status_code == 200, callback_response.text
+    assert callback_response.json()["transaction_status"] == "WAITING_INCOME_INPUT"
+
+    text_response = _post_telegram_update(client, text="makan 20 ribu", update_id=1003)
+
+    assert text_response.status_code == 200, text_response.text
+    payload = text_response.json()
+    assert payload["transaction_status"] == "saved"
+    with session_factory() as db:
+        transaction = db.scalar(select(Transaction))
+        assert transaction is not None
+        assert transaction.type == "income"
 
 
 def test_valid_linking_code_links_telegram_account(
@@ -224,11 +416,25 @@ def _post_telegram_update(
     client: TestClient,
     *,
     text: str,
+    update_id: int = 1001,
 ) -> Any:
     return client.post(
         "/webhook/telegram",
         headers={"X-Telegram-Bot-Api-Secret-Token": "test-telegram-secret"},
-        json=_telegram_update(text=text),
+        json=_telegram_update(text=text, update_id=update_id),
+    )
+
+
+def _post_telegram_callback(
+    client: TestClient,
+    *,
+    data: str,
+    update_id: int = 2001,
+) -> Any:
+    return client.post(
+        "/webhook/telegram",
+        headers={"X-Telegram-Bot-Api-Secret-Token": "test-telegram-secret"},
+        json=_telegram_callback_update(data=data, update_id=update_id),
     )
 
 
@@ -257,6 +463,48 @@ def _telegram_update(
             "text": text,
         },
     }
+
+
+def _telegram_callback_update(
+    *,
+    data: str,
+    update_id: int,
+) -> dict[str, Any]:
+    return {
+        "update_id": update_id,
+        "callback_query": {
+            "id": "callback-1",
+            "from": {
+                "id": 123,
+                "is_bot": False,
+                "first_name": "Tester",
+                "username": "tester",
+            },
+            "message": {
+                "message_id": 99,
+                "chat": {
+                    "id": 456,
+                    "first_name": "Tester",
+                    "username": "tester",
+                    "type": "private",
+                },
+                "date": 1760000000,
+                "text": "Menu Sakoo",
+            },
+            "chat_instance": "chat-instance",
+            "data": data,
+        },
+    }
+
+
+def _keyboard_contains(reply_markup: dict[str, Any] | None, callback_data: str) -> bool:
+    if not reply_markup:
+        return False
+    return any(
+        button.get("callback_data") == callback_data
+        for row in reply_markup.get("inline_keyboard", [])
+        for button in row
+    )
 
 
 def _create_user(db: Session) -> User:

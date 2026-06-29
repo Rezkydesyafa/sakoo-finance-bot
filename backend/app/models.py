@@ -264,6 +264,7 @@ class Receipt(Base):
         ForeignKey("media_files.id", ondelete="CASCADE"),
         nullable=False,
     )
+    caption_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     ocr_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     merchant_name: Mapped[str | None] = mapped_column(String(160), nullable=True)
     receipt_date: Mapped[date | None] = mapped_column(Date, nullable=True)

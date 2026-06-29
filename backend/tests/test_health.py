@@ -34,6 +34,17 @@ def test_api_router_prefix() -> None:
     assert response.json() == {"message": "Sakoo Finance Bot API"}
 
 
+def test_centralized_routers_keep_existing_paths() -> None:
+    response = get("/openapi.json")
+    paths = set(response.json()["paths"])
+
+    assert "/api/auth/register" in paths
+    assert "/api/transactions" in paths
+    assert "/webhook/waha" in paths
+    assert "/webhook/telegram" in paths
+    assert "/health/waha" in paths
+
+
 def test_swagger_docs_available() -> None:
     response = get("/docs")
 

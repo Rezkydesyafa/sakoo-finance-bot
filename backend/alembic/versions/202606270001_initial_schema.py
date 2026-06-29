@@ -25,8 +25,10 @@ DEFAULT_CATEGORIES = [
     {"name": "Kesehatan", "type": "expense"},
     {"name": "Pendidikan", "type": "expense"},
     {"name": "Gaji", "type": "income"},
+    {"name": "Uang Saku", "type": "income"},
     {"name": "Tabungan", "type": "income"},
     {"name": "Lainnya", "type": "expense"},
+    {"name": "Lainnya", "type": "income"},
 ]
 
 
@@ -141,6 +143,7 @@ def upgrade() -> None:
         sa.Column("id", sa.BigInteger(), primary_key=True),
         sa.Column("user_id", sa.BigInteger(), nullable=False),
         sa.Column("media_file_id", sa.BigInteger(), nullable=False),
+        sa.Column("caption_text", sa.Text(), nullable=True),
         sa.Column("ocr_text", sa.Text(), nullable=True),
         sa.Column("merchant_name", sa.String(length=160), nullable=True),
         sa.Column("receipt_date", sa.Date(), nullable=True),

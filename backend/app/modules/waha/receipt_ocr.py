@@ -72,6 +72,12 @@ def handle_whatsapp_receipt_image(
             mime_type=parsed.media_mimetype or downloaded.content_type,
             source="whatsapp_receipt",
         )
+        _store_receipt_caption(
+            db,
+            user_id=user_id,
+            media_file_id=media_file.id,
+            caption_text=parsed.text,
+        )
     except (WahaClientError, MediaStorageError) as exc:
         return ReceiptOcrFlowResult(
             status="download_failed",
@@ -118,8 +124,10 @@ def handle_whatsapp_receipt_image(
         media_file_id=media_file.id,
         job_id=job.id,
         reply_text=(
-            "Foto struk diterima dan masuk antrean OCR. "
-            "Saya akan kirim hasilnya setelah selesai diproses."
+            "Aku lagi baca struknya...\n"
+            "[1/3] Foto diterima\n"
+            "[2/3] masuk antrean OCR\n"
+            "[3/3] Nanti aku kirim hasilnya setelah selesai diproses."
         ),
     )
 
@@ -233,6 +241,35 @@ def _find_pending_receipt(db: Session, *, user_id: int) -> Receipt | None:
     )
 
 
+def _store_receipt_caption(
+    db: Session,
+    *,
+    user_id: int,
+    media_file_id: int,
+    caption_text: str | None,
+) -> Receipt | None:
+    if not caption_text or not caption_text.strip():
+        return None
+
+    receipt = db.scalar(
+        select(Receipt).where(
+            Receipt.user_id == user_id,
+            Receipt.media_file_id == media_file_id,
+        )
+    )
+    if receipt is None:
+        receipt = Receipt(
+            user_id=user_id,
+            media_file_id=media_file_id,
+            status="pending",
+        )
+        db.add(receipt)
+        db.flush()
+
+    receipt.caption_text = caption_text.strip()
+    return receipt
+
+
 def _find_default_expense_category(db: Session) -> Category | None:
     return db.scalar(
         select(Category).where(
@@ -248,6 +285,10 @@ def _parse_edit_amount(value: str) -> Decimal | None:
 
 
 def _receipt_description(receipt: Receipt) -> str:
+    if receipt.caption_text:
+        parsed_caption = parse_transaction_text(receipt.caption_text)
+        if parsed_caption.description:
+            return parsed_caption.description
     if receipt.merchant_name:
         return f"Struk {receipt.merchant_name}"
     return "Struk WhatsApp"
@@ -259,17 +300,31 @@ def _format_receipt_confirmation(receipt: Receipt) -> str:
     confidence = f"{float(receipt.confidence or Decimal('0')) * 100:.0f}%"
 
     if receipt.total_amount is None:
+        fallback_text = (
+            " Kalau foto kurang jelas, caption juga bisa dipakai. "
+            "Contoh caption: beli makan 20 ribu."
+            if not receipt.caption_text
+            else " Caption yang kamu kirim belum punya nominal yang jelas."
+        )
         return (
             "Foto struk sudah diproses OCR, tetapi total belanja belum terbaca. "
             f"Merchant: {merchant}. Tanggal: {receipt_date}. "
             "Kirim koreksi dengan format: edit total 20000."
+            f"{fallback_text}"
         )
 
+    used_caption_fallback = (
+        bool(receipt.caption_text)
+        and receipt.status == "needs_confirmation"
+        and (receipt.confidence or Decimal("0")) == Decimal("0.7000")
+    )
+    fallback_note = " Total ini aku ambil dari caption karena OCR belum cukup jelas. " if used_caption_fallback else ""
     return (
         "Foto struk sudah diproses OCR. "
         f"Merchant: {merchant}. Tanggal: {receipt_date}. "
         f"Total: {_format_rupiah(receipt.total_amount)}. "
         f"Confidence: {confidence}. "
+        f"{fallback_note}"
         "Ketik YA untuk menyimpan transaksi, atau edit total 20000 untuk koreksi."
     )
 
