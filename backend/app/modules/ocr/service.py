@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from fastapi import status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -16,6 +18,7 @@ from app.modules.ocr.rate_limit import (
     log_ocr_usage,
 )
 from app.modules.ocr.receipt_parser import parse_receipt_text
+from app.modules.parser.transaction_text import parse_transaction_text
 
 
 SUPPORTED_RECEIPT_OCR_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
@@ -80,6 +83,9 @@ def process_receipt_ocr(
                 state=rate_limit_state,
                 error_message=exc.detail,
             )
+        fallback_applied = _apply_caption_fallback_if_possible(db, receipt)
+        if fallback_applied:
+            return receipt
         _mark_receipt_error(db, receipt)
         raise
 
@@ -100,6 +106,8 @@ def process_receipt_ocr(
     receipt.total_amount = parse_result.total_amount
     receipt.confidence = parse_result.confidence
     receipt.status = parse_result.status
+    if receipt.total_amount is None:
+        _apply_caption_fallback_if_possible(db, receipt)
     db.commit()
     db.refresh(receipt)
     return receipt
@@ -148,3 +156,21 @@ def _get_or_create_receipt(db: Session, *, user_id: int, media_file_id: int) -> 
 def _mark_receipt_error(db: Session, receipt: Receipt) -> None:
     receipt.status = "error"
     db.commit()
+
+
+def _apply_caption_fallback_if_possible(db: Session, receipt: Receipt) -> bool:
+    if not receipt.caption_text:
+        return False
+
+    parsed_caption = parse_transaction_text(receipt.caption_text)
+    if parsed_caption.intent != "add_transaction" or parsed_caption.amount is None:
+        return False
+
+    receipt.total_amount = parsed_caption.amount
+    receipt.receipt_date = receipt.receipt_date or parsed_caption.transaction_date
+    receipt.merchant_name = receipt.merchant_name or "Caption WhatsApp"
+    receipt.confidence = max(receipt.confidence or 0, Decimal("0.7000"))
+    receipt.status = "needs_confirmation"
+    db.commit()
+    db.refresh(receipt)
+    return True

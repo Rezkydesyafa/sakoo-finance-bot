@@ -197,6 +197,15 @@ def run_receipt_ocr_job(
     db.commit()
 
     try:
+        _send_receipt_processing_notification_if_needed(
+            waha_client=waha_client,
+            notify_chat_id=notify_chat_id,
+            notify_session=notify_session,
+        )
+    except Exception:
+        pass
+
+    try:
         receipt = process_receipt_ocr(
             db,
             user_id=user_id,
@@ -422,6 +431,26 @@ def _send_receipt_notification_if_needed(
     client.send_text(
         chat_id=notify_chat_id,
         text=format_receipt_confirmation(receipt),
+        session=notify_session,
+    )
+
+
+def _send_receipt_processing_notification_if_needed(
+    *,
+    waha_client: WahaClient | None,
+    notify_chat_id: str | None,
+    notify_session: str | None,
+) -> None:
+    if not notify_chat_id:
+        return
+    client = waha_client or get_waha_client()
+    client.send_text(
+        chat_id=notify_chat_id,
+        text=(
+            "Sedang membaca struk...\n"
+            "[==>     ] OCR berjalan\n"
+            "Tunggu sebentar, aku cek total dan tanggalnya."
+        ),
         session=notify_session,
     )
 
