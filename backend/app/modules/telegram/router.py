@@ -1,4 +1,5 @@
 import json
+from dataclasses import asdict, dataclass
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
@@ -22,7 +23,16 @@ from app.modules.telegram.client import (
     TelegramClientError,
     get_telegram_client,
 )
+from app.modules.bot.response_templates import format_help_response
+from app.modules.telegram.callback_handler import (
+    WAITING_EXPENSE_INPUT,
+    WAITING_INCOME_INPUT,
+    build_welcome_text,
+    consume_waiting_input_state,
+    handle_callback_query,
+)
 from app.modules.telegram.linking import handle_telegram_account_linking
+from app.modules.telegram.menu import build_main_menu
 from app.modules.telegram.parser import (
     parse_telegram_update,
     telegram_identifier_candidates,
@@ -48,6 +58,16 @@ class TelegramWebhookResponse(BaseModel):
     voice_note_id: int | None = None
     job_id: int | None = None
     reply_status: str | None = None
+
+
+@dataclass(frozen=True)
+class TelegramMenuCommandResult:
+    status: str
+    reply_text: str
+    reply_markup: dict[str, Any] | None = None
+
+    def to_log_payload(self) -> dict[str, Any]:
+        return asdict(self)
 
 
 @router.post("/telegram", response_model=TelegramWebhookResponse)
@@ -88,6 +108,76 @@ async def receive_telegram_webhook(
         ) from exc
 
     user_id = _resolve_telegram_user_id(db, parsed)
+    menu_command_result = _handle_menu_command_if_needed(parsed)
+    if menu_command_result is not None:
+        bot_log = BotLog(
+            user_id=user_id,
+            platform="telegram",
+            message_type="command",
+            raw_message=parsed.text,
+            parsed_result={
+                **parsed.to_log_payload(),
+                "menu_command": menu_command_result.to_log_payload(),
+            },
+            status=f"menu_{menu_command_result.status}",
+        )
+        db.add(bot_log)
+        db.commit()
+        db.refresh(bot_log)
+
+        reply_status = _send_reply_if_needed(
+            db=db,
+            client=telegram_client,
+            chat_id=parsed.chat_id,
+            reply_text=menu_command_result.reply_text,
+            bot_log=bot_log,
+            reply_markup=menu_command_result.reply_markup,
+        )
+        return TelegramWebhookResponse(
+            status="ok",
+            message_type=bot_log.message_type,
+            bot_log_id=bot_log.id,
+            user_id=bot_log.user_id,
+            linking_status="linked" if user_id else "unlinked",
+            transaction_status=menu_command_result.status,
+            reply_status=reply_status,
+        )
+
+    if parsed.message_type == "callback_query":
+        callback_result = handle_callback_query(
+            db=db,
+            parsed=parsed,
+            linked_user_id=user_id,
+            telegram_client=telegram_client,
+            enqueue=pdf_enqueue,
+        )
+        bot_log = BotLog(
+            user_id=user_id,
+            platform="telegram",
+            message_type="callback_query",
+            raw_message=parsed.callback_data,
+            parsed_result={
+                **parsed.to_log_payload(),
+                "callback": callback_result.to_log_payload(),
+            },
+            status=f"callback_{callback_result.status}",
+            error_message=callback_result.error_message,
+        )
+        db.add(bot_log)
+        db.commit()
+        db.refresh(bot_log)
+
+        return TelegramWebhookResponse(
+            status="ok",
+            message_type=bot_log.message_type,
+            bot_log_id=bot_log.id,
+            user_id=bot_log.user_id,
+            linking_status="linked" if user_id else "unlinked",
+            transaction_status=callback_result.transaction_status or callback_result.status,
+            job_id=callback_result.job_id,
+            reply_status=callback_result.reply_status,
+        )
+
     linking_result = handle_telegram_account_linking(
         db=db,
         parsed=parsed,
@@ -224,10 +314,16 @@ def _handle_text_transaction_if_needed(
         return None
     if parsed_message_type != "text" or not parsed_text:
         return None
+    waiting_state = _consume_waiting_state_for_text(
+        db=db,
+        user_id=linked_user_id,
+        text=parsed_text,
+    )
     return handle_telegram_text_transaction(
         db=db,
         user_id=linked_user_id,
         text=parsed_text,
+        forced_transaction_type=_forced_type_from_waiting_state(waiting_state),
     )
 
 
@@ -381,6 +477,7 @@ def _send_reply_if_needed(
     chat_id: str | None,
     reply_text: str | None,
     bot_log: BotLog,
+    reply_markup: dict[str, Any] | None = None,
 ) -> str | None:
     if not reply_text:
         return None
@@ -391,7 +488,10 @@ def _send_reply_if_needed(
         return "failed"
 
     try:
-        client.send_message(chat_id=chat_id, text=reply_text)
+        message_kwargs: dict[str, Any] = {"chat_id": chat_id, "text": reply_text}
+        if reply_markup:
+            message_kwargs["reply_markup"] = reply_markup
+        client.send_message(**message_kwargs)
     except TelegramClientError as exc:
         bot_log.status = "reply_failed"
         bot_log.error_message = _append_error(bot_log.error_message, str(exc))
@@ -414,3 +514,44 @@ def _verify_webhook_secret(secret_header: str | None) -> None:
 
 def _append_error(existing: str | None, new_error: str) -> str:
     return f"{existing}; {new_error}" if existing else new_error
+
+
+def _handle_menu_command_if_needed(
+    parsed: Any,
+) -> TelegramMenuCommandResult | None:
+    if parsed.message_type != "text" or not parsed.text:
+        return None
+
+    command = parsed.text.strip().split(maxsplit=1)[0].lower()
+    if command == "/start":
+        return TelegramMenuCommandResult(
+            status="start",
+            reply_text=build_welcome_text(),
+            reply_markup=build_main_menu(),
+        )
+    if command == "/help":
+        return TelegramMenuCommandResult(
+            status="help",
+            reply_text=format_help_response(),
+            reply_markup=build_main_menu(),
+        )
+    return None
+
+
+def _consume_waiting_state_for_text(
+    *,
+    db: Session,
+    user_id: int,
+    text: str,
+) -> str | None:
+    if text.lstrip().startswith("/"):
+        return None
+    return consume_waiting_input_state(db, user_id=user_id)
+
+
+def _forced_type_from_waiting_state(waiting_state: str | None) -> str | None:
+    if waiting_state == WAITING_EXPENSE_INPUT:
+        return "expense"
+    if waiting_state == WAITING_INCOME_INPUT:
+        return "income"
+    return None

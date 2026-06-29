@@ -39,6 +39,7 @@ class TelegramClient:
         chat_id: str,
         text: str,
         parse_mode: str | None = None,
+        reply_markup: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "chat_id": chat_id,
@@ -47,7 +48,48 @@ class TelegramClient:
         }
         if parse_mode:
             payload["parse_mode"] = parse_mode
+        if reply_markup:
+            payload["reply_markup"] = reply_markup
         return self._post("sendMessage", payload)
+
+    def edit_message_text(
+        self,
+        *,
+        chat_id: str,
+        message_id: int,
+        text: str,
+        parse_mode: str | None = None,
+        reply_markup: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "chat_id": chat_id,
+            "message_id": message_id,
+            "text": text,
+            "disable_web_page_preview": True,
+        }
+        if parse_mode:
+            payload["parse_mode"] = parse_mode
+        if reply_markup:
+            payload["reply_markup"] = reply_markup
+        return self._post("editMessageText", payload)
+
+    def answer_callback_query(
+        self,
+        *,
+        callback_query_id: str,
+        text: str | None = None,
+        show_alert: bool = False,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "callback_query_id": callback_query_id,
+            "show_alert": show_alert,
+        }
+        if text:
+            payload["text"] = text
+        return self._post("answerCallbackQuery", payload)
+
+    def set_my_commands(self, commands: list[dict[str, str]]) -> dict[str, Any]:
+        return self._post("setMyCommands", {"commands": commands})
 
     def send_document(
         self,
