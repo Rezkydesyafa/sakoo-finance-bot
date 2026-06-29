@@ -44,9 +44,16 @@ class Settings(BaseSettings):
     stt_enable_automatic_punctuation: bool = True
     llm_provider: str = "none"
     gemini_api_key: str = ""
+    gemini_api_key_1: str = ""
+    gemini_api_key_2: str = ""
+    gemini_api_keys: str = ""
+    gemini_model: str = "gemini-1.5-flash"
     glm_api_key: str = ""
+    glm_model: str = "glm-4-flash"
     openrouter_api_key: str = ""
+    openrouter_model: str = "deepseek/deepseek-chat"
     deepseek_api_key: str = ""
+    deepseek_model: str = "deepseek-chat"
     llm_timeout_seconds: float = 15.0
     llm_max_request_per_user_per_day: int = 20
     bot_reply_style: str = "friendly"
