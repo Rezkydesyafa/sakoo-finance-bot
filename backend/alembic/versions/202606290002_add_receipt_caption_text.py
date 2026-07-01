@@ -17,7 +17,11 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.add_column("receipts", sa.Column("caption_text", sa.Text(), nullable=True))
+    op.add_column(
+        "receipts",
+        sa.Column("caption_text", sa.Text(), nullable=True),
+        if_not_exists=True,
+    )
 
 
 def downgrade() -> None:

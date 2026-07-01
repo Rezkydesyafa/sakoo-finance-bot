@@ -143,7 +143,6 @@ def upgrade() -> None:
         sa.Column("id", sa.BigInteger(), primary_key=True),
         sa.Column("user_id", sa.BigInteger(), nullable=False),
         sa.Column("media_file_id", sa.BigInteger(), nullable=False),
-        sa.Column("caption_text", sa.Text(), nullable=True),
         sa.Column("ocr_text", sa.Text(), nullable=True),
         sa.Column("merchant_name", sa.String(length=160), nullable=True),
         sa.Column("receipt_date", sa.Date(), nullable=True),
