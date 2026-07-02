@@ -276,7 +276,7 @@ export default function Home() {
       type: "income",
       amount: 1000000,
       description: "Quick Income",
-      transaction_date: new Date().toISOString(),
+      transaction_date: new Date().toISOString().split("T")[0],
     }).then(() => {
       window.location.reload();
     }).catch(() => {
@@ -291,7 +291,7 @@ export default function Home() {
       type: "expense",
       amount: 50000,
       description: "Quick Expense",
-      transaction_date: new Date().toISOString(),
+      transaction_date: new Date().toISOString().split("T")[0],
     }).then(() => {
       window.location.reload();
     }).catch(() => {
