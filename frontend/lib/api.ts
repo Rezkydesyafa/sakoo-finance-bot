@@ -2,7 +2,9 @@ const DEFAULT_API_BASE_URL = "http://localhost:8000/api";
 const BROWSER_API_BASE_URL = "/api/backend";
 
 export const SERVER_API_BASE_URL = normalizeBaseUrl(
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL,
+  process.env.NEXT_INTERNAL_API_BASE_URL ??
+  process.env.NEXT_PUBLIC_API_BASE_URL ??
+  DEFAULT_API_BASE_URL,
 );
 export const SERVER_SERVICE_BASE_URL = SERVER_API_BASE_URL.replace(/\/api\/?$/, "");
 
@@ -67,6 +69,115 @@ export type TransactionListParams = {
   offset?: number;
 };
 
+export type TransactionCreateRequest = {
+  type: TransactionType;
+  amount: number;
+  category_id?: number | null;
+  description?: string | null;
+  transaction_date?: string;
+};
+
+export type TransactionUpdateRequest = {
+  type?: TransactionType;
+  amount?: number;
+  category_id?: number | null;
+  description?: string | null;
+  transaction_date?: string;
+};
+
+// Report types
+export type ReportTransactionItem = {
+  id: number;
+  type: string;
+  amount: string;
+  category_id: number | null;
+  category_name: string | null;
+  description: string | null;
+  transaction_date: string;
+  source: string;
+};
+
+export type ReportSummaryResponse = {
+  report_type: string;
+  period_start: string;
+  period_end: string;
+  total_income: string;
+  total_expense: string;
+  net_balance: string;
+  transaction_count: number;
+  income_count: number;
+  expense_count: number;
+  transactions: ReportTransactionItem[];
+  total_transactions: number;
+  limit: number;
+  offset: number;
+  has_next: boolean;
+};
+
+export type ReportSummaryParams = {
+  period?: "day" | "week" | "month" | "custom";
+  date?: string;
+  start_date?: string;
+  end_date?: string;
+  limit?: number;
+  offset?: number;
+};
+
+export type ReportCategoryItem = {
+  category_id: number | null;
+  category_name: string;
+  type: string;
+  total_amount: string;
+  transaction_count: number;
+  percentage: string;
+};
+
+export type ReportCategoryResponse = {
+  report_type: string;
+  period_start: string;
+  period_end: string;
+  type: string | null;
+  total_amount: string;
+  items: ReportCategoryItem[];
+};
+
+export type ReportCategoryParams = {
+  period?: "day" | "week" | "month" | "custom";
+  date?: string;
+  start_date?: string;
+  end_date?: string;
+  type?: TransactionType;
+};
+
+export type ReportPdfGenerateResponse = {
+  report: {
+    id: number;
+    user_id: number;
+    period_start: string;
+    period_end: string;
+    report_type: string;
+    file_id: number | null;
+    generated_from: string;
+    status: string;
+    created_at: string;
+  };
+  file: {
+    id: number;
+    filename: string;
+    mime_type: string;
+    size: number;
+  };
+  download_url: string;
+};
+
+export type AccountLinkingCodeResponse = {
+  id: number;
+  code: string;
+  command: string;
+  expired_at: string;
+  created_at: string;
+};
+
 type ApiRequestOptions = RequestInit & {
   token?: string;
   query?: Record<string, string | number | boolean | undefined | null>;
@@ -88,6 +199,28 @@ export const apiClient = {
   health: () => serviceRequest<HealthResponse>("/health"),
   databaseHealth: () => serviceRequest<HealthResponse>("/health/db"),
   wahaHealth: () => serviceRequest<HealthResponse>("/health/waha"),
+
+  auth: {
+    register: (payload: RegisterRequest) =>
+      apiRequest<UserResponse>("/auth/register", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    login: (payload: { email: string; password: string }) =>
+      apiRequest<AuthTokenResponse>("/auth/login", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    me: (token: string) =>
+      apiRequest<UserResponse>("/auth/me", { token }),
+    linkingCode: (token: string) =>
+      apiRequest<AccountLinkingCodeResponse>("/auth/linking-codes", {
+        method: "POST",
+        token,
+      }),
+  },
+
+  // Legacy flat aliases
   register: (payload: RegisterRequest) =>
     apiRequest<UserResponse>("/auth/register", {
       method: "POST",
@@ -99,12 +232,45 @@ export const apiClient = {
       body: JSON.stringify(payload),
     }),
   me: (token: string) =>
-    apiRequest<UserResponse>("/auth/me", {
-      token,
-    }),
+    apiRequest<UserResponse>("/auth/me", { token }),
+
   transactions: {
     list: (token: string, query?: TransactionListParams) =>
       apiRequest<TransactionListResponse>("/transactions", { token, query }),
+    create: (token: string, payload: TransactionCreateRequest) =>
+      apiRequest<Transaction>("/transactions", {
+        method: "POST",
+        token,
+        body: JSON.stringify(payload),
+      }),
+    update: (token: string, id: number, payload: TransactionUpdateRequest) =>
+      apiRequest<Transaction>(`/transactions/${id}`, {
+        method: "PUT",
+        token,
+        body: JSON.stringify(payload),
+      }),
+    delete: (token: string, id: number) =>
+      apiRequest<void>(`/transactions/${id}`, {
+        method: "DELETE",
+        token,
+      }),
+  },
+
+  reports: {
+    summary: (token: string, params?: ReportSummaryParams) =>
+      apiRequest<ReportSummaryResponse>("/reports/summary", { token, query: params }),
+    category: (token: string, params?: ReportCategoryParams) =>
+      apiRequest<ReportCategoryResponse>("/reports/category", { token, query: params }),
+    pdfGenerate: (token: string, payload: { period?: string; generated_from?: string }) =>
+      apiRequest<ReportPdfGenerateResponse>("/reports/pdf/generate", {
+        method: "POST",
+        token,
+        body: JSON.stringify({ generated_from: "dashboard", ...payload }),
+      }),
+  },
+
+  media: {
+    downloadUrl: (id: number) => `${API_BASE_URL}/media/${id}/download`,
   },
 };
 
@@ -183,6 +349,10 @@ async function request<T>(
     body,
     headers: requestHeaders,
   });
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
 
   const payload = await parsePayload(response);
 
