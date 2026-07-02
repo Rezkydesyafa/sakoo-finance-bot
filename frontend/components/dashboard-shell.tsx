@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
-import { Suspense, useState } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { LogoutButton } from "@/components/logout-button";
 import { apiClient } from "@/lib/api";
 import { getStoredAuthToken } from "@/lib/auth-storage";
+import { SettingsTab } from "@/components/tabs/settings-tab";
 
 const navigationItems = [
   { label: "Overview", icon: "dashboard", href: "/?tab=overview", id: "overview" },
@@ -41,6 +42,42 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
     category: "---",
     amount: 0,
   });
+
+  const [userName, setUserName] = useState("Kevin Merico");
+  const [userEmail, setUserEmail] = useState("kevin.merico@example.com");
+  const [userPhone, setUserPhone] = useState("+62 812 3456 7890");
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  useEffect(() => {
+    if (currentTab === "settings" && !isSettingsOpen) {
+      setIsSettingsOpen(true);
+    }
+  }, [currentTab]);
+
+  useEffect(() => {
+    const token = getStoredAuthToken();
+    if (token) {
+      apiClient.me(token).then((user) => {
+        if (user.name) setUserName(user.name);
+        if (user.email) setUserEmail(user.email);
+        if (user.phone_number) setUserPhone(user.phone_number);
+      }).catch(() => {});
+    }
+
+    const loadProfileImage = () => {
+      const savedImage = localStorage.getItem("sakoo_profile_image");
+      if (savedImage) setProfileImage(savedImage);
+    };
+
+    loadProfileImage();
+    window.addEventListener("profile_image_updated", loadProfileImage);
+
+    return () => {
+      window.removeEventListener("profile_image_updated", loadProfileImage);
+    };
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -110,7 +147,6 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
       maximumFractionDigits: 0,
     }).format(val);
   }
-
   return (
     <div className="text-sm text-[#1a1c1b] antialiased bg-[#f9f9f7] min-h-screen">
       <div className="ambient-glow"></div>
@@ -125,6 +161,20 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
         <div className="flex-1 flex flex-col gap-2 overflow-y-auto no-scrollbar">
           {navigationItems.map((item) => {
             const isActive = currentTab === item.id;
+            
+            if (item.id === "settings") {
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setIsSettingsOpen(true)}
+                  className="flex items-center gap-3 text-[#5f5e5e] hover:text-[#4e6700] px-4 py-3 mx-2 transition-colors hover:bg-neutral-100 rounded-xl bg-transparent border-none cursor-pointer w-[calc(100%-1rem)] text-left"
+                >
+                  <span className="material-symbols-outlined">{item.icon}</span>
+                  <span className="text-[13px] font-semibold">{item.label}</span>
+                </button>
+              );
+            }
+
             return (
               <Link
                 key={item.id}
@@ -142,10 +192,10 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
         </div>
         
         <div className="px-6 mb-4 mt-auto">
-          <button className="w-full py-3 px-4 bg-[#4e6700] text-white text-[13px] font-semibold rounded-full hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
+          <Link href="/?tab=transactions" className="w-full py-3 px-4 bg-[#4e6700] text-white text-[13px] font-semibold rounded-full hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
             <span className="material-symbols-outlined">add</span>
             + New Transaction
-          </button>
+          </Link>
         </div>
         
         <div className="flex flex-col gap-1 border-t border-[#E8E8E8] pt-4 mx-4">
@@ -189,11 +239,15 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
               className="flex items-center gap-2 focus:outline-none border-none bg-transparent cursor-pointer"
             >
               <div className="w-10 h-10 rounded-full bg-[#c7ff00] flex items-center justify-center font-bold text-[#151f00] shadow-sm overflow-hidden">
-                <img 
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuC1yZN5I8LBD1KjdLNhfQUCmjK7wwz4bzQ_i6vUkeXVIx5rtGH1eCldQ-Ke2yOREWBZTJrEOYJSrZUliNPFF5MfL416nIe5oVqkZ3a0SfVDE7Q3IyM_2cvY9azoF-9pQfu4cr25cFsW4tXi969ee74rr3QntubQO-hPt6cxraURUWsbr42v2qWtNDX9DxtDXk4-M4gNNgZps0_GY4MGLXPbZsqQHV7_9XOmuMy28mgHGcDzg8EaVx7TtWQVHRW9lc0Xvdh-O58ILwA"
-                  alt="Profile"
-                  className="w-full h-full object-cover"
-                />
+                {profileImage ? (
+                  <img 
+                    src={profileImage}
+                    alt="Profile"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="material-symbols-outlined text-[#151f00]">person</span>
+                )}
               </div>
             </button>
 
@@ -203,7 +257,7 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
                 <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-[#E8E8E8] py-1 z-50 animate-fade-in">
                   <div className="px-4 py-3 border-b border-[#E8E8E8]">
                     <p className="text-[10px] text-[#6F6F6F] font-semibold uppercase tracking-wider">Signed in as</p>
-                    <p className="text-sm font-semibold text-[#1a1c1b] truncate">Fajar</p>
+                    <p className="text-sm font-semibold text-[#1a1c1b] truncate">{userName}</p>
                   </div>
                   
                   <Link 
@@ -215,14 +269,16 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
                     <span>Bot Channels</span>
                   </Link>
 
-                  <Link 
-                    href="/?tab=settings" 
-                    onClick={() => setIsDropdownOpen(false)}
-                    className="flex items-center gap-3 px-4 py-2 text-sm text-[#5f5e5e] hover:bg-neutral-100 transition-colors"
+                  <button 
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      setIsSettingsOpen(true);
+                    }}
+                    className="flex items-center gap-3 w-full text-left px-4 py-2 text-sm text-[#5f5e5e] hover:bg-neutral-100 transition-colors bg-transparent border-none cursor-pointer"
                   >
                     <span className="material-symbols-outlined text-[20px]">settings</span>
                     <span>Settings</span>
-                  </Link>
+                  </button>
 
                   <a 
                     href="#" 
@@ -507,9 +563,24 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
                 </button>
               </div>
             </div>
-          </div>
         </div>
       </div>
+      </div>
+
+      {/* Settings Overlay Modal */}
+      {isSettingsOpen && (
+        <div className="fixed inset-0 z-[200] bg-[#f9f9f7] overflow-y-auto animate-in fade-in duration-200">
+          <div className="ambient-glow"></div>
+          <div className="p-4 md:p-8 max-w-5xl mx-auto pt-6 md:pt-10 relative z-10">
+            <SettingsTab 
+              userName={userName} 
+              userEmail={userEmail} 
+              userPhone={userPhone} 
+              onClose={() => setIsSettingsOpen(false)} 
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

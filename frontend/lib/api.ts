@@ -3,7 +3,6 @@ const BROWSER_API_BASE_URL = "/api/backend";
 
 export const SERVER_API_BASE_URL = normalizeBaseUrl(
   process.env.NEXT_INTERNAL_API_BASE_URL ??
-  process.env.NEXT_PUBLIC_API_BASE_URL ??
   DEFAULT_API_BASE_URL,
 );
 export const SERVER_SERVICE_BASE_URL = SERVER_API_BASE_URL.replace(/\/api\/?$/, "");
@@ -45,6 +44,7 @@ export type Transaction = {
   type: TransactionType;
   amount: string;
   category_id: number | null;
+  category_name?: string | null;
   description: string | null;
   transaction_date: string;
   source: string;

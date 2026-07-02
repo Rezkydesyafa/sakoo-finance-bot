@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { AUTH_TOKEN_COOKIE } from "@/lib/auth-constants";
 import { SERVER_API_BASE_URL, SERVER_SERVICE_BASE_URL } from "@/lib/api";
 
 type RouteContext = {
@@ -64,12 +65,17 @@ function buildTargetUrl(path: string[], searchParams: URLSearchParams): string {
 
 function buildForwardHeaders(request: NextRequest): Headers {
   const headers = new Headers(request.headers);
+  const cookieToken = request.cookies.get(AUTH_TOKEN_COOKIE)?.value;
 
   headers.delete("connection");
   headers.delete("content-length");
   headers.delete("expect");
   headers.delete("host");
   headers.delete("cookie");
+
+  if (!headers.has("authorization") && cookieToken) {
+    headers.set("Authorization", `Bearer ${cookieToken}`);
+  }
 
   return headers;
 }

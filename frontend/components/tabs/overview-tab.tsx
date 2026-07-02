@@ -1,4 +1,7 @@
 import type { Transaction, ChatMessage } from "@/app/(dashboard)/types";
+import { ConnectedBots } from "@/components/connected-bots";
+import { ChatSimulator } from "@/components/chat-simulator";
+import Link from "next/link";
 
 type OverviewTabProps = {
   userName: string;
@@ -12,6 +15,10 @@ type OverviewTabProps = {
   chatInput: string;
   setChatInput: (val: string) => void;
   handleSendChatMessage: () => void;
+  handleQuickAddIncome: () => void;
+  handleQuickAddExpense: () => void;
+  quickActionLoading: "income" | "expense" | null;
+  quickActionStatus: string | null;
   filteredTransactions: Transaction[];
 };
 
@@ -39,6 +46,10 @@ export function OverviewTab({
   chatInput,
   setChatInput,
   handleSendChatMessage,
+  handleQuickAddIncome,
+  handleQuickAddExpense,
+  quickActionLoading,
+  quickActionStatus,
   filteredTransactions,
 }: OverviewTabProps) {
   return (
@@ -80,12 +91,12 @@ export function OverviewTab({
           </div>
           
           {/* Quick Actions Grid */}
-          <div className="md:col-span-5 grid grid-cols-2 grid-rows-2 gap-2 h-full min-h-[200px]">
-            <button className="bg-[#c7ff00] rounded-[20px] p-4 flex flex-col items-center justify-center gap-2 hover:opacity-90 transition-opacity">
+          <div className="md:col-span-5 grid grid-cols-2 gap-2 h-full min-h-[220px]">
+            <button onClick={handleQuickAddExpense} disabled={quickActionLoading !== null} type="button" className="bg-[#c7ff00] rounded-[20px] p-4 flex flex-col items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50">
               <span className="material-symbols-outlined text-3xl">send_money</span>
               <span className="text-[13px] font-semibold text-[#151f00]">Add Expense</span>
             </button>
-            <button className="bg-white card-shadow rounded-[20px] p-4 flex flex-col items-center justify-center gap-2 hover-lift">
+            <button onClick={handleQuickAddIncome} disabled={quickActionLoading !== null} type="button" className="bg-white card-shadow rounded-[20px] p-4 flex flex-col items-center justify-center gap-2 hover-lift disabled:opacity-50">
               <span className="material-symbols-outlined text-3xl text-[#6F6F6F]">account_balance_wallet</span>
               <span className="text-[13px] font-semibold text-[#191919]">Add Income</span>
             </button>
@@ -97,6 +108,11 @@ export function OverviewTab({
               <span className="material-symbols-outlined text-3xl text-[#6F6F6F]">picture_as_pdf</span>
               <span className="text-[13px] font-semibold text-[#191919]">{isExporting ? "Exporting..." : "Export PDF"}</span>
             </button>
+            {quickActionStatus && (
+              <div className="col-span-2 rounded-xl bg-white/90 px-3 py-2 text-center text-xs font-semibold text-[#4e6700] card-shadow">
+                {quickActionStatus}
+              </div>
+            )}
           </div>
         </div>
         
@@ -155,73 +171,21 @@ export function OverviewTab({
       <div className="col-span-12 lg:col-span-4 flex flex-col gap-8 lg:mt-[72px]">
         
         {/* Connected Bot Channels */}
-        <div className="bg-white rounded-[28px] p-6 card-shadow">
-          <h3 className="text-[15px] font-semibold text-[#1a1c1b] mb-4">Connected Bots</h3>
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between p-3 rounded-xl bg-[#F1F2F0]">
-              <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-blue-500">tram</span>
-                <span className="text-sm font-semibold">Telegram Bot</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="relative flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#5FCF6A] opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#5FCF6A]"></span>
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-xl bg-[#F1F2F0]">
-              <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-green-500">chat</span>
-                <span className="text-sm font-semibold">WhatsApp Bot</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#6F6F6F]"></span>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ConnectedBots />
 
         {/* Chat Simulator Widget */}
-        <div className="bg-white rounded-[28px] p-6 card-shadow flex flex-col h-[320px]">
-          <div className="border-b border-[#E8E8E8] pb-3 mb-4 flex items-center justify-between">
-            <div>
-              <h4 className="text-[15px] font-semibold text-[#1a1c1b]">AI Assistant Chat</h4>
-              <p className="text-[10px] text-[#6F6F6F] font-medium">Test bot parsing here</p>
-            </div>
-            <span className="h-2 w-2 rounded-full bg-[#5FCF6A] animate-pulse" />
-          </div>
-          <div className="flex-1 overflow-y-auto no-scrollbar space-y-3 mb-4 pr-1 text-xs font-semibold leading-relaxed">
-            {chatMessages.slice(-3).map((msg) => (
-              <div key={msg.id} className={`flex flex-col max-w-[85%] ${msg.sender === "user" ? "ml-auto items-end" : "mr-auto items-start"}`}>
-                <div className={`p-2.5 rounded-2xl ${
-                  msg.sender === "user" ? "bg-[#4e6700] text-white rounded-tr-none" : "bg-[#F1F2F0] text-[#191919] rounded-tl-none border border-[#E8E8E8]"
-                }`}>
-                  {msg.text}
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="flex gap-2 border-t border-[#E8E8E8] pt-3">
-            <input
-              type="text"
-              placeholder="e.g. 'beli bensin 25rb'..."
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSendChatMessage()}
-              className="flex-1 bg-[#F1F2F0] border-none rounded-xl px-3 py-2 text-xs text-[#191919] placeholder-[#6F6F6F] focus:ring-1 focus:ring-[#c7ff00]"
-            />
-            <button onClick={handleSendChatMessage} className="bg-[#c7ff00] hover:bg-[#bff500] text-[#151f00] text-[13px] font-semibold px-3 py-2 rounded-xl text-xs transition" type="button">
-              Send
-            </button>
-          </div>
-        </div>
+        <ChatSimulator 
+          chatMessages={chatMessages}
+          chatInput={chatInput}
+          setChatInput={setChatInput}
+          handleSendChatMessage={handleSendChatMessage}
+        />
 
         {/* Recent Transactions */}
         <div className="bg-white rounded-[24px] p-6 card-shadow flex-1">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-[15px] font-semibold text-[#1a1c1b]">Recent Transactions</h3>
-            <button className="text-[#4e6700] text-xs font-semibold hover:underline">View All</button>
+            <Link href="/?tab=transactions" className="text-[#4e6700] text-xs font-semibold hover:underline">View All</Link>
           </div>
           <div className="flex flex-col gap-4">
             {filteredTransactions.slice(0, 5).map(t => (

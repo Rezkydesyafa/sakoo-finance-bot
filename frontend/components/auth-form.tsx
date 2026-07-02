@@ -18,6 +18,9 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [email, setEmail] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -26,6 +29,12 @@ export function AuthForm({ mode }: AuthFormProps) {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+
+    if (isRegister && password !== confirmPassword) {
+      setError("Konfirmasi password tidak cocok dengan password.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -50,104 +59,171 @@ export function AuthForm({ mode }: AuthFormProps) {
   }
 
   return (
-    <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-      <div>
-        <p className="text-sm font-semibold uppercase text-emerald-700">
-          Sakoo Finance Bot
-        </p>
-        <h1 className="mt-2 text-2xl font-semibold text-slate-950">
-          {isRegister ? "Daftar akun" : "Masuk"}
-        </h1>
-      </div>
-
-      <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-        {isRegister ? (
-          <label className="block">
-            <span className="text-sm font-medium text-slate-700">Nama</span>
-            <input
-              className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-              minLength={1}
-              maxLength={120}
-              name="name"
-              onChange={(event) => setName(event.target.value)}
-              required
-              type="text"
-              value={name}
-            />
-          </label>
-        ) : null}
-
-        <label className="block">
-          <span className="text-sm font-medium text-slate-700">Email</span>
-          <input
-            autoComplete="email"
-            className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-            maxLength={255}
-            minLength={3}
-            name="email"
-            onChange={(event) => setEmail(event.target.value)}
-            required
-            type="email"
-            value={email}
-          />
-        </label>
-
-        {isRegister ? (
-          <label className="block">
-            <span className="text-sm font-medium text-slate-700">
-              Nomor telepon
+    <div className="bg-surface-white w-full max-w-[480px] p-card-padding sm:p-10 relative overflow-hidden transition-all duration-300 hover:-translate-y-1 group" style={{ borderRadius: '28px', boxShadow: '0 10px 30px rgba(0,0,0,0.06)' }}>
+      <div className="relative z-10 flex flex-col items-center w-full">
+        {/* Logo & Greeting */}
+        <div className="flex justify-center mb-6">
+          <div className="w-16 h-16 bg-surface-muted rounded-full flex items-center justify-center text-primary group-hover:scale-105 transition-transform duration-300">
+            <span className="material-symbols-outlined text-[32px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+              robot_2
             </span>
-            <input
-              autoComplete="tel"
-              className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-              maxLength={32}
-              name="phone_number"
-              onChange={(event) => setPhoneNumber(event.target.value)}
-              type="tel"
-              value={phoneNumber}
+          </div>
+        </div>
+        
+        <h2 className="font-headline-hero text-headline-hero text-center text-inverse-surface mb-2">
+          {isRegister ? "Create Account" : "Welcome Back"}
+        </h2>
+        <p className="font-body-main text-body-main text-text-muted text-center mb-8 px-4">
+          {isRegister ? "Sign up to start using your smart financial assistant." : "Log in to manage your smart financial assistant."}
+        </p>
+
+        <form className="w-full flex flex-col gap-4" onSubmit={handleSubmit}>
+          {isRegister && (
+            <div className="relative w-full">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <span className="material-symbols-outlined text-text-muted text-[20px]">person</span>
+              </div>
+              <input 
+                className="w-full bg-surface-muted rounded-full py-4 pl-12 pr-6 font-body-main text-body-main text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-primary-container focus:bg-surface-white transition-all border-none shadow-none" 
+                placeholder="Full Name" 
+                required 
+                type="text" 
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </div>
+          )}
+
+          <div className="relative w-full">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <span className="material-symbols-outlined text-text-muted text-[20px]">mail</span>
+            </div>
+            <input 
+              className="w-full bg-surface-muted rounded-full py-4 pl-12 pr-6 font-body-main text-body-main text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-primary-container focus:bg-surface-white transition-all border-none shadow-none" 
+              placeholder="Email address" 
+              required 
+              type="email" 
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
             />
-          </label>
-        ) : null}
+          </div>
 
-        <label className="block">
-          <span className="text-sm font-medium text-slate-700">Password</span>
-          <input
-            autoComplete={isRegister ? "new-password" : "current-password"}
-            className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-            maxLength={72}
-            minLength={isRegister ? 8 : 1}
-            name="password"
-            onChange={(event) => setPassword(event.target.value)}
-            required
-            type="password"
-            value={password}
-          />
-        </label>
+          {isRegister && (
+            <div className="relative w-full">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <span className="material-symbols-outlined text-text-muted text-[20px]">phone</span>
+              </div>
+              <input 
+                className="w-full bg-surface-muted rounded-full py-4 pl-12 pr-6 font-body-main text-body-main text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-primary-container focus:bg-surface-white transition-all border-none shadow-none" 
+                placeholder="Phone Number (Optional)" 
+                type="tel" 
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+              />
+            </div>
+          )}
 
-        {error ? (
-          <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">
-            {error}
-          </p>
-        ) : null}
+          <div className="relative w-full">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <span className="material-symbols-outlined text-text-muted text-[20px]">lock</span>
+            </div>
+            <input 
+              className="w-full bg-surface-muted rounded-full py-4 pl-12 pr-12 font-body-main text-body-main text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-primary-container focus:bg-surface-white transition-all border-none shadow-none" 
+              placeholder="Password" 
+              required 
+              type={showPassword ? "text" : "password"} 
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            <button 
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute inset-y-0 right-0 pr-4 flex items-center text-text-muted hover:text-text-primary transition-colors"
+            >
+              <span className="material-symbols-outlined text-[20px]">{showPassword ? "visibility" : "visibility_off"}</span>
+            </button>
+          </div>
 
-        <button
-          className="w-full rounded-md bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-          disabled={isSubmitting}
-          type="submit"
-        >
-          {isSubmitting ? "Memproses..." : isRegister ? "Daftar" : "Masuk"}
-        </button>
-      </form>
+          {isRegister && (
+            <div className="relative w-full">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <span className="material-symbols-outlined text-text-muted text-[20px]">lock_reset</span>
+              </div>
+              <input 
+                className="w-full bg-surface-muted rounded-full py-4 pl-12 pr-12 font-body-main text-body-main text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-primary-container focus:bg-surface-white transition-all border-none shadow-none" 
+                placeholder="Konfirmasi Password" 
+                required 
+                type={showConfirmPassword ? "text" : "password"} 
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+              />
+              <button 
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute inset-y-0 right-0 pr-4 flex items-center text-text-muted hover:text-text-primary transition-colors"
+              >
+                <span className="material-symbols-outlined text-[20px]">{showConfirmPassword ? "visibility" : "visibility_off"}</span>
+              </button>
+            </div>
+          )}
 
-      <p className="mt-5 text-center text-sm text-slate-600">
-        {isRegister ? "Sudah punya akun?" : "Belum punya akun?"}{" "}
-        <Link
-          className="font-semibold text-emerald-700 hover:text-emerald-800"
-          href={isRegister ? "/login" : "/register"}
-        >
-          {isRegister ? "Masuk" : "Daftar"}
-        </Link>
-      </p>
+          {error && (
+            <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+              {error}
+            </p>
+          )}
+
+          {!isRegister && (
+            <div className="flex justify-end w-full px-2 mt-1 mb-2">
+              <a className="font-label-button text-label-button text-text-muted hover:text-primary transition-colors cursor-pointer">
+                Forgot Password?
+              </a>
+            </div>
+          )}
+
+          <button 
+            className="w-full bg-primary-container text-text-primary rounded-full py-4 font-label-button text-label-button flex items-center justify-center gap-2 hover:-translate-y-1 hover:shadow-[0_12px_24px_rgba(199,255,0,0.25)] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none mt-2" 
+            disabled={isSubmitting}
+            type="submit"
+          >
+            {isSubmitting ? "Processing..." : (isRegister ? "Sign Up" : "Log In")}
+            <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+          </button>
+        </form>
+
+        <div className="w-full flex items-center gap-4 my-8">
+          <div className="h-px bg-border-light flex-grow"></div>
+          <span className="font-label-muted text-label-muted text-text-muted">Or continue with</span>
+          <div className="h-px bg-border-light flex-grow"></div>
+        </div>
+
+        <div className="w-full flex flex-row gap-3">
+          <button className="flex-1 bg-surface-muted text-text-primary rounded-full py-3 px-6 font-label-button text-label-button flex items-center justify-center gap-2 hover:bg-surface-variant transition-colors border border-transparent" type="button">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+            </svg>
+            Google
+          </button>
+          <button className="flex-1 bg-surface-muted text-text-primary rounded-full py-3 px-6 font-label-button text-label-button flex items-center justify-center gap-2 hover:bg-surface-variant transition-colors border border-transparent" type="button">
+            <svg width="18" height="18" viewBox="0 0 384 512" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+              <path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/>
+            </svg>
+            Apple
+          </button>
+        </div>
+
+        <div className="mt-8 text-center w-full">
+          <span className="font-body-main text-body-main text-text-muted">
+            {isRegister ? "Already have an account?" : "Don't have an account?"}
+          </span>
+          <Link className="font-label-button text-label-button text-primary hover:underline ml-1" href={isRegister ? "/login" : "/register"}>
+            {isRegister ? "Log In" : "Sign Up"}
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }
