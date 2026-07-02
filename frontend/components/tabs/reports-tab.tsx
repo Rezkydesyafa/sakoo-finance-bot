@@ -1,0 +1,222 @@
+import type { Transaction } from "@/app/(dashboard)/types";
+
+type ReportsTabProps = {
+  transactions: Transaction[];
+  categoryStats: { name: string; value: number; color: string }[];
+  totalIncome: number;
+  totalExpense: number;
+  totalBalance: number;
+  formatCurrency: (val: number) => string;
+  handleDownloadPDF: () => void;
+  isExporting: boolean;
+};
+
+export function ReportsTab({
+  transactions,
+  categoryStats,
+  totalIncome,
+  totalExpense,
+  totalBalance,
+  formatCurrency,
+  handleDownloadPDF,
+  isExporting,
+}: ReportsTabProps) {
+  const displayIncome = totalIncome > 0 ? totalIncome : 24500000;
+  const displayExpense = totalExpense > 0 ? totalExpense : 12800000;
+  const displayBalance = totalBalance !== 0 ? totalBalance : 11700000;
+
+  const savingRate = totalIncome > 0 ? Math.round((totalBalance / totalIncome) * 100) : 48;
+  const savingRateClamped = Math.max(0, Math.min(100, savingRate));
+  const strokeDash = `${(savingRateClamped / 100) * 100} 100`;
+
+  const weeklyData = [
+    { label: "W1", income: "8.0M", expense: "5.0M", incHeight: "h-[40%]", expHeight: "h-[25%]" },
+    { label: "W2", income: "6.0M", expense: "9.0M", incHeight: "h-[30%]", expHeight: "h-[45%]" },
+    { label: "W3", income: "16.0M", expense: "7.0M", incHeight: "h-[80%]", expHeight: "h-[35%]" },
+    { label: "W4", income: "12.0M", expense: "11.0M", incHeight: "h-[60%]", expHeight: "h-[55%]" },
+  ];
+
+  const categoryReportsList = transactions.length > 0 && categoryStats.length > 0
+    ? categoryStats.map((c, i) => {
+        const maxVal = Math.max(...categoryStats.map(x => x.value), 1);
+        return {
+          name: c.name,
+          displayValue: formatCurrency(c.value),
+          widthPercent: Math.round((c.value / maxVal) * 100),
+          icon: c.name.toLowerCase() === "makanan" ? "restaurant" : c.name.toLowerCase() === "transportasi" ? "commute" : c.name.toLowerCase() === "tagihan" ? "receipt" : "shopping_bag",
+          colorClass: i === 0 ? "bg-[#c7ff00]" : i === 1 ? "bg-[#2A2A2A]" : "bg-neutral-300"
+        };
+      })
+    : [
+        { name: "Makanan", displayValue: "Rp4.2M", widthPercent: 70, icon: "restaurant", colorClass: "bg-[#c7ff00]" },
+        { name: "Transportasi", displayValue: "Rp1.5M", widthPercent: 35, icon: "commute", colorClass: "bg-[#2A2A2A]" },
+        { name: "Tagihan", displayValue: "Rp3.2M", widthPercent: 55, icon: "receipt", colorClass: "bg-neutral-300" },
+        { name: "Belanja", displayValue: "Rp2.1M", widthPercent: 40, icon: "shopping_bag", colorClass: "bg-neutral-300" },
+      ];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h2 className="text-2xl font-bold text-[#1a1c1b]">Financial Report</h2>
+        <div className="relative">
+          <select defaultValue="Bulan Ini" className="appearance-none bg-white border-none shadow-sm text-[#1a1c1b] font-semibold py-2.5 pl-4 pr-10 rounded-full focus:ring-1 focus:ring-[#c7ff00] cursor-pointer transition-shadow hover:shadow-md text-xs">
+            <option>Hari Ini</option>
+            <option>Minggu Ini</option>
+            <option>Bulan Ini</option>
+            <option>Custom</option>
+          </select>
+          <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-[#6F6F6F] pointer-events-none text-base">expand_more</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-8 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
+            <div className="bg-white rounded-[24px] p-6 card-shadow hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between">
+              <div className="flex items-center gap-2 mb-2 text-[#6F6F6F]">
+                <span className="material-symbols-outlined text-[#5FCF6A] bg-[#5FCF6A]/10 p-1.5 rounded-full text-[18px]">arrow_downward</span>
+                <span className="text-xs font-semibold">Total Pemasukan</span>
+              </div>
+              <div className="text-xl font-bold text-[#1a1c1b] mb-2">{formatCurrency(displayIncome)}</div>
+              <div className="inline-flex items-center gap-1 bg-[#5FCF6A]/10 text-[#5FCF6A] px-2 py-0.5 rounded-full text-[11px] font-semibold w-fit">
+                <span className="material-symbols-outlined text-[13px]">trending_up</span> +12%
+              </div>
+            </div>
+
+            <div className="bg-white rounded-[24px] p-6 card-shadow hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between">
+              <div className="flex items-center gap-2 mb-2 text-[#6F6F6F]">
+                <span className="material-symbols-outlined text-[#EF6B6B] bg-[#EF6B6B]/10 p-1.5 rounded-full text-[18px]">arrow_upward</span>
+                <span className="text-xs font-semibold">Total Pengeluaran</span>
+              </div>
+              <div className="text-xl font-bold text-[#1a1c1b] mb-2">{formatCurrency(displayExpense)}</div>
+              <div className="inline-flex items-center gap-1 bg-[#5FCF6A]/10 text-[#5FCF6A] px-2 py-0.5 rounded-full text-[11px] font-semibold w-fit">
+                <span className="material-symbols-outlined text-[13px]">trending_down</span> -5%
+              </div>
+            </div>
+
+            <div className="bg-[#2A2A2A] rounded-[28px] p-6 card-shadow text-white relative overflow-hidden group flex flex-col justify-between min-h-[180px]">
+              <div className="absolute -right-10 -top-10 w-32 h-32 bg-[#c7ff00]/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
+              <span className="text-xs text-neutral-300 opacity-80 block mb-1">Sisa Saldo</span>
+              <div className="text-2xl font-extrabold text-[#c7ff00] mb-3 tracking-tight">{formatCurrency(displayBalance)}</div>
+              
+              <div className="flex items-center gap-3 bg-[#1A1A1A] rounded-2xl p-2.5 border border-white/5 relative z-10 w-full mt-auto">
+                <div className="relative w-9 h-9 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                    <circle className="text-neutral-700" cx="18" cy="18" r="16" fill="transparent" stroke="currentColor" strokeWidth="3" />
+                    <circle className="text-[#c7ff00]" cx="18" cy="18" r="16" fill="transparent" stroke="currentColor" strokeWidth="3" strokeDasharray={strokeDash} strokeLinecap="round" />
+                  </svg>
+                  <span className="absolute text-[10px] font-bold text-white">{savingRateClamped}%</span>
+                </div>
+                <div>
+                  <div className="text-[11px] font-semibold text-white">Saving Rate</div>
+                  <div className="text-[9px] text-neutral-400">On track for goal</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-[24px] p-6 card-shadow">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-sm font-bold text-[#1a1c1b]">Money Flow</h3>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[#c7ff00]" /><span className="text-xs text-[#6F6F6F]">Income</span></div>
+                <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-neutral-300" /><span className="text-xs text-[#6F6F6F]">Expense</span></div>
+              </div>
+            </div>
+
+            <div className="h-60 flex items-end justify-between px-2 gap-2 mt-4 border-b border-[#E8E8E8] pb-2 relative">
+              <div className="absolute left-0 top-0 h-full flex flex-col justify-between text-[10px] text-[#6F6F6F] opacity-50 pb-2 pointer-events-none">
+                <span>20M</span>
+                <span>15M</span>
+                <span>10M</span>
+                <span>5M</span>
+                <span>0</span>
+              </div>
+
+              <div className="w-full h-full flex items-end justify-around ml-8">
+                {weeklyData.map((w, idx) => (
+                  <div key={idx} className="flex items-end gap-1.5 group h-full">
+                    <div className={`w-6 md:w-8 rounded-t-lg bg-[#c7ff00] hover:opacity-90 transition-opacity ${w.incHeight} relative`}>
+                      <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-[#2A2A2A] text-white text-[9px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">{w.income}</div>
+                    </div>
+                    <div className={`w-6 md:w-8 rounded-t-lg bg-neutral-200 hover:bg-neutral-300 transition-colors ${w.expHeight} relative`}>
+                      <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-[#2A2A2A] text-white text-[9px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">{w.expense}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-around ml-8 mt-3 text-xs text-[#6F6F6F] font-semibold">
+              {weeklyData.map((w, idx) => (
+                <span key={idx}>{w.label}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="lg:col-span-4 space-y-6">
+          <div className="bg-[#F1F2F0] rounded-[24px] p-5 border border-white relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-[#c7ff00]/10 rounded-bl-full pointer-events-none"></div>
+            <div className="flex items-start gap-4 relative z-10">
+              <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center shrink-0 shadow-sm relative">
+                <span className="material-symbols-outlined text-[#4e6700] text-[24px]">smart_toy</span>
+                <div className="absolute top-0 right-0 w-3 h-3 bg-[#c7ff00] rounded-full border-2 border-white animate-pulse"></div>
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-[#1a1c1b] mb-1">Sakoo Insight</h4>
+                <p className="text-xs text-[#6F6F6F] leading-relaxed">
+                  Pengeluaran <strong className="text-[#1a1c1b]">makanan naik 18%</strong> bulan ini. Coba batasi jajan di luar untuk mencapai target menabungmu!
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-[24px] p-6 card-shadow flex flex-col justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-[#1a1c1b] mb-6">Spending by Category</h3>
+              <div className="space-y-5">
+                {categoryReportsList.map((c, i) => (
+                  <div key={i}>
+                    <div className="flex justify-between items-center mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[18px] text-[#5f5e5e]">{c.icon}</span>
+                        <span className="text-xs font-semibold text-[#1a1c1b]">{c.name}</span>
+                      </div>
+                      <span className="text-xs font-bold text-[#1a1c1b]">{c.displayValue}</span>
+                    </div>
+                    <div className="w-full bg-[#F1F2F0] rounded-full h-2">
+                      <div className={`${c.colorClass} h-2 rounded-full`} style={{ width: `${c.widthPercent}%` }}></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <button className="w-full mt-6 py-2.5 border border-[#E8E8E8] text-[#1a1c1b] text-xs font-semibold rounded-full hover:bg-[#F1F2F0] transition-colors border-solid bg-transparent cursor-pointer">
+              View All Categories
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="w-full">
+        <h3 className="text-sm font-bold text-[#1a1c1b] mb-4">Export Options</h3>
+        <div className="flex flex-wrap gap-3">
+          <button onClick={handleDownloadPDF} disabled={isExporting} className="bg-[#2A2A2A] text-white px-6 py-2.5 rounded-full text-xs font-semibold flex items-center gap-2 hover:opacity-90 transition-opacity border-none cursor-pointer">
+            <span className="material-symbols-outlined text-[18px]">picture_as_pdf</span>
+            {isExporting ? "Export PDF..." : "Export PDF"}
+          </button>
+          <button onClick={() => alert("CSV export is coming soon.")} className="bg-white border border-[#E8E8E8] text-[#1a1c1b] px-6 py-2.5 rounded-full text-xs font-semibold flex items-center gap-2 hover:bg-[#F1F2F0] transition-colors border-solid bg-transparent cursor-pointer">
+            <span className="material-symbols-outlined text-[18px]">download</span>
+            Download CSV
+          </button>
+          <button onClick={() => alert("Share option coming soon.")} className="bg-[#c7ff00] text-[#151f00] px-6 py-2.5 rounded-full text-xs font-semibold flex items-center gap-2 hover:opacity-95 transition-opacity ml-auto md:ml-0 border-none cursor-pointer">
+            <span className="material-symbols-outlined text-[18px]">share</span>
+            Share
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
