@@ -1,4 +1,5 @@
 import { useState } from "react";
+import Link from "next/link";
 
 export function IntegrationsTab() {
   // Toggle states
@@ -212,9 +213,9 @@ export function IntegrationsTab() {
       <div className="block lg:hidden space-y-6 px-1">
         {/* Mobile Header with back arrow */}
         <div className="flex items-center gap-3 mb-6">
-          <a href="/?tab=overview" className="w-8 h-8 rounded-full bg-[#F1F2F0] flex items-center justify-center text-[#1a1c1b] no-underline">
+          <Link href="/?tab=overview" className="w-8 h-8 rounded-full bg-[#F1F2F0] flex items-center justify-center text-[#1a1c1b] no-underline">
             <span className="material-symbols-outlined text-lg">arrow_back</span>
-          </a>
+          </Link>
           <h2 className="text-lg font-bold text-[#1a1c1b]">Bot Channels</h2>
         </div>
 

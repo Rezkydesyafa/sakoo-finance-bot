@@ -142,7 +142,7 @@ export function TransactionsTab({
               <div className="w-10 h-10 rounded-full bg-[#F1F2F0] flex items-center justify-center text-[#5f5e5e]">
                 <span className="material-symbols-outlined text-[20px]">trending_down</span>
               </div>
-              <span className="text-sm font-semibold text-[#6F6F6F]">This Month's Spending</span>
+              <span className="text-sm font-semibold text-[#6F6F6F]">This Month&apos;s Spending</span>
             </div>
             <div className="text-3xl font-bold text-[#1a1c1b]">{formatCurrency(thisMonthSpending)}</div>
           </div>
