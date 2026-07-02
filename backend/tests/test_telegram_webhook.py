@@ -2,6 +2,7 @@ import os
 from collections.abc import Iterator
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -22,12 +23,16 @@ from app.models import (
     AccountLinkingCode,
     BotLog,
     Category,
+    Job,
+    MediaFile,
+    Receipt,
     Transaction,
     User,
     UserPlatformAccount,
 )
+from app.modules.jobs.service import get_receipt_ocr_enqueue, get_report_pdf_enqueue
 from app.modules.telegram.commands import BOT_COMMANDS, register_bot_commands
-from app.modules.telegram.client import get_telegram_client
+from app.modules.telegram.client import DownloadedTelegramFile, get_telegram_client
 
 
 class FakeTelegramClient:
@@ -36,6 +41,12 @@ class FakeTelegramClient:
         self.edited_messages: list[dict[str, Any]] = []
         self.answered_callback_queries: list[dict[str, Any]] = []
         self.commands: list[dict[str, str]] | None = None
+        self.downloaded_file_ids: list[str] = []
+        self.downloaded_media = DownloadedTelegramFile(
+            content=b"fake-telegram-receipt",
+            content_type="application/octet-stream",
+            filename="telegram-receipt.jpg",
+        )
 
     def send_message(
         self,
@@ -95,9 +106,33 @@ class FakeTelegramClient:
         self.commands = commands
         return {"ok": True, "result": True}
 
+    def download_media(
+        self,
+        *,
+        file_id: str,
+        fallback_filename: str | None = None,
+        fallback_content_type: str | None = None,
+    ) -> DownloadedTelegramFile:
+        self.downloaded_file_ids.append(file_id)
+        return self.downloaded_media
+
 
 @pytest.fixture()
-def test_client() -> Iterator[tuple[TestClient, sessionmaker[Session], FakeTelegramClient]]:
+def test_client(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> Iterator[
+    tuple[
+        TestClient,
+        sessionmaker[Session],
+        FakeTelegramClient,
+        list[dict[str, Any]],
+    ]
+]:
+    monkeypatch.setenv("STORAGE_PATH", str(tmp_path / "storage"))
+    monkeypatch.setenv("MEDIA_RECEIPT_MAX_BYTES", "5242880")
+    monkeypatch.setenv("OCR_DAILY_LIMIT_PER_USER", "20")
+    monkeypatch.setenv("OCR_RATE_LIMIT_TIMEZONE", "Asia/Jakarta")
     get_settings.cache_clear()
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -124,6 +159,7 @@ def test_client() -> Iterator[tuple[TestClient, sessionmaker[Session], FakeTeleg
         db.commit()
 
     fake_telegram_client = FakeTelegramClient()
+    queued_receipt_jobs: list[dict[str, Any]] = []
 
     def override_get_db() -> Iterator[Session]:
         db = TestingSessionLocal()
@@ -132,11 +168,19 @@ def test_client() -> Iterator[tuple[TestClient, sessionmaker[Session], FakeTeleg
         finally:
             db.close()
 
+    def fake_receipt_enqueue(**kwargs: Any) -> None:
+        queued_receipt_jobs.append(kwargs)
+
+    def fake_report_pdf_enqueue(**kwargs: Any) -> None:
+        return None
+
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_telegram_client] = lambda: fake_telegram_client
+    app.dependency_overrides[get_receipt_ocr_enqueue] = lambda: fake_receipt_enqueue
+    app.dependency_overrides[get_report_pdf_enqueue] = lambda: fake_report_pdf_enqueue
 
     with TestClient(app) as client:
-        yield client, TestingSessionLocal, fake_telegram_client
+        yield client, TestingSessionLocal, fake_telegram_client, queued_receipt_jobs
 
     app.dependency_overrides.clear()
     Base.metadata.drop_all(bind=engine)
@@ -145,9 +189,9 @@ def test_client() -> Iterator[tuple[TestClient, sessionmaker[Session], FakeTeleg
 
 
 def test_telegram_webhook_rejects_invalid_secret(
-    test_client: tuple[TestClient, sessionmaker[Session], FakeTelegramClient],
+    test_client: tuple[TestClient, sessionmaker[Session], FakeTelegramClient, list[dict[str, Any]]],
 ) -> None:
-    client, _session_factory, _fake_telegram = test_client
+    client, _session_factory, _fake_telegram, _queued_jobs = test_client
 
     response = client.post(
         "/webhook/telegram",
@@ -159,9 +203,9 @@ def test_telegram_webhook_rejects_invalid_secret(
 
 
 def test_unlinked_telegram_user_gets_linking_instruction(
-    test_client: tuple[TestClient, sessionmaker[Session], FakeTelegramClient],
+    test_client: tuple[TestClient, sessionmaker[Session], FakeTelegramClient, list[dict[str, Any]]],
 ) -> None:
-    client, session_factory, fake_telegram = test_client
+    client, session_factory, fake_telegram, _queued_jobs = test_client
 
     response = _post_telegram_update(client, text="beli makan 20 ribu")
 
@@ -196,9 +240,9 @@ def test_register_bot_commands_uses_telegram_set_my_commands() -> None:
 
 
 def test_start_command_shows_main_menu_without_linking(
-    test_client: tuple[TestClient, sessionmaker[Session], FakeTelegramClient],
+    test_client: tuple[TestClient, sessionmaker[Session], FakeTelegramClient, list[dict[str, Any]]],
 ) -> None:
-    client, _session_factory, fake_telegram = test_client
+    client, _session_factory, fake_telegram, _queued_jobs = test_client
 
     response = _post_telegram_update(client, text="/start")
 
@@ -214,9 +258,9 @@ def test_start_command_shows_main_menu_without_linking(
 
 
 def test_add_menu_callback_edits_message_without_transaction_parser(
-    test_client: tuple[TestClient, sessionmaker[Session], FakeTelegramClient],
+    test_client: tuple[TestClient, sessionmaker[Session], FakeTelegramClient, list[dict[str, Any]]],
 ) -> None:
-    client, session_factory, fake_telegram = test_client
+    client, session_factory, fake_telegram, _queued_jobs = test_client
 
     response = _post_telegram_callback(client, data="MENU_ADD")
 
@@ -234,9 +278,9 @@ def test_add_menu_callback_edits_message_without_transaction_parser(
 
 
 def test_balance_callback_for_linked_user_uses_menu_handler(
-    test_client: tuple[TestClient, sessionmaker[Session], FakeTelegramClient],
+    test_client: tuple[TestClient, sessionmaker[Session], FakeTelegramClient, list[dict[str, Any]]],
 ) -> None:
-    client, session_factory, fake_telegram = test_client
+    client, session_factory, fake_telegram, _queued_jobs = test_client
     with session_factory() as db:
         user = _create_user(db)
         _link_telegram_user(db, user.id)
@@ -275,10 +319,90 @@ def test_balance_callback_for_linked_user_uses_menu_handler(
     assert fake_telegram.answered_callback_queries
 
 
-def test_add_expense_callback_sets_state_and_next_text_saves_expense(
-    test_client: tuple[TestClient, sessionmaker[Session], FakeTelegramClient],
+def test_linked_telegram_slash_commands_use_menu_handlers(
+    test_client: tuple[TestClient, sessionmaker[Session], FakeTelegramClient, list[dict[str, Any]]],
 ) -> None:
-    client, session_factory, fake_telegram = test_client
+    client, session_factory, fake_telegram, _queued_jobs = test_client
+    with session_factory() as db:
+        user = _create_user(db)
+        _link_telegram_user(db, user.id)
+        income_category = db.scalar(select(Category).where(Category.name == "Gaji"))
+        expense_category = db.scalar(select(Category).where(Category.name == "Makanan"))
+        db.add_all(
+            [
+                Transaction(
+                    user_id=user.id,
+                    type="income",
+                    amount=Decimal("100000.00"),
+                    category_id=income_category.id if income_category else None,
+                    description="gaji",
+                    transaction_date=datetime.now(timezone.utc).date(),
+                    source="telegram_text",
+                ),
+                Transaction(
+                    user_id=user.id,
+                    type="expense",
+                    amount=Decimal("20000.00"),
+                    category_id=expense_category.id if expense_category else None,
+                    description="makan",
+                    transaction_date=datetime.now(timezone.utc).date(),
+                    source="telegram_text",
+                ),
+            ]
+        )
+        db.commit()
+
+    command_expectations = [
+        ("/saldo", "balance", "Sisa saldo: Rp80.000"),
+        ("/pengeluaran", "expense_list", "List pengeluaran"),
+        ("/pemasukan", "income_list", "List pemasukan"),
+        ("/laporan", "report", "Laporan bulan ini"),
+        ("/riwayat", "history", "Riwayat transaksi terbaru"),
+    ]
+    for index, (command, status, expected_text) in enumerate(command_expectations, start=1):
+        response = _post_telegram_update(
+            client,
+            text=command,
+            update_id=1100 + index,
+        )
+
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["message_type"] == "command"
+        assert payload["transaction_status"] == status
+        assert payload["reply_status"] == "sent"
+        assert expected_text in fake_telegram.sent_messages[-1]["text"]
+        assert _keyboard_contains(fake_telegram.sent_messages[-1]["reply_markup"], "MENU_BALANCE")
+
+
+def test_linked_telegram_export_command_queues_monthly_pdf(
+    test_client: tuple[TestClient, sessionmaker[Session], FakeTelegramClient, list[dict[str, Any]]],
+) -> None:
+    client, session_factory, fake_telegram, _queued_jobs = test_client
+    with session_factory() as db:
+        user = _create_user(db)
+        _link_telegram_user(db, user.id)
+        db.commit()
+
+    response = _post_telegram_update(client, text="/export", update_id=1110)
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["message_type"] == "command"
+    assert payload["transaction_status"] == "queued"
+    assert payload["job_id"] is not None
+    assert "export PDF laporan bulan ini" in fake_telegram.sent_messages[-1]["text"]
+    with session_factory() as db:
+        job = db.scalar(select(Job))
+        assert job is not None
+        assert job.job_type == "report_pdf"
+        assert job.status == "queued"
+
+
+def test_add_expense_callback_sets_state_and_next_text_saves_expense(
+    test_client: tuple[TestClient, sessionmaker[Session], FakeTelegramClient, list[dict[str, Any]]],
+) -> None:
+    client, session_factory, fake_telegram, _queued_jobs = test_client
     with session_factory() as db:
         user = _create_user(db)
         _link_telegram_user(db, user.id)
@@ -303,9 +427,9 @@ def test_add_expense_callback_sets_state_and_next_text_saves_expense(
 
 
 def test_add_income_callback_forces_next_text_as_income(
-    test_client: tuple[TestClient, sessionmaker[Session], FakeTelegramClient],
+    test_client: tuple[TestClient, sessionmaker[Session], FakeTelegramClient, list[dict[str, Any]]],
 ) -> None:
-    client, session_factory, _fake_telegram = test_client
+    client, session_factory, _fake_telegram, _queued_jobs = test_client
     with session_factory() as db:
         user = _create_user(db)
         _link_telegram_user(db, user.id)
@@ -328,9 +452,9 @@ def test_add_income_callback_forces_next_text_as_income(
 
 
 def test_valid_linking_code_links_telegram_account(
-    test_client: tuple[TestClient, sessionmaker[Session], FakeTelegramClient],
+    test_client: tuple[TestClient, sessionmaker[Session], FakeTelegramClient, list[dict[str, Any]]],
 ) -> None:
-    client, session_factory, fake_telegram = test_client
+    client, session_factory, fake_telegram, _queued_jobs = test_client
     with session_factory() as db:
         user = _create_user(db)
         db.add(
@@ -363,9 +487,9 @@ def test_valid_linking_code_links_telegram_account(
 
 
 def test_linked_telegram_user_can_save_text_transaction(
-    test_client: tuple[TestClient, sessionmaker[Session], FakeTelegramClient],
+    test_client: tuple[TestClient, sessionmaker[Session], FakeTelegramClient, list[dict[str, Any]]],
 ) -> None:
-    client, session_factory, fake_telegram = test_client
+    client, session_factory, fake_telegram, _queued_jobs = test_client
     with session_factory() as db:
         user = _create_user(db)
         _link_telegram_user(db, user.id)
@@ -391,9 +515,9 @@ def test_linked_telegram_user_can_save_text_transaction(
 
 
 def test_missing_amount_asks_telegram_user_to_clarify(
-    test_client: tuple[TestClient, sessionmaker[Session], FakeTelegramClient],
+    test_client: tuple[TestClient, sessionmaker[Session], FakeTelegramClient, list[dict[str, Any]]],
 ) -> None:
-    client, session_factory, fake_telegram = test_client
+    client, session_factory, fake_telegram, _queued_jobs = test_client
     with session_factory() as db:
         user = _create_user(db)
         _link_telegram_user(db, user.id)
@@ -409,6 +533,86 @@ def test_missing_amount_asks_telegram_user_to_clarify(
     assert "nominal belum terbaca" in fake_telegram.sent_messages[0]["text"]
 
     with session_factory() as db:
+        assert db.scalar(select(Transaction)) is None
+
+
+def test_linked_telegram_user_photo_receipt_is_queued_for_ocr(
+    test_client: tuple[TestClient, sessionmaker[Session], FakeTelegramClient, list[dict[str, Any]]],
+) -> None:
+    client, session_factory, fake_telegram, queued_jobs = test_client
+    with session_factory() as db:
+        user = _create_user(db)
+        _link_telegram_user(db, user.id)
+        db.commit()
+
+    response = client.post(
+        "/webhook/telegram",
+        headers={"X-Telegram-Bot-Api-Secret-Token": "test-telegram-secret"},
+        json=_telegram_photo_update(caption="Struk makan siang"),
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["message_type"] == "receipt_ocr"
+    assert payload["transaction_status"] == "queued"
+    assert payload["job_id"] is not None
+    assert payload["reply_status"] == "sent"
+    assert fake_telegram.downloaded_file_ids == ["telegram-photo-large"]
+    assert "masuk antrean OCR" in fake_telegram.sent_messages[-1]["text"]
+    assert len(queued_jobs) == 1
+    assert queued_jobs[0]["source"] == "telegram"
+    assert queued_jobs[0]["notify_chat_id"] == "456"
+    assert queued_jobs[0]["notify_platform"] == "telegram"
+
+    with session_factory() as db:
+        media_file = db.scalar(select(MediaFile))
+        receipt = db.scalar(select(Receipt))
+        job = db.scalar(select(Job))
+        assert media_file is not None
+        assert media_file.file_type == "receipt"
+        assert media_file.mime_type == "image/jpeg"
+        assert media_file.source == "telegram_receipt"
+        assert receipt is not None
+        assert receipt.caption_text == "Struk makan siang"
+        assert job is not None
+        assert job.status == "queued"
+
+
+def test_telegram_photo_without_caption_asks_for_receipt_context(
+    test_client: tuple[TestClient, sessionmaker[Session], FakeTelegramClient, list[dict[str, Any]]],
+) -> None:
+    client, session_factory, fake_telegram, _queued_jobs = test_client
+    with session_factory() as db:
+        user = _create_user(db)
+        _link_telegram_user(db, user.id)
+        db.commit()
+
+    photo_response = client.post(
+        "/webhook/telegram",
+        headers={"X-Telegram-Bot-Api-Secret-Token": "test-telegram-secret"},
+        json=_telegram_photo_update(update_id=3101),
+    )
+
+    assert photo_response.status_code == 200, photo_response.text
+    assert photo_response.json()["transaction_status"] == "queued"
+    assert "balas keterangan struknya" in fake_telegram.sent_messages[-1]["text"]
+
+    caption_response = _post_telegram_update(
+        client,
+        text="makan siang",
+        update_id=3102,
+    )
+
+    assert caption_response.status_code == 200, caption_response.text
+    payload = caption_response.json()
+    assert payload["message_type"] == "receipt_ocr"
+    assert payload["transaction_status"] == "caption_saved"
+    assert "keterangan struk kusimpan" in fake_telegram.sent_messages[-1]["text"]
+
+    with session_factory() as db:
+        receipt = db.scalar(select(Receipt))
+        assert receipt is not None
+        assert receipt.caption_text == "makan siang"
         assert db.scalar(select(Transaction)) is None
 
 
@@ -495,6 +699,48 @@ def _telegram_callback_update(
             "data": data,
         },
     }
+
+
+def _telegram_photo_update(
+    *,
+    caption: str | None = None,
+    update_id: int = 3001,
+) -> dict[str, Any]:
+    message: dict[str, Any] = {
+        "message_id": 11,
+        "from": {
+            "id": 123,
+            "is_bot": False,
+            "first_name": "Tester",
+            "username": "tester",
+        },
+        "chat": {
+            "id": 456,
+            "first_name": "Tester",
+            "username": "tester",
+            "type": "private",
+        },
+        "date": 1760000000,
+        "photo": [
+            {
+                "file_id": "telegram-photo-small",
+                "file_unique_id": "small",
+                "width": 90,
+                "height": 90,
+                "file_size": 1200,
+            },
+            {
+                "file_id": "telegram-photo-large",
+                "file_unique_id": "large",
+                "width": 900,
+                "height": 1200,
+                "file_size": 120000,
+            },
+        ],
+    }
+    if caption is not None:
+        message["caption"] = caption
+    return {"update_id": update_id, "message": message}
 
 
 def _keyboard_contains(reply_markup: dict[str, Any] | None, callback_data: str) -> bool:

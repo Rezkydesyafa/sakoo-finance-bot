@@ -1,0 +1,117 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to laptop VPS
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on:
+      - self-hosted
+      - Linux
+      - sakoo-prod
+    timeout-minutes: 30
+    env:
+      COMPOSE_FILE: infra/docker/docker-compose.yml
+      COMPOSE_PROJECT_NAME: sakoo-finance-bot
+      NEXT_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          clean: false
+
+      - name: Write production env from secret
+        shell: bash
+        env:
+          PRODUCTION_ENV: ${{ secrets.PRODUCTION_ENV }}
+        run: |
+          if [ -n "${PRODUCTION_ENV:-}" ]; then
+            printf '%s' "$PRODUCTION_ENV" > .env
+          fi
+
+      - name: Write Google credentials from secret
+        shell: bash
+        env:
+          GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
+        run: |
+          if [ -n "${GOOGLE_CREDENTIALS_JSON:-}" ]; then
+            mkdir -p credentials
+            printf '%s' "$GOOGLE_CREDENTIALS_JSON" > credentials/google-service-account.json
+            chmod 600 credentials/google-service-account.json
+          fi
+
+      - name: Validate production env
+        shell: bash
+        run: |
+          if [ ! -f ".env" ]; then
+            echo "File .env production tidak ditemukan. Isi GitHub Actions secret PRODUCTION_ENV atau buat .env di workspace runner."
+            exit 1
+          fi
+
+          required=(
+            POSTGRES_USER
+            POSTGRES_PASSWORD
+            POSTGRES_DB
+            JWT_SECRET
+            WAHA_API_KEY
+            WAHA_DASHBOARD_USERNAME
+            WAHA_DASHBOARD_PASSWORD
+          )
+
+          for name in "${required[@]}"; do
+            if ! grep -Eq "^${name}=.+" .env; then
+              echo "Variable ${name} belum diisi di .env production."
+              exit 1
+            fi
+          done
+
+      - name: Ensure runtime directories
+        shell: bash
+        run: |
+          mkdir -p storage credentials storage/receipts storage/voice_notes storage/reports storage/temp
+
+      - name: Build and restart containers
+        shell: bash
+        run: docker compose -f "$COMPOSE_FILE" up -d --build --remove-orphans
+
+      - name: Wait for app health
+        shell: bash
+        run: |
+          port="$(grep -E '^NGINX_HTTP_PORT=' .env | tail -n 1 | cut -d '=' -f 2- | tr -d '\r')"
+          port="${port:-8080}"
+          health_url="http://127.0.0.1:${port}/health"
+          deadline=$((SECONDS + 120))
+
+          until curl -fsS "$health_url" >/dev/null; do
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              docker compose -f "$COMPOSE_FILE" ps
+              docker compose -f "$COMPOSE_FILE" logs --tail=80 backend
+              echo "Health check gagal: ${health_url} tidak mengembalikan HTTP 200."
+              exit 1
+            fi
+            sleep 5
+          done
+
+          echo "Health check OK: ${health_url}"
+
+      - name: Show service status
+        shell: bash
+        run: docker compose -f "$COMPOSE_FILE" ps

@@ -121,6 +121,7 @@ def test_receipt_ocr_endpoint_queues_background_job(
             "source": "dashboard",
             "notify_chat_id": None,
             "notify_session": None,
+            "notify_platform": None,
         }
     ]
     assert fake_ocr.calls == 0

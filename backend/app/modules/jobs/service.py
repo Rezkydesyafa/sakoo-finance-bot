@@ -65,6 +65,7 @@ def queue_receipt_ocr_job(
     enqueue: ReceiptOcrEnqueue,
     notify_chat_id: str | None = None,
     notify_session: str | None = None,
+    notify_platform: str | None = None,
 ) -> Job:
     try:
         media_file = get_receipt_media_file(db, user_id=user_id, media_id=media_id)
@@ -111,6 +112,7 @@ def queue_receipt_ocr_job(
             source=source,
             notify_chat_id=notify_chat_id,
             notify_session=notify_session,
+            notify_platform=notify_platform,
         )
     except Exception as exc:
         job.status = JOB_STATUS_FAILED

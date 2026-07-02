@@ -56,9 +56,15 @@ from app.modules.transactions.service import (
 
 WAITING_EXPENSE_INPUT = "WAITING_EXPENSE_INPUT"
 WAITING_INCOME_INPUT = "WAITING_INCOME_INPUT"
+WAITING_RECEIPT_CAPTION = "WAITING_RECEIPT_CAPTION"
 TELEGRAM_MENU_STATE_MESSAGE_TYPE = "telegram_menu_state"
 CONSUMED_MENU_STATE_STATUS = "consumed_menu_state"
 SUPERSEDED_MENU_STATE_STATUS = "superseded_menu_state"
+ACTIVE_WAITING_INPUT_STATES = {
+    WAITING_EXPENSE_INPUT,
+    WAITING_INCOME_INPUT,
+    WAITING_RECEIPT_CAPTION,
+}
 
 
 @dataclass(frozen=True)
@@ -304,9 +310,17 @@ def set_waiting_input_state(
     user_id: int,
     chat_id: str | None,
     state: str,
+    metadata: dict[str, Any] | None = None,
 ) -> None:
+    if state not in ACTIVE_WAITING_INPUT_STATES:
+        return
+
     for existing in _get_waiting_state_logs(db, user_id=user_id):
         existing.status = SUPERSEDED_MENU_STATE_STATUS
+
+    payload = {"state": state, "chat_id": chat_id}
+    if metadata:
+        payload.update(metadata)
 
     db.add(
         BotLog(
@@ -314,21 +328,44 @@ def set_waiting_input_state(
             platform="telegram",
             message_type=TELEGRAM_MENU_STATE_MESSAGE_TYPE,
             raw_message=chat_id,
-            parsed_result={"state": state, "chat_id": chat_id},
+            parsed_result=payload,
             status=state,
         )
     )
     db.flush()
 
 
-def consume_waiting_input_state(db: Session, *, user_id: int) -> str | None:
+def consume_waiting_input_state(
+    db: Session,
+    *,
+    user_id: int,
+    states: set[str] | None = None,
+) -> str | None:
+    payload = consume_waiting_input_state_payload(
+        db,
+        user_id=user_id,
+        states=states,
+    )
+    if payload is None:
+        return None
+    state = payload.get("state")
+    return state if isinstance(state, str) else None
+
+
+def consume_waiting_input_state_payload(
+    db: Session,
+    *,
+    user_id: int,
+    states: set[str] | None = None,
+) -> dict[str, Any] | None:
+    allowed_states = states or ACTIVE_WAITING_INPUT_STATES
     state_log = db.scalar(
         select(BotLog)
         .where(
             BotLog.user_id == user_id,
             BotLog.platform == "telegram",
             BotLog.message_type == TELEGRAM_MENU_STATE_MESSAGE_TYPE,
-            BotLog.status.in_([WAITING_EXPENSE_INPUT, WAITING_INCOME_INPUT]),
+            BotLog.status.in_(allowed_states),
         )
         .order_by(BotLog.created_at.desc(), BotLog.id.desc())
     )
@@ -339,7 +376,9 @@ def consume_waiting_input_state(db: Session, *, user_id: int) -> str | None:
     state = payload.get("state") if isinstance(payload, dict) else state_log.status
     state_log.status = CONSUMED_MENU_STATE_STATUS
     db.flush()
-    return state if state in {WAITING_EXPENSE_INPUT, WAITING_INCOME_INPUT} else None
+    if state not in allowed_states:
+        return None
+    return payload if isinstance(payload, dict) else {"state": state}
 
 
 def _get_waiting_state_logs(db: Session, *, user_id: int) -> list[BotLog]:
@@ -349,7 +388,7 @@ def _get_waiting_state_logs(db: Session, *, user_id: int) -> list[BotLog]:
                 BotLog.user_id == user_id,
                 BotLog.platform == "telegram",
                 BotLog.message_type == TELEGRAM_MENU_STATE_MESSAGE_TYPE,
-                BotLog.status.in_([WAITING_EXPENSE_INPUT, WAITING_INCOME_INPUT]),
+                BotLog.status.in_(ACTIVE_WAITING_INPUT_STATES),
             )
         )
     )
@@ -466,4 +505,3 @@ def _link_instruction_text() -> str:
 
 def _append_error(existing: str | None, new_error: str) -> str:
     return f"{existing}; {new_error}" if existing else new_error
-

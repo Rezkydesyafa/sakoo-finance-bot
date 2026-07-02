@@ -62,9 +62,22 @@ def parse_telegram_update(update: dict[str, Any]) -> ParsedTelegramMessage:
     chat_id = _as_str(chat.get("id")) if isinstance(chat, dict) else None
     platform_user_id = _as_str(sender.get("id")) if isinstance(sender, dict) else None
     text = message.get("text")
+    caption = message.get("caption")
     voice = message.get("voice")
     audio = message.get("audio")
-    media = voice if isinstance(voice, dict) else audio if isinstance(audio, dict) else None
+    photo = _largest_photo(message.get("photo"))
+    document = message.get("document")
+    media = (
+        voice
+        if isinstance(voice, dict)
+        else audio
+        if isinstance(audio, dict)
+        else photo
+        if isinstance(photo, dict)
+        else document
+        if _is_image_document(document)
+        else None
+    )
 
     return ParsedTelegramMessage(
         update_id=update_id,
@@ -78,8 +91,20 @@ def parse_telegram_update(update: dict[str, Any]) -> ParsedTelegramMessage:
         username=sender.get("username") if isinstance(sender, dict) else None,
         first_name=sender.get("first_name") if isinstance(sender, dict) else None,
         last_name=sender.get("last_name") if isinstance(sender, dict) else None,
-        text=text if isinstance(text, str) else None,
-        message_type=_detect_message_type(text=text, voice=voice, audio=audio),
+        text=(
+            text
+            if isinstance(text, str)
+            else caption
+            if isinstance(caption, str)
+            else None
+        ),
+        message_type=_detect_message_type(
+            text=text,
+            voice=voice,
+            audio=audio,
+            photo=photo,
+            document=document,
+        ),
         file_id=_as_str(media.get("file_id")) if isinstance(media, dict) else None,
         file_unique_id=_as_str(media.get("file_unique_id")) if isinstance(media, dict) else None,
         mime_type=_as_optional_str(media.get("mime_type")) if isinstance(media, dict) else None,
@@ -143,11 +168,15 @@ def _detect_message_type(
     text: object,
     voice: object,
     audio: object,
+    photo: object,
+    document: object,
 ) -> str:
     if isinstance(text, str):
         return "text"
     if isinstance(voice, dict) or isinstance(audio, dict):
         return "audio"
+    if isinstance(photo, dict) or _is_image_document(document):
+        return "photo"
     return "unsupported"
 
 
@@ -157,3 +186,27 @@ def _positive_float(value: object) -> float | None:
     except (TypeError, ValueError):
         return None
     return number if number > 0 else None
+
+
+def _largest_photo(photo: object) -> dict[str, Any] | None:
+    if not isinstance(photo, list):
+        return None
+    candidates = [item for item in photo if isinstance(item, dict)]
+    if not candidates:
+        return None
+    return max(
+        candidates,
+        key=lambda item: (
+            _positive_float(item.get("file_size")) or 0,
+            (_positive_float(item.get("width")) or 0)
+            * (_positive_float(item.get("height")) or 0),
+        ),
+    )
+
+
+def _is_image_document(document: object) -> bool:
+    return (
+        isinstance(document, dict)
+        and isinstance(document.get("mime_type"), str)
+        and document["mime_type"].lower().startswith("image/")
+    )

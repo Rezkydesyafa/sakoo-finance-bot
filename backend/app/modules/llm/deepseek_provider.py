@@ -8,6 +8,7 @@ from app.modules.llm.base import (
     BaseLlmProvider,
     LlmProviderError,
     build_llm_prompt,
+    compact_error_detail,
     parse_json_object,
     validate_llm_response,
 )
@@ -22,8 +23,9 @@ class DeepSeekProvider(BaseLlmProvider):
         if not self.config.api_key:
             raise LlmProviderError("deepseek_api_key_missing")
 
+        model = self.config.model or self.model
         payload = {
-            "model": self.model,
+            "model": model,
             "messages": [{"role": "user", "content": build_llm_prompt(message)}],
             "temperature": 0,
             "max_tokens": 120,
@@ -37,8 +39,17 @@ class DeepSeekProvider(BaseLlmProvider):
             )
             response.raise_for_status()
             data = response.json()
-        except (httpx.HTTPError, ValueError) as exc:
-            raise LlmProviderError("deepseek_request_failed") from exc
+        except httpx.HTTPStatusError as exc:
+            detail = compact_error_detail(exc.response.text)
+            raise LlmProviderError(
+                f"deepseek_request_failed:{exc.response.status_code}:{detail}"
+            ) from None
+        except httpx.HTTPError as exc:
+            raise LlmProviderError(
+                f"deepseek_request_failed:{type(exc).__name__}"
+            ) from None
+        except ValueError as exc:
+            raise LlmProviderError("deepseek_response_invalid_json") from exc
 
         return validate_llm_response(parse_json_object(_extract_chat_text(data)))
 

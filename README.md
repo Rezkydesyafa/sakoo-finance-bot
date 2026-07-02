@@ -70,6 +70,8 @@ Dependency Python ada di [backend/requirements.txt](backend/requirements.txt). D
 
 Docker adalah cara utama untuk onboarding developer baru karena PostgreSQL, Redis, backend, frontend, Celery, WAHA, dan Nginx sudah disatukan di [infra/docker/docker-compose.yml](infra/docker/docker-compose.yml).
 
+Panduan operasional Docker yang lebih lengkap, termasuk checklist container sehat, integrasi backend-frontend lewat Nginx, dan troubleshooting tersedia di [docs/docker-setup.md](docs/docker-setup.md).
+
 1. Salin file environment dari root project:
 
 ```bash
