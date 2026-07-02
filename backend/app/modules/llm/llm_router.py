@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import datetime, time, timedelta
 from typing import Any
@@ -68,8 +69,8 @@ def parse_transaction_with_llm(
     settings: Settings | None = None,
 ) -> dict[str, Any]:
     active_settings = settings or get_settings()
-    provider = get_llm_provider(active_settings)
-    if provider is None:
+    providers = get_llm_providers(active_settings)
+    if not providers:
         raise LlmProviderUnavailable("llm_provider_disabled")
 
     state = None
@@ -80,57 +81,131 @@ def parse_transaction_with_llm(
             limit=active_settings.llm_max_request_per_user_per_day,
         )
 
-    compact_result = provider.parse_transaction(message)
-    expanded = expand_llm_response(compact_result, source=source, today=today)
+    errors: list[str] = []
+    for provider in providers:
+        try:
+            compact_result = provider.parse_transaction(message)
+            expanded = expand_llm_response(compact_result, source=source, today=today)
+        except LlmProviderError as exc:
+            errors.append(f"{provider.provider_name}:{exc.detail}")
+            continue
 
-    if db is not None and user_id is not None and state is not None:
-        log_llm_usage(
-            db,
-            user_id=user_id,
-            provider=provider.provider_name,
-            result=expanded,
-            state=state,
-        )
+        metadata = dict(expanded.get("metadata") or {})
+        metadata["llm_provider"] = provider.provider_name
+        expanded["metadata"] = metadata
 
-    return expanded
+        if db is not None and user_id is not None and state is not None:
+            log_llm_usage(
+                db,
+                user_id=user_id,
+                provider=provider.provider_name,
+                result=expanded,
+                state=state,
+            )
+
+        return expanded
+
+    detail = ";".join(errors) if errors else "no_provider_attempted"
+    raise LlmProviderError(f"llm_all_providers_failed:{detail}")
 
 
 def get_llm_provider(settings: Settings | None = None) -> BaseLlmProvider | None:
+    providers = get_llm_providers(settings)
+    return providers[0] if providers else None
+
+
+def get_llm_providers(settings: Settings | None = None) -> list[BaseLlmProvider]:
     active_settings = settings or get_settings()
-    provider_name = active_settings.llm_provider.strip().lower()
+    provider_names = _parse_provider_names(active_settings.llm_provider)
     timeout = active_settings.llm_timeout_seconds
 
-    if provider_name in {"", "none", "off", "disabled"}:
-        return None
-    if provider_name == "gemini":
-        return GeminiProvider(
-            LlmProviderConfig(
-                api_key=active_settings.gemini_api_key,
-                timeout_seconds=timeout,
+    providers: list[BaseLlmProvider] = []
+    for provider_name in provider_names:
+        if provider_name in {"", "none", "off", "disabled"}:
+            continue
+        if provider_name == "gemini":
+            gemini_keys = _gemini_api_keys(active_settings)
+            if not gemini_keys:
+                providers.append(
+                    GeminiProvider(
+                        LlmProviderConfig(
+                            api_key="",
+                            timeout_seconds=timeout,
+                            model=active_settings.gemini_model,
+                        )
+                    )
+                )
+                continue
+            providers.extend(
+                GeminiProvider(
+                    LlmProviderConfig(
+                        api_key=api_key,
+                        timeout_seconds=timeout,
+                        model=active_settings.gemini_model,
+                    )
+                )
+                for api_key in gemini_keys
             )
-        )
-    if provider_name == "glm":
-        return GlmProvider(
-            LlmProviderConfig(
-                api_key=active_settings.glm_api_key,
-                timeout_seconds=timeout,
+            continue
+        if provider_name == "glm":
+            providers.append(
+                GlmProvider(
+                    LlmProviderConfig(
+                        api_key=active_settings.glm_api_key,
+                        timeout_seconds=timeout,
+                        model=active_settings.glm_model,
+                    )
+                )
             )
-        )
-    if provider_name == "openrouter":
-        return OpenRouterProvider(
-            LlmProviderConfig(
-                api_key=active_settings.openrouter_api_key,
-                timeout_seconds=timeout,
+            continue
+        if provider_name == "openrouter":
+            providers.append(
+                OpenRouterProvider(
+                    LlmProviderConfig(
+                        api_key=active_settings.openrouter_api_key,
+                        timeout_seconds=timeout,
+                        model=active_settings.openrouter_model,
+                    )
+                )
             )
-        )
-    if provider_name == "deepseek":
-        return DeepSeekProvider(
-            LlmProviderConfig(
-                api_key=active_settings.deepseek_api_key,
-                timeout_seconds=timeout,
+            continue
+        if provider_name == "deepseek":
+            providers.append(
+                DeepSeekProvider(
+                    LlmProviderConfig(
+                        api_key=active_settings.deepseek_api_key,
+                        timeout_seconds=timeout,
+                        model=active_settings.deepseek_model,
+                    )
+                )
             )
-        )
-    raise LlmProviderUnavailable("llm_provider_unknown")
+            continue
+        raise LlmProviderUnavailable(f"llm_provider_unknown:{provider_name}")
+
+    return providers
+
+
+def _parse_provider_names(value: str) -> list[str]:
+    return [
+        item
+        for item in re.split(r"[\s,;|+>]+", value.strip().lower())
+        if item
+    ]
+
+
+def _gemini_api_keys(settings: Settings) -> list[str]:
+    raw_values = [
+        settings.gemini_api_key,
+        settings.gemini_api_key_1,
+        settings.gemini_api_key_2,
+        *re.split(r"[\s,;|]+", settings.gemini_api_keys),
+    ]
+    keys: list[str] = []
+    for value in raw_values:
+        normalized = value.strip()
+        if normalized and normalized not in keys:
+            keys.append(normalized)
+    return keys
 
 
 def enforce_llm_daily_limit(

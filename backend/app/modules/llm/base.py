@@ -48,6 +48,7 @@ class LlmResponseValidationError(LlmProviderError):
 class LlmProviderConfig:
     api_key: str
     timeout_seconds: float
+    model: str | None = None
 
 
 class BaseLlmProvider(ABC):
@@ -65,6 +66,13 @@ def build_llm_prompt(message: str) -> str:
     compact_message = re.sub(r"\s+", " ", message.strip())
     escaped_message = compact_message[:500].replace("\\", "\\\\").replace('"', '\\"')
     return LLM_PROMPT_TEMPLATE.replace("{message}", escaped_message)
+
+
+def compact_error_detail(raw_text: str, *, limit: int = 240) -> str:
+    text = re.sub(r"\s+", " ", str(raw_text or "")).strip()
+    if not text:
+        return "empty_response"
+    return text[:limit]
 
 
 def parse_json_object(raw_text: str) -> dict[str, Any]:
@@ -104,8 +112,7 @@ def validate_llm_response(payload: dict[str, Any]) -> dict[str, Any]:
         raise LlmResponseValidationError("llm_response_invalid_category")
     if date_code not in DATE_CODE_MAP:
         raise LlmResponseValidationError("llm_response_invalid_date")
-    if not isinstance(payload["ask"], bool):
-        raise LlmResponseValidationError("llm_response_invalid_ask")
+    ask = _parse_bool(payload["ask"])
 
     try:
         amount = int(payload["a"])
@@ -114,12 +121,7 @@ def validate_llm_response(payload: dict[str, Any]) -> dict[str, Any]:
     if amount < 0:
         raise LlmResponseValidationError("llm_response_invalid_amount")
 
-    try:
-        confidence = float(payload["cf"])
-    except (TypeError, ValueError) as exc:
-        raise LlmResponseValidationError("llm_response_invalid_confidence") from exc
-    if confidence < 0 or confidence > 1:
-        raise LlmResponseValidationError("llm_response_invalid_confidence")
+    confidence = _parse_confidence(payload["cf"])
 
     description = payload["d"]
     if description is None:
@@ -135,7 +137,7 @@ def validate_llm_response(payload: dict[str, Any]) -> dict[str, Any]:
         "d": description.strip(),
         "dt": date_code,
         "cf": confidence,
-        "ask": payload["ask"],
+        "ask": ask,
     }
 
 
@@ -183,3 +185,41 @@ def _resolve_transaction_date(date_code: str, current_date: date) -> date:
     if date_code == "yesterday":
         return current_date - timedelta(days=1)
     return current_date
+
+
+def _parse_confidence(value: Any) -> float:
+    is_percent = False
+    parsed_value = value
+    if isinstance(value, str):
+        text = value.strip()
+        is_percent = text.endswith("%")
+        if is_percent:
+            text = text[:-1].strip()
+        parsed_value = text
+
+    try:
+        confidence = float(parsed_value)
+    except (TypeError, ValueError) as exc:
+        raise LlmResponseValidationError("llm_response_invalid_confidence") from exc
+
+    if is_percent or confidence > 1:
+        if 0 <= confidence <= 100:
+            confidence /= 100
+
+    if confidence < 0 or confidence > 1:
+        raise LlmResponseValidationError("llm_response_invalid_confidence")
+    return confidence
+
+
+def _parse_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"true", "1", "yes", "y"}:
+            return True
+        if normalized in {"false", "0", "no", "n"}:
+            return False
+    if isinstance(value, int) and value in {0, 1}:
+        return bool(value)
+    raise LlmResponseValidationError("llm_response_invalid_ask")
