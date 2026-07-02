@@ -3,138 +3,512 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import { LogoutButton } from "@/components/logout-button";
+import { apiClient } from "@/lib/api";
+import { getStoredAuthToken } from "@/lib/auth-storage";
 
 const navigationItems = [
-  { label: "Ringkasan", href: "/?tab=overview", id: "overview" },
-  { label: "Transaksi", href: "/?tab=transactions", id: "transactions" },
-  { label: "Laporan", href: "/?tab=reports", id: "reports" },
-  { label: "Integrasi", href: "/?tab=integrations", id: "integrations" },
+  { label: "Overview", icon: "dashboard", href: "/?tab=overview", id: "overview" },
+  { label: "Transactions", icon: "receipt_long", href: "/?tab=transactions", id: "transactions" },
+  { label: "Reports", icon: "bar_chart", href: "/?tab=reports", id: "reports" },
+  { label: "Budgets", icon: "account_balance_wallet", href: "/?tab=budgets", id: "budgets" },
+  { label: "Receipt Scan", icon: "document_scanner", href: "/?tab=receipt_scan", id: "receipt_scan" },
+  { label: "Bot Channels", icon: "smart_toy", href: "/?tab=integrations", id: "integrations" },
+  { label: "Settings", icon: "settings", href: "/?tab=settings", id: "settings" },
+];
+
+const mobileNavigationItems = [
+  { label: "Overview", icon: "dashboard", href: "/?tab=overview", id: "overview" },
+  { label: "Transactions", icon: "receipt_long", href: "/?tab=transactions", id: "transactions" },
+  { label: "Scan", icon: "document_scanner", href: "/?tab=receipt_scan", id: "receipt_scan", isScan: true },
+  { label: "Budgets", icon: "account_balance_wallet", href: "/?tab=budgets", id: "budgets" },
+  { label: "Reports", icon: "bar_chart", href: "/?tab=reports", id: "reports" },
 ];
 
 function DashboardShellContent({ children }: { children: ReactNode }) {
   const searchParams = useSearchParams();
   const currentTab = searchParams.get("tab") || "overview";
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  // Mobile scanning states
+  const [isMobileScanOpen, setIsMobileScanOpen] = useState(false);
+  const [receiptImage, setReceiptImage] = useState<string | null>(null);
+  const [scanStatus, setScanStatus] = useState<"idle" | "scanning" | "completed">("idle");
+  const [scannedData, setScannedData] = useState({
+    merchant: "---",
+    date: "---",
+    category: "---",
+    amount: 0,
+  });
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setReceiptImage(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+
+    setScanStatus("scanning");
+    setScannedData({
+      merchant: "---",
+      date: "---",
+      category: "---",
+      amount: 0,
+    });
+
+    setTimeout(() => {
+      setScanStatus("completed");
+      setScannedData({
+        merchant: "Starbucks Coffee",
+        date: new Date().toISOString().split("T")[0],
+        category: "Makanan",
+        amount: 85000,
+      });
+    }, 2500);
+  };
+
+  const handleCancelReceipt = () => {
+    setReceiptImage(null);
+    setScanStatus("idle");
+    setScannedData({
+      merchant: "---",
+      date: "---",
+      category: "---",
+      amount: 0,
+    });
+    setIsMobileScanOpen(false);
+  };
+
+  const handleConfirmReceipt = () => {
+    if (scanStatus !== "completed") return;
+    const token = getStoredAuthToken();
+    if (token) {
+      apiClient.transactions.create(token, {
+        type: "expense",
+        amount: scannedData.amount,
+        description: scannedData.merchant,
+        transaction_date: scannedData.date,
+      }).then(() => {
+        handleCancelReceipt();
+        window.location.reload();
+      }).catch(() => {
+        alert("Failed to save transaction.");
+      });
+    } else {
+      alert("Please login first.");
+    }
+  };
+
+  function formatCurrency(val: number) {
+    return new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR",
+      maximumFractionDigits: 0,
+    }).format(val);
+  }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col lg:flex-row">
-      {/* Sidebar - Widescreen */}
-      <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-[#0b3d2e] bg-[#062A1F] text-slate-100 lg:block z-20 shadow-lg">
-        <div className="flex h-full flex-col">
-          {/* Logo / Header */}
-          <div className="border-b border-[#0b3d2e] px-6 py-6 flex items-center gap-3">
-            <div className="h-8 w-8 rounded-lg bg-[#A1F02D] flex items-center justify-center font-semibold text-[#062A1F] shadow-md animate-pulse-glow">
-              S
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-[#A1F02D]">
-                Sakoo
-              </p>
-              <p className="text-base font-semibold text-white leading-tight">
-                Finance Assistant
-              </p>
-            </div>
-          </div>
-
-          {/* Navigation */}
-          <nav className="flex flex-1 flex-col gap-1.5 px-4 py-6">
-            <p className="px-3 text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-              Menu Utama
-            </p>
-            {navigationItems.map((item) => {
-              const isActive = currentTab === item.id;
-              return (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  className={`flex items-center px-4 py-3 text-sm font-medium rounded-xl transition duration-150 ${
-                    isActive
-                      ? "bg-[#A1F02D] text-[#062A1F] font-semibold shadow-md"
-                      : "text-slate-300 hover:bg-[#0a382a] hover:text-white"
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
-
-          {/* User Workspace Info */}
-          <div className="border-t border-[#0b3d2e] bg-[#041d15] px-6 py-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-[#A1F02D]">
-                Workspace
-              </p>
-              <p className="text-sm font-semibold text-white">
-                Local MVP
-              </p>
-            </div>
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[#A1F02D]/10 text-[#A1F02D] border border-[#A1F02D]/20">
-              Active
-            </span>
+    <div className="text-sm text-[#1a1c1b] antialiased bg-[#f9f9f7] min-h-screen">
+      <div className="ambient-glow"></div>
+      
+      {/* SideNavBar */}
+      <nav className="hidden md:flex fixed left-0 top-0 h-screen w-[240px] bg-white flex-col py-8 border-r border-[#E8E8E8] z-50">
+        <div className="px-8 mb-8">
+          <h1 className="text-xl font-bold text-[#1a1c1b]">Sakoo</h1>
+          <p className="text-xs text-[#6F6F6F] mt-1">Finance Bot</p>
+        </div>
+        
+        <div className="flex-1 flex flex-col gap-2 overflow-y-auto no-scrollbar">
+          {navigationItems.map((item) => {
+            const isActive = currentTab === item.id;
+            return (
+              <Link
+                key={item.id}
+                href={item.href}
+                className={isActive
+                  ? "flex items-center gap-3 bg-[#c7ff00] text-[#151f00] rounded-xl px-4 py-3 mx-2 scale-[0.98] transition-transform duration-200"
+                  : "flex items-center gap-3 text-[#5f5e5e] hover:text-[#4e6700] px-4 py-3 mx-2 transition-colors hover:bg-neutral-100 rounded-xl"
+                }
+              >
+                <span className="material-symbols-outlined" style={isActive ? { fontVariationSettings: '"FILL" 1' } : {}}>{item.icon}</span>
+                <span className="text-[13px] font-semibold">{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+        
+        <div className="px-6 mb-4 mt-auto">
+          <button className="w-full py-3 px-4 bg-[#4e6700] text-white text-[13px] font-semibold rounded-full hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
+            <span className="material-symbols-outlined">add</span>
+            + New Transaction
+          </button>
+        </div>
+        
+        <div className="flex flex-col gap-1 border-t border-[#E8E8E8] pt-4 mx-4">
+          <a className="flex items-center gap-3 text-[#5f5e5e] hover:text-[#4e6700] px-4 py-3 transition-colors" href="#">
+            <span className="material-symbols-outlined">headset_mic</span>
+            <span className="text-[13px] font-semibold">Support</span>
+          </a>
+          <div className="px-4 py-3 flex items-center gap-3 text-[#ba1a1a] hover:opacity-80 transition-opacity">
+            <span className="material-symbols-outlined">logout</span>
+            <LogoutButton className="text-[13px] font-semibold text-left" />
           </div>
         </div>
-      </aside>
+      </nav>
+
+      {/* TopNavBar */}
+      <header className="fixed top-0 md:right-0 w-full md:w-[calc(100%_-_240px)] z-40 bg-[#f9f9f7] flex justify-between items-center h-20 px-4 md:px-8 border-b md:border-none border-[#E8E8E8]">
+        <div className="flex items-center w-64 md:w-96 relative hidden sm:flex">
+          <span className="material-symbols-outlined absolute left-4 text-[#6F6F6F]">search</span>
+          <input 
+            type="text" 
+            placeholder="Search transactions, assets..." 
+            className="w-full bg-[#F1F2F0] border-none rounded-full py-2.5 pl-12 pr-4 text-xs focus:ring-1 focus:ring-[#c7ff00] text-[#1a1c1b] font-semibold placeholder-[#6F6F6F]"
+          />
+        </div>
+
+        <div className="flex sm:hidden items-center">
+          <h1 className="text-lg font-bold text-[#1a1c1b]">Sakoo</h1>
+        </div>
+
+        <div className="flex items-center gap-4 ml-auto sm:ml-0">
+          <button className="w-10 h-10 rounded-full hover:bg-neutral-100 flex items-center justify-center transition-colors border-none bg-transparent">
+            <span className="material-symbols-outlined text-[#6F6F6F]">notifications</span>
+          </button>
+          
+          <div className="h-6 w-[1px] bg-[#E8E8E8] mx-2"></div>
+
+          {/* Profile Dropdown */}
+          <div className="relative">
+            <button 
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className="flex items-center gap-2 focus:outline-none border-none bg-transparent cursor-pointer"
+            >
+              <div className="w-10 h-10 rounded-full bg-[#c7ff00] flex items-center justify-center font-bold text-[#151f00] shadow-sm overflow-hidden">
+                <img 
+                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuC1yZN5I8LBD1KjdLNhfQUCmjK7wwz4bzQ_i6vUkeXVIx5rtGH1eCldQ-Ke2yOREWBZTJrEOYJSrZUliNPFF5MfL416nIe5oVqkZ3a0SfVDE7Q3IyM_2cvY9azoF-9pQfu4cr25cFsW4tXi969ee74rr3QntubQO-hPt6cxraURUWsbr42v2qWtNDX9DxtDXk4-M4gNNgZps0_GY4MGLXPbZsqQHV7_9XOmuMy28mgHGcDzg8EaVx7TtWQVHRW9lc0Xvdh-O58ILwA"
+                  alt="Profile"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            </button>
+
+            {isDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-45" onClick={() => setIsDropdownOpen(false)}></div>
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-[#E8E8E8] py-1 z-50 animate-fade-in">
+                  <div className="px-4 py-3 border-b border-[#E8E8E8]">
+                    <p className="text-[10px] text-[#6F6F6F] font-semibold uppercase tracking-wider">Signed in as</p>
+                    <p className="text-sm font-semibold text-[#1a1c1b] truncate">Fajar</p>
+                  </div>
+                  
+                  <Link 
+                    href="/?tab=integrations" 
+                    onClick={() => setIsDropdownOpen(false)}
+                    className="flex items-center gap-3 px-4 py-2 text-sm text-[#5f5e5e] hover:bg-neutral-100 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">smart_toy</span>
+                    <span>Bot Channels</span>
+                  </Link>
+
+                  <Link 
+                    href="/?tab=settings" 
+                    onClick={() => setIsDropdownOpen(false)}
+                    className="flex items-center gap-3 px-4 py-2 text-sm text-[#5f5e5e] hover:bg-neutral-100 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">settings</span>
+                    <span>Settings</span>
+                  </Link>
+
+                  <a 
+                    href="#" 
+                    onClick={() => setIsDropdownOpen(false)}
+                    className="flex items-center gap-3 px-4 py-2 text-sm text-[#5f5e5e] hover:bg-neutral-100 transition-colors border-t border-[#E8E8E8]"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">headset_mic</span>
+                    <span>Support</span>
+                  </a>
+
+                  <div className="px-1 py-1 border-t border-[#E8E8E8] mt-1">
+                    <div className="flex items-center gap-3 w-full px-3 py-2 text-sm text-[#ba1a1a] hover:bg-red-50 rounded-xl transition-colors">
+                      <span className="material-symbols-outlined text-[20px]">logout</span>
+                      <LogoutButton className="text-sm font-semibold text-left w-full" />
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </header>
+      
+      {/* Mobile Navigation */}
+      <nav className="flex items-center justify-between border-t border-[#E8E8E8] bg-white fixed bottom-0 left-0 right-0 z-50 py-1.5 md:hidden no-scrollbar shadow-[0_-4px_10px_rgba(0,0,0,0.05)] animate-fade-in">
+        {mobileNavigationItems.map((item) => {
+          const isActive = currentTab === item.id;
+          if (item.isScan) {
+            return (
+              <div key={item.id} className="flex-1 flex justify-center items-center">
+                <button
+                  onClick={() => setIsMobileScanOpen(true)}
+                  type="button"
+                  className={`flex items-center justify-center w-12 h-12 rounded-full shadow-md active:scale-95 transition-all duration-200 ${
+                    isMobileScanOpen
+                      ? "bg-[#4e6700] text-white"
+                      : "bg-[#c7ff00] text-[#151f00] hover:bg-[#bff500]"
+                  } border-none`}
+                >
+                  <span className="material-symbols-outlined text-[24px]" style={isMobileScanOpen ? { fontVariationSettings: '"FILL" 1' } : {}}>{item.icon}</span>
+                </button>
+              </div>
+            );
+          }
+
+          return (
+            <div key={item.label} className="flex-1 flex justify-center items-center">
+              <Link
+                href={item.href}
+                className={`flex flex-col items-center justify-center py-1.5 w-full rounded-xl transition duration-150 ${
+                  isActive
+                    ? "text-[#4e6700] font-semibold"
+                    : "text-[#6F6F6F] hover:text-[#4e6700]"
+                }`}
+              >
+                <span className="material-symbols-outlined text-xl mb-0.5" style={isActive ? { fontVariationSettings: '"FILL" 1' } : {}}>{item.icon}</span>
+                <span className="text-[9px] font-semibold">{item.label}</span>
+              </Link>
+            </div>
+          );
+        })}
+      </nav>
 
       {/* Main Content Area */}
-      <div className="flex-1 lg:pl-64 flex flex-col min-h-screen">
-        {/* Header */}
-        <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 backdrop-blur-md px-4 py-4 sm:px-6 lg:px-8 shadow-sm">
-          <div className="mx-auto flex items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-[#A1F02D] animate-pulse" />
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  Dashboard
-                </p>
+      <main className="md:ml-[240px] pt-20 px-4 pb-20 md:pt-28 md:px-8 md:pb-8 max-w-[1440px] min-h-screen">
+        {children}
+      </main>
+
+      {/* Sliding Mobile Scanner Overlay */}
+      <div 
+        className={`fixed inset-0 bg-[#f9f9f7] z-[100] md:hidden transition-transform duration-300 ease-out transform ${
+          isMobileScanOpen ? "translate-y-0" : "translate-y-full"
+        }`}
+      >
+        <style>{`
+          @keyframes scan {
+            0% { transform: translateY(-100%); }
+            50% { transform: translateY(200%); }
+            100% { transform: translateY(-100%); }
+          }
+          @keyframes scanLine {
+            0% { top: 0; }
+            50% { top: 100%; }
+            100% { top: 0; }
+          }
+          .animate-scan {
+            animation: scan 4s ease-in-out infinite;
+          }
+          .animate-scanLine {
+            animation: scanLine 4s ease-in-out infinite;
+          }
+        `}</style>
+
+        <div className="flex flex-col h-full relative overflow-y-auto pb-10">
+          {/* Header with Back Button */}
+          <header className="sticky top-0 bg-[#f9f9f7] flex items-center justify-between px-4 py-4 z-40 border-b border-[#E8E8E8]/50 shrink-0">
+            <button 
+              onClick={handleCancelReceipt}
+              type="button"
+              className="w-10 h-10 flex items-center justify-center rounded-full bg-[#F1F2F0] hover:opacity-80 transition-opacity border-none cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[#1a1c1b]">arrow_back</span>
+            </button>
+            <h1 className="text-base font-bold text-[#1a1c1b]">Receipt Scan</h1>
+            <div className="w-10"></div>
+          </header>
+
+          {/* Body Content */}
+          <div className="flex-1 px-4 py-6 space-y-6 max-w-md mx-auto w-full">
+            {/* Hidden file inputs */}
+            <input 
+              type="file" 
+              id="mobile-receipt-input-gallery" 
+              className="hidden" 
+              accept="image/*" 
+              onChange={handleFileChange} 
+            />
+            <input 
+              type="file" 
+              id="mobile-receipt-input-camera" 
+              className="hidden" 
+              accept="image/*" 
+              capture="environment"
+              onChange={handleFileChange} 
+            />
+
+            {/* Scan Area view finder */}
+            <div className="relative w-full aspect-[3/4] bg-neutral-900 rounded-[28px] overflow-hidden shadow-lg border border-neutral-800">
+              {receiptImage ? (
+                <img src={receiptImage} alt="Receipt Scan Viewfinder" className="w-full h-full object-cover opacity-80" />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center text-white/40 gap-3">
+                  <span className="material-symbols-outlined text-5xl">photo_camera</span>
+                  <p className="text-xs text-neutral-400">Select Gallery or Capture to Scan</p>
+                </div>
+              )}
+
+              <div className="absolute inset-0 border-2 border-[#c7ff00]/40 m-4 rounded-[20px] pointer-events-none"></div>
+              
+              {scanStatus === "scanning" && (
+                <>
+                  <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#c7ff00]/20 to-transparent h-1/2 w-full animate-scan top-0 pointer-events-none"></div>
+                  <div className="absolute top-0 left-0 w-full h-[2px] bg-[#c7ff00] animate-scanLine shadow-[0_0_10px_#c7ff00]"></div>
+                </>
+              )}
+
+              {/* Overlay Actions */}
+              <div className="absolute bottom-4 left-4 right-4 grid grid-cols-3 items-center bg-black/40 backdrop-blur-md p-3 rounded-2xl border border-white/10 z-10">
+                <div className="flex justify-start">
+                  <button 
+                    onClick={() => document.getElementById("mobile-receipt-input-gallery")?.click()}
+                    type="button" 
+                    className="flex items-center gap-1.5 text-white text-xs font-semibold border-none bg-transparent cursor-pointer hover:opacity-80"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">photo_library</span> Gallery
+                  </button>
+                </div>
+                
+                <div className="flex justify-center">
+                  <button 
+                    onClick={() => document.getElementById("mobile-receipt-input-camera")?.click()}
+                    type="button" 
+                    className="w-12 h-12 bg-[#c7ff00] rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(199,255,0,0.5)] active:scale-90 transition-transform border-none cursor-pointer hover:bg-[#bff500]"
+                  >
+                    <span className="material-symbols-outlined text-[#151f00] text-[28px]">photo_camera</span>
+                  </button>
+                </div>
+
+                <div className="flex justify-end">
+                  <button 
+                    onClick={() => alert("Flash features are only available in native mobile apps.")}
+                    type="button" 
+                    className="w-8 h-8 flex items-center justify-center rounded-full bg-white/20 border-none cursor-pointer hover:bg-white/30"
+                  >
+                    <span className="material-symbols-outlined text-white text-[20px]">flash_on</span>
+                  </button>
+                </div>
               </div>
-              <h1 className="mt-0.5 text-lg font-semibold text-slate-900 tracking-tight">
-                Personal Finance Bot
-              </h1>
             </div>
 
-            {/* Profile & Logout */}
-            <div className="flex items-center gap-4">
-              <div className="hidden sm:block text-right">
-                <p className="text-xs font-semibold uppercase tracking-wider text-[#062A1F]">
-                  Production
-                </p>
-                <p className="text-xs text-slate-500 font-medium">
-                  Ready
-                </p>
+            {/* Extracted Data Form */}
+            <div className="bg-white rounded-[24px] p-5 shadow-sm space-y-4 border border-[#E8E8E8]">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-bold text-[#1a1c1b]">Scan Results</h2>
+                {scanStatus === "scanning" && (
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#F6C85F] opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#F6C85F]"></span>
+                  </span>
+                )}
+                {scanStatus === "completed" && (
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#5FCF6A]"></span>
+                  </span>
+                )}
+                {scanStatus === "idle" && (
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-neutral-400"></span>
+                  </span>
+                )}
               </div>
-              <div className="border-l border-slate-200 pl-4">
-                <LogoutButton />
+
+              {/* Total Amount Highlight */}
+              <div className="flex flex-col items-center justify-center py-4 bg-[#F1F2F0] rounded-2xl">
+                <span className="text-[10px] font-semibold text-[#6F6F6F] mb-1">Total Amount</span>
+                <span className={`text-2xl font-bold text-[#1a1c1b] ${scanStatus !== "completed" ? "opacity-30" : ""}`}>
+                  {scanStatus === "completed" ? formatCurrency(scannedData.amount) : "Rp 0"}
+                </span>
+              </div>
+
+              {/* Form Fields */}
+              <div className="space-y-3">
+                <div>
+                  <label className="text-[10px] font-semibold text-[#6F6F6F] mb-1 block">Merchant</label>
+                  <div className="flex items-center bg-[#F1F2F0] rounded-full px-4 py-2.5">
+                    <span className="material-symbols-outlined text-[#6F6F6F] mr-2 text-[18px]">storefront</span>
+                    <input 
+                      className="bg-transparent border-none p-0 w-full text-xs text-[#1a1c1b] focus:ring-0 font-semibold" 
+                      disabled={scanStatus !== "completed"} 
+                      type="text" 
+                      value={scannedData.merchant}
+                      onChange={(e) => setScannedData({ ...scannedData, merchant: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] font-semibold text-[#6F6F6F] mb-1 block">Date</label>
+                    <div className="flex items-center bg-[#F1F2F0] rounded-full px-4 py-2.5">
+                      <span className="material-symbols-outlined text-[#6F6F6F] mr-2 text-[18px]">calendar_today</span>
+                      <input 
+                        className="bg-transparent border-none p-0 w-full text-xs text-[#1a1c1b] focus:ring-0 font-semibold" 
+                        disabled={scanStatus !== "completed"} 
+                        type="text" 
+                        value={scannedData.date}
+                        onChange={(e) => setScannedData({ ...scannedData, date: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-semibold text-[#6F6F6F] mb-1 block">Category</label>
+                    <div className="flex items-center bg-[#F1F2F0] rounded-full px-4 py-2.5">
+                      <span className="material-symbols-outlined text-[#6F6F6F] mr-2 text-[18px]">restaurant</span>
+                      <select 
+                        className="bg-transparent border-none p-0 w-full text-xs text-[#1a1c1b] focus:ring-0 font-semibold appearance-none cursor-pointer" 
+                        disabled={scanStatus !== "completed"} 
+                        value={scannedData.category}
+                        onChange={(e) => setScannedData({ ...scannedData, category: e.target.value })}
+                      >
+                        <option value="---">---</option>
+                        <option value="Makanan">Makanan</option>
+                        <option value="Belanja">Belanja</option>
+                        <option value="Transportasi">Transportasi</option>
+                        <option value="Hiburan">Hiburan</option>
+                        <option value="Lainnya">Lainnya</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button 
+                  onClick={handleCancelReceipt}
+                  type="button" 
+                  className="flex-1 py-3 bg-[#F1F2F0] text-[#1a1c1b] text-xs font-semibold rounded-full hover:bg-[#E8E8E8] transition-colors border-none cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={handleConfirmReceipt}
+                  disabled={scanStatus !== "completed"}
+                  type="button" 
+                  className={`flex-1 py-3 bg-[#c7ff00] text-[#151f00] text-xs font-semibold rounded-full hover:opacity-90 transition-opacity border-none flex justify-center items-center gap-1 ${
+                    scanStatus !== "completed" ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-sm">check_circle</span>
+                  Save
+                </button>
               </div>
             </div>
           </div>
-
-          {/* Navigation - Mobile Screen */}
-          <nav className="flex gap-1 overflow-x-auto border-t border-slate-100 mt-3 pt-2 lg:hidden no-scrollbar">
-            {navigationItems.map((item) => {
-              const isActive = currentTab === item.id;
-              return (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  className={`whitespace-nowrap px-3 py-1.5 text-xs font-semibold rounded-lg transition duration-150 ${
-                    isActive
-                      ? "bg-[#062A1F] text-white"
-                      : "text-slate-600 hover:text-[#062A1F] hover:bg-slate-100"
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
-        </header>
-
-        {/* Page Content */}
-        <main className="flex-1 overflow-x-hidden">
-          {children}
-        </main>
+        </div>
       </div>
     </div>
   );
@@ -143,12 +517,12 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
 export function DashboardShell({ children }: { children: ReactNode }) {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-slate-100 flex items-center justify-center">
+      <div className="min-h-screen bg-[#f9f9f7] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-[#062A1F] flex items-center justify-center font-semibold text-[#A1F02D] animate-spin">
+          <div className="h-12 w-12 rounded-2xl bg-[#c7ff00] flex items-center justify-center font-bold text-[#151f00] animate-pulse shadow-lg text-xl">
             S
           </div>
-          <p className="text-sm font-semibold text-slate-500">Memuat Sakoo...</p>
+          <p className="text-sm font-semibold text-[#6F6F6F]">Loading Sakoo...</p>
         </div>
       </div>
     }>
@@ -156,5 +530,3 @@ export function DashboardShell({ children }: { children: ReactNode }) {
     </Suspense>
   );
 }
-
-
