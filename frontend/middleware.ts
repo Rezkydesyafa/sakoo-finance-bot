@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { AUTH_TOKEN_COOKIE } from "@/lib/auth-constants";
+import { normalizeBaseUrl } from "./lib/api";
 
 const authRoutes = new Set(["/login", "/register"]);
 
@@ -34,3 +35,6 @@ export function middleware(request: NextRequest) {
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };
+export const SERVER_API_BASE_URL = normalizeBaseUrl(
+  process.env.NEXT_INTERNAL_API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api"
+);
