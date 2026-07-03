@@ -296,6 +296,7 @@ export default function Home() {
             category_name: category,
             description: text.replace(/beli|bayar|pengeluaran/gi, "").trim() || "Pengeluaran Baru",
             transaction_date: new Date().toISOString(),
+            created_at: new Date().toISOString(),
             source: "whatsapp_text",
           };
           setTransactions(prev => [newTransaction, ...prev]);
@@ -313,6 +314,7 @@ export default function Home() {
             category_name: "Gaji",
             description: text.replace(/gaji|masuk|pemasukan/gi, "").trim() || "Pemasukan Baru",
             transaction_date: new Date().toISOString(),
+            created_at: new Date().toISOString(),
             source: "whatsapp_text",
           };
           setTransactions(prev => [newTransaction, ...prev]);
@@ -585,6 +587,7 @@ function toDashboardTransaction(
     category_name: transaction.category_name || fallbackCategory,
     description: transaction.description || "Transaksi Tanpa Keterangan",
     transaction_date: transaction.transaction_date,
+    created_at: transaction.created_at,
     source: transaction.source,
   };
 }

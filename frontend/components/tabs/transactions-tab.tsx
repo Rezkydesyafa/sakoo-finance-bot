@@ -87,7 +87,7 @@ export function TransactionsTab({
       sourceBg = "bg-[#E8F5E9] text-[#2E7D32]";
     }
 
-    const dateObj = new Date(t.transaction_date);
+    const dateObj = new Date(t.created_at || t.transaction_date);
     const timeStr = dateObj.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
 
     return (
