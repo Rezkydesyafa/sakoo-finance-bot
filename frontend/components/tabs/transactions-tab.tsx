@@ -107,12 +107,9 @@ export function TransactionsTab({
         </div>
         <div className="text-right flex items-center gap-3">
           <div>
-            <div className={`font-semibold text-sm ${isIncome ? "text-[#4e6700]" : "text-[#1a1c1b]"}`}>
+            <div className={`font-semibold text-[15px] sm:text-sm ${isIncome ? "text-[#4e6700]" : "text-[#1a1c1b]"}`}>
               {isIncome ? "+" : "-"} {formatCurrency(t.amount)}
             </div>
-          </div>
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${sourceBg}`} title={sourceTitle}>
-            <span className="material-symbols-outlined text-[16px]">{sourceIcon}</span>
           </div>
           
           <div className="relative">
@@ -209,25 +206,25 @@ export function TransactionsTab({
         </div>
 
         {/* Stat Cards */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="bg-white p-6 rounded-[24px] card-shadow flex flex-col justify-between hover:-translate-y-1 transition-transform duration-300">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-[#F1F2F0] flex items-center justify-center text-[#5f5e5e]">
-                <span className="material-symbols-outlined text-[20px]">trending_down</span>
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+          <div className="bg-white p-4 sm:p-6 rounded-[24px] card-shadow flex flex-col justify-between hover:-translate-y-1 transition-transform duration-300">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 mb-2 sm:mb-4">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 shrink-0 rounded-full bg-[#F1F2F0] flex items-center justify-center text-[#5f5e5e]">
+                <span className="material-symbols-outlined text-[16px] sm:text-[20px]">trending_down</span>
               </div>
-              <span className="text-sm font-semibold text-[#6F6F6F]">This Month&apos;s Spending</span>
+              <span className="text-[11px] sm:text-sm font-semibold text-[#6F6F6F] leading-tight">This Month&apos;s Spending</span>
             </div>
-            <div className="text-2xl font-bold text-[#1a1c1b]">{formatCurrency(thisMonthSpending)}</div>
+            <div className="text-[15px] sm:text-2xl font-bold text-[#1a1c1b] truncate">{formatCurrency(thisMonthSpending)}</div>
           </div>
 
-          <div className="bg-white p-6 rounded-[24px] card-shadow flex flex-col justify-between hover:-translate-y-1 transition-transform duration-300">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-[#c7ff00]/20 flex items-center justify-center text-[#4e6700]">
-                <span className="material-symbols-outlined text-[20px]">savings</span>
+          <div className="bg-white p-4 sm:p-6 rounded-[24px] card-shadow flex flex-col justify-between hover:-translate-y-1 transition-transform duration-300">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 mb-2 sm:mb-4">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 shrink-0 rounded-full bg-[#c7ff00]/20 flex items-center justify-center text-[#4e6700]">
+                <span className="material-symbols-outlined text-[16px] sm:text-[20px]">savings</span>
               </div>
-              <span className="text-sm font-semibold text-[#6F6F6F]">Total Savings</span>
+              <span className="text-[11px] sm:text-sm font-semibold text-[#6F6F6F] leading-tight">Total Savings</span>
             </div>
-            <div className="text-2xl font-bold text-[#1a1c1b]">{formatCurrency(totalSavings)}</div>
+            <div className="text-[15px] sm:text-2xl font-bold text-[#1a1c1b] truncate">{formatCurrency(totalSavings)}</div>
           </div>
         </div>
 

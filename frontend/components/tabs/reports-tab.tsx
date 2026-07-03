@@ -85,49 +85,49 @@ export function ReportsTab({
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-8 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
-            <div className="bg-white rounded-[24px] p-6 card-shadow hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-full bg-[#5FCF6A]/10 flex items-center justify-center text-[#5FCF6A]">
-                  <span className="material-symbols-outlined text-[20px]">arrow_downward</span>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-6 items-stretch">
+            <div className="bg-white rounded-[24px] p-4 sm:p-6 card-shadow hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 mb-2 sm:mb-4">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 shrink-0 rounded-full bg-[#5FCF6A]/10 flex items-center justify-center text-[#5FCF6A]">
+                  <span className="material-symbols-outlined text-[16px] sm:text-[20px]">arrow_downward</span>
                 </div>
-                <span className="text-sm font-semibold text-[#6F6F6F]">Total Pemasukan</span>
+                <span className="text-[11px] sm:text-sm font-semibold text-[#6F6F6F] leading-tight">Total Pemasukan</span>
               </div>
-              <div className="text-2xl font-bold text-[#1a1c1b] mb-2">{formatCurrency(displayIncome)}</div>
-              <div className="inline-flex items-center gap-1 bg-[#5FCF6A]/10 text-[#5FCF6A] px-2 py-0.5 rounded-full text-[11px] font-semibold w-fit">
-                <span className="material-symbols-outlined text-[13px]">trending_up</span> +12%
+              <div className="text-[15px] sm:text-2xl font-bold text-[#1a1c1b] mb-2 truncate">{formatCurrency(displayIncome)}</div>
+              <div className="inline-flex items-center gap-1 bg-[#5FCF6A]/10 text-[#5FCF6A] px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold w-fit">
+                <span className="material-symbols-outlined text-[11px] sm:text-[13px]">trending_up</span> +12%
               </div>
             </div>
 
-            <div className="bg-white rounded-[24px] p-6 card-shadow hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-full bg-[#EF6B6B]/10 flex items-center justify-center text-[#EF6B6B]">
-                  <span className="material-symbols-outlined text-[20px]">arrow_upward</span>
+            <div className="bg-white rounded-[24px] p-4 sm:p-6 card-shadow hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 mb-2 sm:mb-4">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 shrink-0 rounded-full bg-[#EF6B6B]/10 flex items-center justify-center text-[#EF6B6B]">
+                  <span className="material-symbols-outlined text-[16px] sm:text-[20px]">arrow_upward</span>
                 </div>
-                <span className="text-sm font-semibold text-[#6F6F6F]">Total Pengeluaran</span>
+                <span className="text-[11px] sm:text-sm font-semibold text-[#6F6F6F] leading-tight">Total Pengeluaran</span>
               </div>
-              <div className="text-2xl font-bold text-[#1a1c1b] mb-2">{formatCurrency(displayExpense)}</div>
-              <div className="inline-flex items-center gap-1 bg-[#5FCF6A]/10 text-[#5FCF6A] px-2 py-0.5 rounded-full text-[11px] font-semibold w-fit">
-                <span className="material-symbols-outlined text-[13px]">trending_down</span> -5%
+              <div className="text-[15px] sm:text-2xl font-bold text-[#1a1c1b] mb-2 truncate">{formatCurrency(displayExpense)}</div>
+              <div className="inline-flex items-center gap-1 bg-[#5FCF6A]/10 text-[#5FCF6A] px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold w-fit">
+                <span className="material-symbols-outlined text-[11px] sm:text-[13px]">trending_down</span> -5%
               </div>
             </div>
 
-            <div className="bg-[#2A2A2A] rounded-[28px] p-6 card-shadow text-white relative overflow-hidden group flex flex-col justify-between min-h-[180px]">
+            <div className="col-span-2 md:col-span-1 bg-[#2A2A2A] rounded-[28px] p-5 sm:p-6 card-shadow text-white relative overflow-hidden group flex flex-col justify-between min-h-[160px] sm:min-h-[180px]">
               <div className="absolute -right-10 -top-10 w-32 h-32 bg-[#c7ff00]/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
-              <span className="text-xs text-neutral-300 opacity-80 block mb-1">Sisa Saldo</span>
-              <div className="text-2xl font-extrabold text-[#c7ff00] mb-3 tracking-tight">{formatCurrency(displayBalance)}</div>
+              <span className="text-[11px] sm:text-xs text-neutral-300 opacity-80 block mb-1">Sisa Saldo (Tabungan)</span>
+              <div className="text-xl sm:text-2xl font-extrabold text-[#c7ff00] mb-3 tracking-tight truncate">{formatCurrency(displayBalance)}</div>
               
-              <div className="flex items-center gap-3 bg-[#1A1A1A] rounded-2xl p-2.5 border border-white/5 relative z-10 w-full mt-auto">
-                <div className="relative w-9 h-9 flex items-center justify-center flex-shrink-0">
+              <div className="flex items-center gap-2 sm:gap-3 bg-[#1A1A1A] rounded-2xl p-2 sm:p-2.5 border border-white/5 relative z-10 w-full mt-auto">
+                <div className="relative w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center flex-shrink-0">
                   <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
                     <circle className="text-neutral-700" cx="18" cy="18" r="16" fill="transparent" stroke="currentColor" strokeWidth="3" />
                     <circle className="text-[#c7ff00]" cx="18" cy="18" r="16" fill="transparent" stroke="currentColor" strokeWidth="3" strokeDasharray={strokeDash} strokeLinecap="round" />
                   </svg>
-                  <span className="absolute text-[10px] font-bold text-white">{savingRateClamped}%</span>
+                  <span className="absolute text-[9px] sm:text-[10px] font-bold text-white">{savingRateClamped}%</span>
                 </div>
-                <div>
-                  <div className="text-[11px] font-semibold text-white">Saving Rate</div>
-                <div className="text-[9px] text-neutral-400">Dari data transaksi</div>
+                <div className="min-w-0">
+                  <div className="text-[10px] sm:text-[11px] font-semibold text-white truncate">Saving Rate</div>
+                  <div className="text-[8px] sm:text-[9px] text-neutral-400 truncate">Dari data transaksi</div>
                 </div>
               </div>
             </div>

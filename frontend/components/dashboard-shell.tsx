@@ -169,7 +169,7 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
     }).format(val);
   }
   return (
-    <div className="text-sm text-[#1a1c1b] antialiased bg-[#f9f9f7] min-h-screen">
+    <div className="text-sm text-[#1a1c1b] antialiased bg-[#f9f9f7] h-[100dvh] overflow-hidden">
       <div className="ambient-glow"></div>
       
       {/* SideNavBar */}
@@ -286,8 +286,8 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
                     }}
                     className="flex items-center gap-3 w-full text-left px-4 py-2 text-sm text-[#5f5e5e] hover:bg-neutral-100 transition-colors bg-transparent border-none cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-[20px]">settings</span>
-                    <span>Settings</span>
+                    <span className="material-symbols-outlined text-[20px]">person</span>
+                    <span>Profil</span>
                   </button>
 
                   <a 
@@ -355,7 +355,7 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
       </nav>
 
       {/* Main Content Area */}
-      <main className="md:ml-[240px] pt-28 px-4 pb-32 md:pt-28 md:px-8 md:pb-8 max-w-[1440px] min-h-screen">
+      <main className="md:ml-[240px] pt-28 px-4 pb-32 md:pt-28 md:px-8 md:pb-8 max-w-[1440px] h-full overflow-y-auto no-scrollbar">
         {children}
       </main>
 
