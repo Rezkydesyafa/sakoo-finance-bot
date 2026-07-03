@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
 import { Suspense, useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { LogoutButton } from "@/components/logout-button";
 import { apiClient } from "@/lib/api";
 import { getStoredAuthToken } from "@/lib/auth-storage";
@@ -26,6 +27,7 @@ const mobileNavigationItems = [
 ];
 
 function DashboardShellContent({ children }: { children: ReactNode }) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const currentTab = searchParams.get("tab") || "overview";
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -56,13 +58,19 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const token = getStoredAuthToken();
-    if (token) {
-      apiClient.me(token).then((user) => {
-        if (user.name) setUserName(user.name);
-        if (user.email) setUserEmail(user.email);
-        if (user.phone_number) setUserPhone(user.phone_number);
-      }).catch(() => {});
+    if (!token) {
+      router.replace("/login");
+      return;
     }
+
+    apiClient.me(token).then((user) => {
+      if (user.name) setUserName(user.name);
+      if (user.email) setUserEmail(user.email);
+      if (user.phone_number) setUserPhone(user.phone_number);
+    }).catch(() => {
+      // If fetching user fails, might be an expired token
+      router.replace("/login");
+    });
 
     const loadProfileImage = () => {
       const savedImage = localStorage.getItem("sakoo_profile_image");

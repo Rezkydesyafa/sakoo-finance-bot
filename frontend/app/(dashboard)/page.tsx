@@ -539,6 +539,7 @@ function toDashboardTransaction(
     category_name: transaction.category_name || fallbackCategory,
     description: transaction.description || "Transaksi Tanpa Keterangan",
     transaction_date: transaction.transaction_date,
+    created_at: transaction.created_at,
     source: transaction.source,
   };
 }

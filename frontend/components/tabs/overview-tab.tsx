@@ -220,28 +220,61 @@ export function OverviewTab({
         />
 
         {/* Recent Transactions */}
-        <div className="bg-white rounded-[24px] p-6 card-shadow flex-1">
-          <div className="flex justify-between items-center mb-4">
+        <div className="bg-white rounded-[24px] card-shadow flex-1 overflow-hidden flex flex-col">
+          <div className="px-6 py-5 flex justify-between items-center border-b border-[#E8E8E8]">
             <h3 className="text-[15px] font-semibold text-[#1a1c1b]">Recent Transactions</h3>
             <Link href="/?tab=transactions" className="text-[#4e6700] text-xs font-semibold hover:underline">View All</Link>
           </div>
-          <div className="flex flex-col gap-4">
-            {filteredTransactions.slice(0, 5).map(t => (
-              <div key={t.id} className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[#F1F2F0] flex items-center justify-center text-[#6F6F6F]">
-                    <CategoryIcon name={t.category_name} />
+          <div className="px-6 divide-y divide-[#E8E8E8]/50">
+            {filteredTransactions.slice(0, 5).map(t => {
+              const isIncome = t.type === "income";
+              const iconBg = isIncome ? "bg-[#c7ff00]/20 text-[#4e6700]" : "bg-[#F1F2F0] text-[#5f5e5e]";
+              
+              let sourceIcon = "edit_square";
+              let sourceTitle = "Manual Entry";
+              let sourceBg = "bg-[#F1F2F0] text-[#6F6F6F]";
+              
+              if (t.source.includes("telegram")) {
+                sourceIcon = "send";
+                sourceTitle = "Telegram Bot";
+                sourceBg = "bg-[#E3F2FD] text-[#1976D2]";
+              } else if (t.source.includes("whatsapp")) {
+                sourceIcon = "chat";
+                sourceTitle = "WhatsApp Bot";
+                sourceBg = "bg-[#E8F5E9] text-[#2E7D32]";
+              }
+
+              const dateObj = new Date(t.created_at || t.transaction_date);
+              const timeStr = dateObj.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+
+              return (
+                <div key={t.id} className="py-4 flex items-center justify-between hover:bg-[#F1F2F0]/30 transition-colors -mx-6 px-6 group">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all group-hover:bg-white group-hover:shadow-sm ${iconBg}`}>
+                      <CategoryIcon name={t.category_name} />
+                    </div>
+                    <div>
+                      <div className="font-semibold text-sm text-[#1a1c1b] mb-0.5">{t.description}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-[#6F6F6F]">{t.category_name}</span>
+                        <span className="w-1 h-1 rounded-full bg-[#E8E8E8]"></span>
+                        <span className="text-xs text-[#6F6F6F]">{timeStr}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-semibold text-[#1a1c1b]">{t.description}</p>
-                    <p className="text-xs text-[#6F6F6F]">{t.category_name} • {new Date(t.transaction_date).toLocaleDateString("id-ID")}</p>
+                  <div className="text-right flex items-center gap-3">
+                    <div>
+                      <div className={`font-semibold text-sm ${isIncome ? "text-[#4e6700]" : "text-[#1a1c1b]"}`}>
+                        {isIncome ? "+" : "-"} {formatCurrency(t.amount)}
+                      </div>
+                    </div>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${sourceBg}`} title={sourceTitle}>
+                      <span className="material-symbols-outlined text-[16px]">{sourceIcon}</span>
+                    </div>
                   </div>
                 </div>
-                <span className={`text-sm font-semibold ${t.type === "income" ? "text-[#4e6700]" : "text-[#1a1c1b]"}`}>
-                  {t.type === "income" ? "+" : "-"}{formatCurrency(t.amount)}
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>

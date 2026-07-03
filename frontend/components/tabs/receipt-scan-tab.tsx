@@ -159,7 +159,7 @@ export function ReceiptScanTab({
                         <input 
                           className="bg-transparent border-none p-0 w-full text-xs text-[#1a1c1b] focus:ring-0 font-semibold" 
                           disabled={scanStatus !== "completed"} 
-                          type="text" 
+                          type="date" 
                           value={scannedData.date}
                           onChange={(e) => setScannedData({ ...scannedData, date: e.target.value })}
                         />
@@ -333,7 +333,7 @@ export function ReceiptScanTab({
                   <input 
                     className="bg-transparent border-none p-0 w-full text-xs text-[#1a1c1b] focus:ring-0 font-semibold" 
                     disabled={scanStatus !== "completed"} 
-                    type="text" 
+                    type="date" 
                     value={scannedData.date}
                     onChange={(e) => setScannedData({ ...scannedData, date: e.target.value })}
                   />

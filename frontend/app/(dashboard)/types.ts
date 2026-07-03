@@ -5,6 +5,7 @@ export type Transaction = {
   category_name: string;
   description: string;
   transaction_date: string;
+  created_at?: string;
   source: string;
 };
 

@@ -78,6 +78,9 @@ const config: Config = {
         "stack-sm": "8px",
         "stack-lg": "32px"
       },
+      borderRadius: {
+        "card": "24px",
+      },
       fontFamily: {
         "label-button": ["Plus Jakarta Sans", "sans-serif"],
         "display-balance": ["Plus Jakarta Sans", "sans-serif"],

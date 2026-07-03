@@ -87,13 +87,13 @@ export function TransactionsTab({
       sourceBg = "bg-[#E8F5E9] text-[#2E7D32]";
     }
 
-    const dateObj = new Date(t.transaction_date);
+    const dateObj = new Date(t.created_at || t.transaction_date);
     const timeStr = dateObj.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
 
     return (
       <div key={t.id} className="py-4 flex items-center justify-between hover:bg-[#F1F2F0]/30 transition-colors -mx-6 px-6 group">
         <div className="flex items-center gap-4">
-          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all group-hover:bg-white group-hover:shadow-sm ${iconBg}`}>
+          <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all group-hover:bg-white group-hover:shadow-sm ${iconBg}`}>
             <CategoryIcon name={t.category_name} />
           </div>
           <div>
@@ -180,7 +180,7 @@ export function TransactionsTab({
               </button>
               
               {isFilterDropdownOpen && (
-                <div className="absolute right-0 top-full mt-2 w-32 bg-white rounded-2xl shadow-lg border border-[#E8E8E8] py-2 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="absolute right-0 top-full mt-2 w-32 bg-white rounded-[24px] shadow-lg border border-[#E8E8E8] py-2 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                   {[
                     { value: "all", label: "This Month" },
                     { value: "income", label: "Income" },
@@ -210,33 +210,33 @@ export function TransactionsTab({
 
         {/* Stat Cards */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="bg-white p-6 rounded-2xl card-shadow flex flex-col justify-between hover:-translate-y-1 transition-transform duration-300">
+          <div className="bg-white p-6 rounded-[24px] card-shadow flex flex-col justify-between hover:-translate-y-1 transition-transform duration-300">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-[#F1F2F0] flex items-center justify-center text-[#5f5e5e]">
                 <span className="material-symbols-outlined text-[20px]">trending_down</span>
               </div>
               <span className="text-sm font-semibold text-[#6F6F6F]">This Month&apos;s Spending</span>
             </div>
-            <div className="text-3xl font-bold text-[#1a1c1b]">{formatCurrency(thisMonthSpending)}</div>
+            <div className="text-2xl font-bold text-[#1a1c1b]">{formatCurrency(thisMonthSpending)}</div>
           </div>
 
-          <div className="bg-white p-6 rounded-2xl card-shadow flex flex-col justify-between hover:-translate-y-1 transition-transform duration-300">
+          <div className="bg-white p-6 rounded-[24px] card-shadow flex flex-col justify-between hover:-translate-y-1 transition-transform duration-300">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-[#c7ff00]/20 flex items-center justify-center text-[#4e6700]">
                 <span className="material-symbols-outlined text-[20px]">savings</span>
               </div>
               <span className="text-sm font-semibold text-[#6F6F6F]">Total Savings</span>
             </div>
-            <div className="text-3xl font-bold text-[#1a1c1b]">{formatCurrency(totalSavings)}</div>
+            <div className="text-2xl font-bold text-[#1a1c1b]">{formatCurrency(totalSavings)}</div>
           </div>
         </div>
 
         {/* Transactions List Grouped */}
-        <div className="bg-white rounded-2xl card-shadow overflow-hidden">
+        <div className="bg-white rounded-[24px] card-shadow overflow-hidden">
           {grouped.Today.length > 0 && (
             <>
-              <div className="px-6 py-4 bg-[#F1F2F0]/50 border-b border-[#E8E8E8]">
-                <h3 className="text-sm font-semibold text-[#5f5e5e]">Today</h3>
+              <div className="px-6 py-5 bg-white border-b border-[#E8E8E8]">
+                <h3 className="text-[15px] font-semibold text-[#1a1c1b]">Today</h3>
               </div>
               <div className="px-6 divide-y divide-[#E8E8E8]/50">
                 {grouped.Today.map(t => renderTransactionRow(t))}
@@ -246,8 +246,8 @@ export function TransactionsTab({
 
           {grouped.Yesterday.length > 0 && (
             <>
-              <div className="px-6 py-4 bg-[#F1F2F0]/50 border-y border-[#E8E8E8]">
-                <h3 className="text-sm font-semibold text-[#5f5e5e]">Yesterday</h3>
+              <div className="px-6 py-5 bg-white border-y border-[#E8E8E8]">
+                <h3 className="text-[15px] font-semibold text-[#1a1c1b]">Yesterday</h3>
               </div>
               <div className="px-6 divide-y divide-[#E8E8E8]/50">
                 {grouped.Yesterday.map(t => renderTransactionRow(t))}
@@ -257,8 +257,8 @@ export function TransactionsTab({
 
           {grouped.Earlier.length > 0 && (
             <>
-              <div className="px-6 py-4 bg-[#F1F2F0]/50 border-y border-[#E8E8E8]">
-                <h3 className="text-sm font-semibold text-[#5f5e5e]">Earlier</h3>
+              <div className="px-6 py-5 bg-white border-y border-[#E8E8E8]">
+                <h3 className="text-[15px] font-semibold text-[#1a1c1b]">Earlier</h3>
               </div>
               <div className="px-6 divide-y divide-[#E8E8E8]/50">
                 {grouped.Earlier.map(t => renderTransactionRow(t))}
@@ -281,7 +281,7 @@ export function TransactionsTab({
       {/* Right Column */}
       <div className="col-span-12 xl:col-span-4 space-y-6 min-w-0">
         {/* Quick Action Card */}
-        <div className="bg-white p-6 rounded-2xl card-shadow">
+        <div className="bg-white p-6 rounded-[24px] card-shadow">
           <h3 className="text-base font-bold text-[#1a1c1b] mb-4">Quick Action</h3>
           <div className="grid grid-cols-2 gap-3 mb-4">
             <button onClick={handleQuickAddIncome} disabled={quickActionLoading !== null} className="bg-[#c7ff00] text-[#151f00] py-3 rounded-xl text-[13px] font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity border-none cursor-pointer disabled:opacity-50">
@@ -302,7 +302,7 @@ export function TransactionsTab({
         </div>
 
         {/* Budget Progress Card */}
-        <div className="bg-white p-6 rounded-2xl card-shadow">
+        <div className="bg-white p-6 rounded-[24px] card-shadow">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-base font-bold text-[#1a1c1b]">Budget Progress</h3>
             <button className="w-8 h-8 rounded-full hover:bg-[#F1F2F0] flex items-center justify-center transition-colors border-none cursor-pointer">
@@ -342,7 +342,7 @@ export function TransactionsTab({
         </div>
 
         {/* Export Data Card */}
-        <div className="bg-white p-6 rounded-2xl card-shadow">
+        <div className="bg-white p-6 rounded-[24px] card-shadow">
           <h3 className="text-base font-bold text-[#1a1c1b] mb-4">Export Data</h3>
           <p className="text-sm text-[#6F6F6F] mb-4">Download your transaction history for accounting purposes.</p>
           <div className="flex gap-3">
