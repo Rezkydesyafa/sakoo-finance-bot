@@ -1,4 +1,3 @@
-import { SERVER_API_BASE_URL } from "@/middleware";
 import { Capacitor } from "@capacitor/core";
 
 const getBrowserApiBaseUrl = () => {
@@ -24,6 +23,9 @@ const getBrowserApiBaseUrl = () => {
 const BROWSER_API_BASE_URL = normalizeBaseUrl(getBrowserApiBaseUrl());
 const BROWSER_SERVICE_BASE_URL = BROWSER_API_BASE_URL.replace(/\/api\/?$/, "");
 
+export const SERVER_API_BASE_URL = normalizeBaseUrl(
+  process.env.NEXT_INTERNAL_API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api"
+);
 export const SERVER_SERVICE_BASE_URL = SERVER_API_BASE_URL.replace(/\/api\/?$/, "");
 
 export const API_BASE_URL =
