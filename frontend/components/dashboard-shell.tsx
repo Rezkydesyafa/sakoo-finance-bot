@@ -43,9 +43,9 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
     amount: 0,
   });
 
-  const [userName, setUserName] = useState("Kevin Merico");
-  const [userEmail, setUserEmail] = useState("kevin.merico@example.com");
-  const [userPhone, setUserPhone] = useState("+62 812 3456 7890");
+  const [userName, setUserName] = useState("User");
+  const [userEmail, setUserEmail] = useState("");
+  const [userPhone, setUserPhone] = useState("");
   const [profileImage, setProfileImage] = useState<string | null>(null);
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -85,9 +85,14 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const token = getStoredAuthToken();
+    if (!token) {
+      alert("Silakan login terlebih dahulu.");
+      return;
+    }
 
     const reader = new FileReader();
     reader.onloadend = () => {
@@ -103,15 +108,25 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
       amount: 0,
     });
 
-    setTimeout(() => {
+    try {
+      const media = await apiClient.media.upload(token, file, "receipt", "dashboard_upload");
+      const queued = await apiClient.ocr.runReceipt(token, media.id);
+      const job = await waitForJob(token, queued.job.id);
+      if (!job.result_id) {
+        throw new Error(job.error_message || "OCR tidak menghasilkan data.");
+      }
+      const receipt = await apiClient.ocr.receiptResult(token, job.result_id);
       setScanStatus("completed");
       setScannedData({
-        merchant: "Starbucks Coffee",
-        date: new Date().toISOString().split("T")[0],
-        category: "Makanan",
-        amount: 85000,
+        merchant: receipt.merchant_name || "Struk",
+        date: receipt.receipt_date || formatLocalDate(new Date()),
+        category: "Lainnya",
+        amount: Number(receipt.total_amount || 0),
       });
-    }, 2500);
+    } catch (error) {
+      setScanStatus("idle");
+      alert(error instanceof Error ? error.message : "Gagal memproses OCR struk.");
+    }
   };
 
   const handleCancelReceipt = () => {
@@ -597,4 +612,24 @@ export function DashboardShell({ children }: { children: ReactNode }) {
       <DashboardShellContent>{children}</DashboardShellContent>
     </Suspense>
   );
+}
+
+async function waitForJob(token: string, jobId: number) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const job = await apiClient.jobs.get(token, jobId);
+    if (job.status === "completed") return job;
+    if (job.status === "failed") {
+      throw new Error(job.error_message || "Job OCR gagal.");
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+  }
+
+  throw new Error("OCR masih diproses. Coba cek lagi beberapa saat.");
+}
+
+function formatLocalDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }

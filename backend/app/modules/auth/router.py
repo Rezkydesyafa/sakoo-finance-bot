@@ -11,9 +11,11 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.database import get_db
 from app.models import AccountLinkingCode, User
+from app.models import UserPlatformAccount
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.schemas import (
     AccountLinkingCodeResponse,
+    PlatformAccountResponse,
     TokenResponse,
     UserLoginRequest,
     UserRegisterRequest,
@@ -85,6 +87,20 @@ def get_current_user_profile(
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> User:
     return current_user
+
+
+@router.get("/platform-accounts", response_model=list[PlatformAccountResponse])
+def list_platform_accounts(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> list[UserPlatformAccount]:
+    return list(
+        db.scalars(
+            select(UserPlatformAccount)
+            .where(UserPlatformAccount.user_id == current_user.id)
+            .order_by(UserPlatformAccount.platform)
+        )
+    )
 
 
 @router.post(

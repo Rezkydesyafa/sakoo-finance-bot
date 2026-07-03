@@ -64,6 +64,7 @@ jobs:
             cd infra/docker
             docker compose --env-file ../../.env pull
             docker compose --env-file ../../.env up -d --build --remove-orphans
+            docker compose --env-file ../../.env restart nginx
 
             echo "🧹 Cleaning up old images..."
             docker image prune -f

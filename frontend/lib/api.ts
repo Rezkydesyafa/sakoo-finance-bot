@@ -99,6 +99,16 @@ export type TransactionUpdateRequest = {
   transaction_date?: string;
 };
 
+export type TransactionTextParseRequest = {
+  text: string;
+};
+
+export type TransactionTextParseResponse = {
+  status: string;
+  reply_text: string;
+  transaction_id: number | null;
+};
+
 // Report types
 export type ReportTransactionItem = {
   id: number;
@@ -192,6 +202,56 @@ export type AccountLinkingCodeResponse = {
   created_at: string;
 };
 
+export type MediaFileResponse = {
+  id: number;
+  user_id: number;
+  file_type: string;
+  original_filename: string | null;
+  stored_path: string;
+  mime_type: string | null;
+  size: number | null;
+  source: string;
+  created_at: string;
+};
+
+export type JobResponse = {
+  id: number;
+  user_id: number;
+  job_type: string;
+  status: string;
+  result_id: number | null;
+  error_message: string | null;
+  created_at: string;
+  completed_at: string | null;
+};
+
+export type ReceiptOcrJobResponse = {
+  job: JobResponse;
+  message: string;
+};
+
+export type ReceiptOcrResponse = {
+  id: number;
+  user_id: number;
+  media_file_id: number;
+  ocr_text: string | null;
+  merchant_name: string | null;
+  receipt_date: string | null;
+  total_amount: string | null;
+  confidence: string | null;
+  status: string;
+  created_at: string;
+};
+
+export type PlatformAccountResponse = {
+  platform: "telegram" | "whatsapp";
+  platform_user_id: string | null;
+  phone_number: string | null;
+  chat_id: string | null;
+  linked_at: string;
+  is_active: boolean;
+};
+
 type ApiRequestOptions = RequestInit & {
   token?: string;
   query?: Record<string, string | number | boolean | undefined | null>;
@@ -232,6 +292,8 @@ export const apiClient = {
         method: "POST",
         token,
       }),
+    platformAccounts: (token: string) =>
+      apiRequest<PlatformAccountResponse[]>("/auth/platform-accounts", { token }),
   },
 
   // Legacy flat aliases
@@ -268,6 +330,12 @@ export const apiClient = {
         method: "DELETE",
         token,
       }),
+    parseText: (token: string, payload: TransactionTextParseRequest) =>
+      apiRequest<TransactionTextParseResponse>("/transactions/parse", {
+        method: "POST",
+        token,
+        body: JSON.stringify(payload),
+      }),
   },
 
   reports: {
@@ -283,7 +351,33 @@ export const apiClient = {
       }),
   },
 
+  ocr: {
+    runReceipt: (token: string, mediaId: number) =>
+      apiRequest<ReceiptOcrJobResponse>(`/ocr/receipts/${mediaId}`, {
+        method: "POST",
+        token,
+      }),
+    receiptResult: (token: string, receiptId: number) =>
+      apiRequest<ReceiptOcrResponse>(`/ocr/receipts/results/${receiptId}`, { token }),
+  },
+
+  jobs: {
+    get: (token: string, jobId: number) =>
+      apiRequest<JobResponse>(`/jobs/${jobId}`, { token }),
+  },
+
   media: {
+    upload: (token: string, file: File, fileType: string, source = "dashboard_upload") => {
+      const formData = new FormData();
+      formData.set("file", file);
+      formData.set("file_type", fileType);
+      formData.set("source", source);
+      return apiRequest<MediaFileResponse>("/media", {
+        method: "POST",
+        token,
+        body: formData,
+      });
+    },
     downloadUrl: (id: number) => `${API_BASE_URL}/media/${id}/download`,
   },
 };
@@ -350,7 +444,7 @@ async function request<T>(
 
   requestHeaders.set("Accept", "application/json");
 
-  if (body) {
+  if (body && !(body instanceof FormData)) {
     requestHeaders.set("Content-Type", "application/json");
   }
 

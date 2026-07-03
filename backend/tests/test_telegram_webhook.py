@@ -216,7 +216,9 @@ def test_unlinked_telegram_user_gets_linking_instruction(
     assert payload["transaction_status"] is None
     assert payload["reply_status"] == "sent"
     assert fake_telegram.sent_messages[0]["chat_id"] == "456"
+    assert "Silakan daftar atau login" in fake_telegram.sent_messages[0]["text"]
     assert "hubungkan KODE" in fake_telegram.sent_messages[0]["text"]
+    assert _keyboard_contains_url(fake_telegram.sent_messages[0]["reply_markup"], "/register")
 
     with session_factory() as db:
         assert db.scalar(select(Transaction)) is None
@@ -748,6 +750,16 @@ def _keyboard_contains(reply_markup: dict[str, Any] | None, callback_data: str) 
         return False
     return any(
         button.get("callback_data") == callback_data
+        for row in reply_markup.get("inline_keyboard", [])
+        for button in row
+    )
+
+
+def _keyboard_contains_url(reply_markup: dict[str, Any] | None, url_part: str) -> bool:
+    if not reply_markup:
+        return False
+    return any(
+        url_part in button.get("url", "")
         for row in reply_markup.get("inline_keyboard", [])
         for button in row
     )

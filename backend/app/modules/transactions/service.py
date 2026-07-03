@@ -504,7 +504,10 @@ def _format_command_response(
     if parse_result.intent == INTENT_HELP:
         return format_help_response()
     if parse_result.intent == INTENT_LINK_ACCOUNT:
-        return "Untuk menghubungkan akun, kirim: hubungkan KODE dari dashboard Sakoo."
+        return (
+            "Silakan daftar atau login di dashboard Sakoo, buka Connected Bots, "
+            "buat kode linking, lalu kirim: hubungkan KODE."
+        )
     if parse_result.intent == INTENT_UNKNOWN:
         return format_unknown_response()
     return "Perintah terdeteksi."

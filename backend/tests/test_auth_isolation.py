@@ -14,7 +14,7 @@ os.environ["JWT_SECRET"] = "test-jwt-secret-minimum-32-characters"
 from app.config import get_settings
 from app.database import Base, get_db
 from app.main import app
-from app.models import AccountLinkingCode, Transaction, User
+from app.models import AccountLinkingCode, Transaction, User, UserPlatformAccount
 from app.modules.auth.security import verify_password
 
 
@@ -188,6 +188,42 @@ def test_create_linking_code_returns_command_and_expires_previous_code(
         assert len(codes) == 2
         assert _as_utc(codes[0].expired_at) <= datetime.now(timezone.utc)
         assert _as_utc(codes[1].expired_at) > datetime.now(timezone.utc)
+
+
+def test_platform_accounts_are_isolated_by_current_user(
+    test_client: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    client, session_factory = test_client
+    token_a = _register_and_login(client, "linked@example.com")
+    token_b = _register_and_login(client, "empty@example.com")
+
+    with session_factory() as db:
+        user = db.scalar(select(User).where(User.email == "linked@example.com"))
+        assert user is not None
+        db.add(
+            UserPlatformAccount(
+                user_id=user.id,
+                platform="telegram",
+                platform_user_id="123",
+                chat_id="456",
+            )
+        )
+        db.commit()
+
+    response_a = client.get(
+        "/api/auth/platform-accounts",
+        headers=_auth_headers(token_a),
+    )
+    response_b = client.get(
+        "/api/auth/platform-accounts",
+        headers=_auth_headers(token_b),
+    )
+
+    assert response_a.status_code == 200
+    assert response_a.json()[0]["platform"] == "telegram"
+    assert response_a.json()[0]["is_active"] is True
+    assert response_b.status_code == 200
+    assert response_b.json() == []
 
 
 def _register_and_login(client: TestClient, email: str) -> str:
