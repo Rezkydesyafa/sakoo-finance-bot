@@ -37,7 +37,7 @@ from app.modules.telegram.callback_handler import (
     handle_callback_query,
 )
 from app.modules.telegram.linking import handle_telegram_account_linking
-from app.modules.telegram.menu import build_main_menu
+from app.modules.telegram.menu import build_link_menu, build_main_menu
 from app.modules.telegram.parser import (
     parse_telegram_update,
     telegram_identifier_candidates,
@@ -313,6 +313,7 @@ async def receive_telegram_webhook(
         chat_id=parsed.chat_id,
         reply_text=reply_text,
         bot_log=bot_log,
+        reply_markup=build_link_menu() if linking_result.action == "instruction" else None,
     )
 
     return TelegramWebhookResponse(
@@ -663,7 +664,7 @@ def _handle_menu_command_if_needed(
         return TelegramMenuCommandResult(
             status="unlinked",
             reply_text=_link_instruction_text(),
-            reply_markup=build_main_menu(),
+            reply_markup=build_link_menu(),
         )
 
     if command == "/saldo":
@@ -764,8 +765,9 @@ def _handle_export_command(
 
 def _link_instruction_text() -> str:
     return (
-        "Akun Telegram ini belum terhubung ke dashboard.\n\n"
-        "Login ke dashboard, buat kode linking, lalu kirim: hubungkan KODE."
+        "Silakan daftar atau login di dashboard Sakoo untuk memulai bot.\n\n"
+        "Setelah masuk, buka Connected Bots, buat kode linking, lalu kirim ke bot:\n"
+        "hubungkan KODE"
     )
 
 

@@ -70,3 +70,14 @@ class AccountLinkingCodeResponse(BaseModel):
     command: str
     expired_at: datetime
     created_at: datetime
+
+
+class PlatformAccountResponse(BaseModel):
+    platform: str
+    platform_user_id: str | None
+    phone_number: str | None
+    chat_id: str | None
+    linked_at: datetime
+    is_active: bool
+
+    model_config = ConfigDict(from_attributes=True)

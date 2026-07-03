@@ -10,6 +10,7 @@ from sqlalchemy.pool import StaticPool
 
 os.environ["DATABASE_URL"] = "sqlite+pysqlite:///:memory:"
 os.environ["JWT_SECRET"] = "test-jwt-secret-minimum-32-characters"
+os.environ["LLM_PROVIDER"] = "none"
 
 from app.config import get_settings
 from app.database import Base, get_db
@@ -167,6 +168,32 @@ def test_transaction_rejects_category_from_different_type(
     )
 
     assert response.status_code == 400
+
+
+def test_transaction_parse_endpoint_uses_backend_parser(
+    test_client: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    client, session_factory = test_client
+    token = _register_and_login(client, "chat-owner@example.com")
+
+    response = client.post(
+        "/api/transactions/parse",
+        headers=_auth_headers(token),
+        json={"text": "jajan kopi 18k"},
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["status"] == "saved"
+    assert payload["transaction_id"] is not None
+    assert "Saldo sekarang" in payload["reply_text"]
+
+    with session_factory() as db:
+        transaction = db.get(Transaction, payload["transaction_id"])
+        assert transaction is not None
+        assert transaction.source == "dashboard_manual"
+        assert transaction.description == "jajan kopi"
+        assert transaction.amount == Decimal("18000.00")
 
 
 def test_transaction_list_supports_filters_pagination_and_newest_sort(

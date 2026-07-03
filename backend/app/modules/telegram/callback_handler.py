@@ -40,6 +40,7 @@ from app.modules.telegram.menu import (
     build_add_menu,
     build_export_menu,
     build_history_menu,
+    build_link_menu,
     build_main_menu,
     build_report_menu,
     build_settings_menu,
@@ -162,7 +163,7 @@ def handle_callback_query(
             parsed=parsed,
             telegram_client=telegram_client,
             text=_link_instruction_text(),
-            reply_markup=build_main_menu(),
+            reply_markup=build_link_menu(),
             status="unlinked",
             answer_text="Hubungkan akun dulu",
             show_alert=True,
@@ -286,7 +287,10 @@ def handle_callback_query(
     else:
         text = "Menu belum tersedia."
 
-    reply_markup = build_history_menu() if data.startswith("HISTORY_") else build_settings_menu()
+    if data == SET_LINK:
+        reply_markup = build_link_menu()
+    else:
+        reply_markup = build_history_menu() if data.startswith("HISTORY_") else build_settings_menu()
     return _respond_to_callback(
         parsed=parsed,
         telegram_client=telegram_client,
@@ -498,8 +502,9 @@ def _respond_to_callback(
 
 def _link_instruction_text() -> str:
     return (
-        "Akun Telegram ini belum terhubung ke dashboard.\n\n"
-        "Login ke dashboard, buat kode linking, lalu kirim: hubungkan KODE."
+        "Silakan daftar atau login di dashboard Sakoo untuk memulai bot.\n\n"
+        "Setelah masuk, buka Connected Bots, buat kode linking, lalu kirim ke bot:\n"
+        "hubungkan KODE"
     )
 
 

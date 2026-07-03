@@ -5,17 +5,12 @@ from datetime import datetime, timezone
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.models import AccountLinkingCode, UserPlatformAccount
 from app.modules.waha.parser import ParsedWahaMessage
 
 
 LINKING_COMMAND_RE = re.compile(r"^\s*hubungkan\s+([A-Za-z0-9_-]{4,32})\s*$", re.IGNORECASE)
-
-LINKING_INSTRUCTION_MESSAGE = (
-    "Nomor WhatsApp ini belum terhubung ke akun dashboard. "
-    "Login ke dashboard, buat kode linking, lalu kirim pesan: hubungkan KODE."
-)
-
 
 @dataclass(frozen=True)
 class LinkingResult:
@@ -53,7 +48,7 @@ def handle_account_linking(
         return LinkingResult(
             action="instruction",
             status="unlinked",
-            reply_text=LINKING_INSTRUCTION_MESSAGE,
+            reply_text=_linking_instruction_message(),
         )
 
     return LinkingResult(action="ignored", status="linked", user_id=current_user_id)
@@ -150,3 +145,13 @@ def _is_expired(expired_at: datetime) -> bool:
     if comparable_expired_at.tzinfo is None:
         comparable_expired_at = comparable_expired_at.replace(tzinfo=timezone.utc)
     return comparable_expired_at <= datetime.now(timezone.utc)
+
+
+def _linking_instruction_message() -> str:
+    app_url = get_settings().app_base_url.rstrip("/")
+    return (
+        "Silakan daftar atau login di dashboard Sakoo untuk memulai bot:\n"
+        f"{app_url}/register\n\n"
+        "Setelah masuk, buka Connected Bots, buat kode linking, lalu kirim ke WhatsApp ini:\n"
+        "hubungkan KODE"
+    )

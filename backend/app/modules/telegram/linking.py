@@ -14,8 +14,9 @@ from app.modules.telegram.parser import ParsedTelegramMessage
 LINKING_COMMAND_RE = re.compile(r"^\s*hubungkan\s+([A-Za-z0-9_-]{4,32})\s*$", re.IGNORECASE)
 
 LINKING_INSTRUCTION_MESSAGE = (
-    "Akun Telegram ini belum terhubung ke akun dashboard. "
-    "Login ke dashboard, buat kode linking, lalu kirim pesan: hubungkan KODE."
+    "Silakan daftar atau login di dashboard Sakoo untuk memulai bot.\n\n"
+    "Setelah masuk, buka Connected Bots, buat kode linking, lalu kirim ke bot:\n"
+    "hubungkan KODE"
 )
 
 
