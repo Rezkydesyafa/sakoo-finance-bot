@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'SakooFinance',
   webDir: 'out',
   server: {
-    url: "http://192.168.1.102:3000",
+    androidScheme: 'http',
     cleartext: true
   }
 };

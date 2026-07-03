@@ -1,23 +1,15 @@
 import { Capacitor } from "@capacitor/core";
 
+
+
 const getBrowserApiBaseUrl = () => {
-  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
-    return process.env.NEXT_PUBLIC_API_BASE_URL;
-  }
-
   if (typeof window !== "undefined") {
-    if (Capacitor.isNativePlatform()) {
-      return "http://192.168.1.102:8000/api";
-    }
-
     // If running Next.js dev server (port 3000) locally or via LAN (Live Reload)
     if (window.location.port === "3000" || window.location.port === "3001") {
       return `http://${window.location.hostname}:8000/api`;
     }
   }
-
-  // Fallback for online deployment (behind Nginx proxy on port 80/443)
-  return "/api";
+  return "https://sakoo.lab-sigma.web.id/api";
 };
 
 const BROWSER_API_BASE_URL = normalizeBaseUrl(getBrowserApiBaseUrl());
