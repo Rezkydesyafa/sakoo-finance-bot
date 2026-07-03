@@ -1,24 +1,29 @@
+import { SERVER_API_BASE_URL } from "@/middleware";
 import { Capacitor } from "@capacitor/core";
 
-let defaultApiBaseUrl = "http://localhost:8000/api";
-if (typeof window !== "undefined") {
-  if (Capacitor.isNativePlatform()) {
-    defaultApiBaseUrl = "http://192.168.1.102:8000/api";
-  } else if (window.location.hostname !== "localhost") {
-    // When using Live Reload on phone, hostname might be the laptop's IP
-    defaultApiBaseUrl = `http://${window.location.hostname}:8000/api`;
+const getBrowserApiBaseUrl = () => {
+  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
+    return process.env.NEXT_PUBLIC_API_BASE_URL;
   }
-}
-const DEFAULT_API_BASE_URL = defaultApiBaseUrl;
 
-const BROWSER_API_BASE_URL = normalizeBaseUrl(
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? (typeof window !== "undefined" && Capacitor.isNativePlatform() ? DEFAULT_API_BASE_URL : "/api"),
-);
+  if (typeof window !== "undefined") {
+    if (Capacitor.isNativePlatform()) {
+      return "http://192.168.1.102:8000/api";
+    }
+
+    // If running Next.js dev server (port 3000) locally or via LAN (Live Reload)
+    if (window.location.port === "3000" || window.location.port === "3001") {
+      return `http://${window.location.hostname}:8000/api`;
+    }
+  }
+
+  // Fallback for online deployment (behind Nginx proxy on port 80/443)
+  return "/api";
+};
+
+const BROWSER_API_BASE_URL = normalizeBaseUrl(getBrowserApiBaseUrl());
 const BROWSER_SERVICE_BASE_URL = BROWSER_API_BASE_URL.replace(/\/api\/?$/, "");
 
-export const SERVER_API_BASE_URL = normalizeBaseUrl(
-  process.env.NEXT_INTERNAL_API_BASE_URL ?? DEFAULT_API_BASE_URL,
-);
 export const SERVER_SERVICE_BASE_URL = SERVER_API_BASE_URL.replace(/\/api\/?$/, "");
 
 export const API_BASE_URL =
@@ -410,7 +415,7 @@ export async function serviceRequest<T>(
   return request<T>(buildServiceUrl(path, options.query), options);
 }
 
-function normalizeBaseUrl(value: string): string {
+export function normalizeBaseUrl(value: string): string {
   return value.replace(/\/+$/, "");
 }
 
