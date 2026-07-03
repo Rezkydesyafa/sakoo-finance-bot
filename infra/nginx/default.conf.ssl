@@ -51,7 +51,7 @@ server {
     }
 
     location /api/backend/ {
-        proxy_pass http://frontend_app;
+        proxy_pass http://backend_app/api/;
     }
 
     location /api/ {
