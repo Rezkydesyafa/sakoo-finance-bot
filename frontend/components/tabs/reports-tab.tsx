@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { Transaction } from "@/app/(dashboard)/types";
 
 type ReportsTabProps = {
@@ -21,6 +22,10 @@ export function ReportsTab({
   handleDownloadPDF,
   isExporting,
 }: ReportsTabProps) {
+  const [isTimeDropdownOpen, setIsTimeDropdownOpen] = useState(false);
+  const [selectedTime, setSelectedTime] = useState("Bulan Ini");
+  const timeOptions = ["Hari Ini", "Minggu Ini", "Bulan Ini", "Custom"];
+
   const displayIncome = totalIncome > 0 ? totalIncome : 24500000;
   const displayExpense = totalExpense > 0 ? totalExpense : 12800000;
   const displayBalance = totalBalance !== 0 ? totalBalance : 11700000;
@@ -56,16 +61,35 @@ export function ReportsTab({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-row justify-between items-center gap-4">
         <h2 className="text-2xl font-bold text-[#1a1c1b]">Financial Report</h2>
         <div className="relative">
-          <select defaultValue="Bulan Ini" className="appearance-none bg-white border-none shadow-sm text-[#1a1c1b] font-semibold py-2.5 pl-4 pr-10 rounded-full focus:ring-1 focus:ring-[#c7ff00] cursor-pointer transition-shadow hover:shadow-md text-xs">
-            <option>Hari Ini</option>
-            <option>Minggu Ini</option>
-            <option>Bulan Ini</option>
-            <option>Custom</option>
-          </select>
-          <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-[#6F6F6F] pointer-events-none text-base">expand_more</span>
+          <button 
+            onClick={() => setIsTimeDropdownOpen(!isTimeDropdownOpen)}
+            className="flex items-center gap-2 bg-white border-none shadow-sm text-[#1a1c1b] font-semibold py-2.5 pl-4 pr-3 rounded-full focus:ring-1 focus:ring-[#c7ff00] cursor-pointer transition-shadow hover:shadow-md text-xs"
+          >
+            {selectedTime}
+            <span className={`material-symbols-outlined text-[#6F6F6F] text-base transition-transform ${isTimeDropdownOpen ? 'rotate-180' : ''}`}>
+              expand_more
+            </span>
+          </button>
+          
+          {isTimeDropdownOpen && (
+            <div className="absolute right-0 top-full mt-2 w-36 bg-white rounded-2xl shadow-lg border border-[#E8E8E8] py-2 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+              {timeOptions.map((opt) => (
+                <button
+                  key={opt}
+                  onClick={() => {
+                    setSelectedTime(opt);
+                    setIsTimeDropdownOpen(false);
+                  }}
+                  className={`w-full text-left px-4 py-2.5 text-xs font-semibold hover:bg-[#F1F2F0] transition-colors cursor-pointer border-none bg-transparent ${selectedTime === opt ? 'text-[#4e6700]' : 'text-[#1a1c1b]'}`}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

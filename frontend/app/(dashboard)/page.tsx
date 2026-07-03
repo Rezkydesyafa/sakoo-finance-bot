@@ -2,8 +2,9 @@
 
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState, useMemo } from "react";
-import { getStoredAuthToken } from "@/lib/auth-storage";
-import { apiClient } from "@/lib/api";
+import { clearAuthToken, getStoredAuthToken } from "@/lib/auth-storage";
+import { ApiError, apiClient } from "@/lib/api";
+import type { Transaction as ApiTransaction, TransactionType } from "@/lib/api";
 import { OverviewTab } from "@/components/tabs/overview-tab";
 import { TransactionsTab } from "@/components/tabs/transactions-tab";
 import { ReportsTab } from "@/components/tabs/reports-tab";
@@ -11,6 +12,7 @@ import { ReceiptScanTab } from "@/components/tabs/receipt-scan-tab";
 import { BudgetsTab } from "@/components/tabs/budgets-tab";
 import { SettingsTab } from "@/components/tabs/settings-tab";
 import { IntegrationsTab } from "@/components/tabs/integrations-tab";
+import { TransactionModal } from "@/components/add-transaction-modal";
 import type { Transaction, ChatMessage } from "./types";
 
 const initialMockTransactions: Transaction[] = [
@@ -57,9 +59,21 @@ export default function Home() {
   const activeTab = searchParams.get("tab") || "overview";
 
   const [userName, setUserName] = useState("Kevin Merico");
+  const [userEmail, setUserEmail] = useState("kevin.merico@example.com");
+  const [userPhone, setUserPhone] = useState("+62 812 3456 7890");
   const [transactions, setTransactions] = useState<Transaction[]>(initialMockTransactions);
   const [searchTerm, setSearchTerm] = useState("");
   const [expenseFilterType, setExpenseFilterType] = useState<"all" | "income" | "expense">("all");
+  const [quickActionLoading, setQuickActionLoading] = useState<TransactionType | null>(null);
+  const [quickActionStatus, setQuickActionStatus] = useState<string | null>(null);
+
+  const [isAddTxModalOpen, setIsAddTxModalOpen] = useState(false);
+  const [addTxInitialType, setAddTxInitialType] = useState<TransactionType>("expense");
+
+  const [editTxId, setEditTxId] = useState<number | null>(null);
+  const [editTxData, setEditTxData] = useState<{ type: TransactionType, title: string, amount: number } | null>(null);
+
+  const [deleteTxId, setDeleteTxId] = useState<number | null>(null);
 
   const [chatInput, setChatInput] = useState("");
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
@@ -106,25 +120,23 @@ export default function Home() {
       apiClient.me(token)
         .then((user) => {
           if (user.name) setUserName(user.name);
+          if (user.email) setUserEmail(user.email);
+          if (user.phone_number) setUserPhone(user.phone_number);
         })
-        .catch(() => {});
-
-      apiClient.transactions.list(token)
-        .then((res) => {
-          if (res.items && res.items.length > 0) {
-            const formatted = res.items.map((t: { id: number; type: "income" | "expense"; amount: string; category_name?: string; description?: string | null; transaction_date: string; source: string }) => ({
-              id: t.id,
-              type: t.type,
-              amount: parseFloat(t.amount),
-              category_name: t.category_name || "Lainnya",
-              description: t.description || "Transaksi Tanpa Keterangan",
-              transaction_date: t.transaction_date,
-              source: t.source,
-            }));
-            setTransactions(formatted);
+        .catch((error) => {
+          if (isAuthExpiredError(error)) {
+            clearAuthToken();
+            window.location.href = "/login?next=/";
           }
-        })
-        .catch(() => {});
+        });
+
+      refreshTransactions(token)
+        .catch((error) => {
+          if (isAuthExpiredError(error)) {
+            clearAuthToken();
+            window.location.href = "/login?next=/";
+          }
+        });
     }
   }, []);
 
@@ -174,8 +186,62 @@ export default function Home() {
     }).format(val).replace("Rp", "Rp ").trim();
   }
 
+  async function handleConfirmDeleteTransaction() {
+    if (!deleteTxId) return;
+    
+    const token = getStoredAuthToken();
+    if (!token) return;
+
+    try {
+      await apiClient.transactions.delete(token, deleteTxId);
+      await refreshTransactions(token);
+    } catch (error) {
+      alert("Gagal menghapus transaksi.");
+    } finally {
+      setDeleteTxId(null);
+    }
+  }
+
   function handleDeleteTransaction(id: number) {
-    setTransactions(prev => prev.filter(t => t.id !== id));
+    setDeleteTxId(id);
+  }
+
+  async function handleEditTransaction(id: number) {
+    const tx = transactions.find((t) => t.id === id);
+    if (!tx) return;
+    
+    setEditTxId(id);
+    setEditTxData({
+      type: tx.type,
+      title: tx.description || "",
+      amount: tx.amount,
+    });
+  }
+
+  async function handleSaveEditTransaction(data: { type: "income" | "expense"; title: string; amount: number }) {
+    if (!editTxId) return;
+    const id = editTxId;
+    setEditTxId(null);
+    setEditTxData(null);
+    
+    const token = getStoredAuthToken();
+    if (!token) return alert("Silakan login terlebih dahulu.");
+
+    try {
+      await apiClient.transactions.update(token, id, {
+        description: data.title.trim(),
+        amount: data.amount,
+        type: data.type,
+      });
+      await refreshTransactions(token);
+    } catch (error) {
+      alert("Gagal mengubah transaksi.");
+    }
+  }
+
+  async function refreshTransactions(token: string) {
+    const res = await apiClient.transactions.list(token);
+    setTransactions(res.items.map(item => toDashboardTransaction(item)));
   }
 
   const [isExporting, setIsExporting] = useState(false);
@@ -268,35 +334,57 @@ export default function Home() {
     }, 800);
   }
 
+  async function handleSaveModalTransaction(data: { type: "income" | "expense"; title: string; amount: number }) {
+    setIsAddTxModalOpen(false);
+    const token = getStoredAuthToken();
+    if (!token) {
+      setQuickActionStatus("Silakan login ulang sebelum menambah transaksi.");
+      window.location.href = "/login?next=/";
+      return;
+    }
+
+    const isIncome = data.type === "income";
+    const label = isIncome ? "pemasukan" : "pengeluaran";
+
+    setQuickActionLoading(data.type);
+    setQuickActionStatus(`Mencatat ${label}...`);
+
+    try {
+      const created = await apiClient.transactions.create(token, {
+        type: data.type,
+        amount: data.amount,
+        description: data.title.trim(),
+        transaction_date: formatLocalDate(new Date()),
+      });
+
+      setTransactions(prev => [
+        toDashboardTransaction(created, "Lainnya"),
+        ...prev.filter(transaction => transaction.id !== created.id),
+      ]);
+      await refreshTransactions(token);
+      setQuickActionStatus(`${isIncome ? "Pemasukan" : "Pengeluaran"} berhasil ditambahkan.`);
+    } catch (error) {
+      if (isAuthExpiredError(error)) {
+        clearAuthToken();
+        setQuickActionStatus("Sesi login kedaluwarsa. Silakan login ulang.");
+        window.location.href = "/login?next=/";
+        return;
+      }
+      setQuickActionStatus(getTransactionCreateErrorMessage(error));
+    } finally {
+      setQuickActionLoading(null);
+    }
+  }
+
   // Quick Action Handlers
   const handleQuickAddIncome = () => {
-    const token = getStoredAuthToken();
-    if (!token) return alert("Please login first");
-    apiClient.transactions.create(token, {
-      type: "income",
-      amount: 1000000,
-      description: "Quick Income",
-      transaction_date: new Date().toISOString().split("T")[0],
-    }).then(() => {
-      window.location.reload();
-    }).catch(() => {
-      alert("Failed to add transaction.");
-    });
+    setAddTxInitialType("income");
+    setIsAddTxModalOpen(true);
   };
 
   const handleQuickAddExpense = () => {
-    const token = getStoredAuthToken();
-    if (!token) return alert("Please login first");
-    apiClient.transactions.create(token, {
-      type: "expense",
-      amount: 50000,
-      description: "Quick Expense",
-      transaction_date: new Date().toISOString().split("T")[0],
-    }).then(() => {
-      window.location.reload();
-    }).catch(() => {
-      alert("Failed to add transaction.");
-    });
+    setAddTxInitialType("expense");
+    setIsAddTxModalOpen(true);
   };
 
   // Receipt scanning handlers (Desktop)
@@ -362,70 +450,204 @@ export default function Home() {
 
   return (
     <>
-      {activeTab === "overview" && (
-        <OverviewTab
-          userName={userName}
-          totalBalance={totalBalance}
-          totalIncome={totalIncome}
-          totalExpense={totalExpense}
-          formatCurrency={formatCurrency}
-          handleDownloadPDF={handleDownloadPDF}
-          isExporting={isExporting}
-          chatMessages={chatMessages}
-          chatInput={chatInput}
-          setChatInput={setChatInput}
-          handleSendChatMessage={handleSendChatMessage}
-          filteredTransactions={filteredTransactions}
+      {/* Render Main Tab Content */}
+      <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-both" style={{ animationDelay: '100ms' }}>
+        {(activeTab === "overview" || activeTab === "settings") && (
+          <OverviewTab
+            userName={userName}
+            totalBalance={totalBalance}
+            totalIncome={totalIncome}
+            totalExpense={totalExpense}
+            formatCurrency={formatCurrency}
+            handleDownloadPDF={handleDownloadPDF}
+            isExporting={isExporting}
+            chatMessages={chatMessages}
+            chatInput={chatInput}
+            setChatInput={setChatInput}
+            handleSendChatMessage={handleSendChatMessage}
+            handleQuickAddIncome={handleQuickAddIncome}
+            handleQuickAddExpense={handleQuickAddExpense}
+            quickActionLoading={quickActionLoading}
+            quickActionStatus={quickActionStatus}
+            filteredTransactions={filteredTransactions}
+          />
+        )}
+
+        {activeTab === "transactions" && (
+          <TransactionsTab
+            transactions={transactions}
+            filteredTransactions={filteredTransactions}
+            expenseFilterType={expenseFilterType}
+            setExpenseFilterType={setExpenseFilterType}
+            formatCurrency={formatCurrency}
+            handleDeleteTransaction={handleDeleteTransaction}
+            handleEditTransaction={handleEditTransaction}
+            handleQuickAddIncome={handleQuickAddIncome}
+            handleQuickAddExpense={handleQuickAddExpense}
+            quickActionLoading={quickActionLoading}
+            quickActionStatus={quickActionStatus}
+            handleDownloadPDF={handleDownloadPDF}
+            isExporting={isExporting}
+            totalBalance={totalBalance}
+          />
+        )}
+
+        {activeTab === "reports" && (
+          <ReportsTab
+            transactions={transactions}
+            categoryStats={categoryStats}
+            totalIncome={totalIncome}
+            totalExpense={totalExpense}
+            totalBalance={totalBalance}
+            formatCurrency={formatCurrency}
+            handleDownloadPDF={handleDownloadPDF}
+            isExporting={isExporting}
+          />
+        )}
+
+        {activeTab === "receipt_scan" && (
+          <ReceiptScanTab
+            receiptImage={receiptImage}
+            scanStatus={scanStatus}
+            scannedData={scannedData}
+            setScannedData={setScannedData}
+            handleFileChange={handleFileChange}
+            handleCancelReceipt={handleCancelReceipt}
+            handleConfirmReceipt={handleConfirmReceipt}
+            formatCurrency={formatCurrency}
+          />
+        )}
+
+        {activeTab === "budgets" && <BudgetsTab />}
+
+        {activeTab === "integrations" && <IntegrationsTab />}
+      </div>
+
+      <TransactionModal 
+        isOpen={isAddTxModalOpen} 
+        mode="add"
+        onClose={() => setIsAddTxModalOpen(false)} 
+        onSave={handleSaveModalTransaction} 
+        initialType={addTxInitialType} 
+      />
+
+      {editTxData && (
+        <TransactionModal 
+          isOpen={editTxId !== null} 
+          mode="edit"
+          onClose={() => { setEditTxId(null); setEditTxData(null); }} 
+          onSave={handleSaveEditTransaction} 
+          initialType={editTxData.type}
+          initialTitle={editTxData.title}
+          initialAmount={editTxData.amount}
         />
       )}
 
-      {activeTab === "transactions" && (
-        <TransactionsTab
-          transactions={transactions}
-          filteredTransactions={filteredTransactions}
-          expenseFilterType={expenseFilterType}
-          setExpenseFilterType={setExpenseFilterType}
-          formatCurrency={formatCurrency}
-          handleDeleteTransaction={handleDeleteTransaction}
-          handleQuickAddIncome={handleQuickAddIncome}
-          handleQuickAddExpense={handleQuickAddExpense}
-          handleDownloadPDF={handleDownloadPDF}
-          isExporting={isExporting}
-          totalBalance={totalBalance}
-        />
+      {deleteTxId !== null && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200" style={{ margin: 0 }}>
+          <div className="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl animate-in zoom-in-95 duration-200 relative">
+            <div className="w-12 h-12 rounded-full flex items-center justify-center mb-4 mx-auto bg-red-100 text-red-600">
+              <span className="material-symbols-outlined text-2xl">
+                delete
+              </span>
+            </div>
+            
+            <h3 className="text-lg font-bold text-center text-[#1a1c1b] mb-2">
+              Hapus Transaksi?
+            </h3>
+            <p className="text-sm text-center text-[#6F6F6F] mb-8">
+              Tindakan ini tidak dapat dibatalkan. Transaksi ini akan dihapus dari laporan Anda selamanya.
+            </p>
+            
+            <div className="flex flex-col gap-3">
+              <button onClick={handleConfirmDeleteTransaction} className="w-full py-3 rounded-full text-sm font-bold border-none cursor-pointer transition-colors bg-red-600 hover:bg-red-700 text-white">
+                Ya, Hapus
+              </button>
+              <button onClick={() => setDeleteTxId(null)} className="w-full py-3 bg-white border border-[#E8E8E8] text-[#1a1c1b] rounded-full text-sm font-bold hover:bg-[#F1F2F0] transition-colors cursor-pointer">
+                Batal
+              </button>
+            </div>
+          </div>
+        </div>
       )}
-
-      {activeTab === "reports" && (
-        <ReportsTab
-          transactions={transactions}
-          categoryStats={categoryStats}
-          totalIncome={totalIncome}
-          totalExpense={totalExpense}
-          totalBalance={totalBalance}
-          formatCurrency={formatCurrency}
-          handleDownloadPDF={handleDownloadPDF}
-          isExporting={isExporting}
-        />
-      )}
-
-      {activeTab === "receipt_scan" && (
-        <ReceiptScanTab
-          receiptImage={receiptImage}
-          scanStatus={scanStatus}
-          scannedData={scannedData}
-          setScannedData={setScannedData}
-          handleFileChange={handleFileChange}
-          handleCancelReceipt={handleCancelReceipt}
-          handleConfirmReceipt={handleConfirmReceipt}
-          formatCurrency={formatCurrency}
-        />
-      )}
-
-      {activeTab === "budgets" && <BudgetsTab />}
-
-      {activeTab === "settings" && <SettingsTab />}
-
-      {activeTab === "integrations" && <IntegrationsTab />}
     </>
   );
+}
+
+function toDashboardTransaction(
+  transaction: ApiTransaction,
+  fallbackCategory = "Lainnya",
+): Transaction {
+  return {
+    id: transaction.id,
+    type: transaction.type,
+    amount: parseFloat(transaction.amount),
+    category_name: transaction.category_name || fallbackCategory,
+    description: transaction.description || "Transaksi Tanpa Keterangan",
+    transaction_date: transaction.transaction_date,
+    source: transaction.source,
+  };
+}
+
+function formatLocalDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function isAuthExpiredError(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 401;
+}
+
+function getTransactionCreateErrorMessage(error: unknown): string {
+  if (error instanceof TypeError) {
+    return "Gagal menambah transaksi. Backend belum bisa dihubungi.";
+  }
+
+  if (error instanceof ApiError) {
+    const detail = getPayloadDetail(error.payload);
+    if (detail) {
+      return `Gagal menambah transaksi: ${detail}`;
+    }
+    if (error.status === 401) {
+      return "Sesi login sudah berakhir. Silakan login ulang.";
+    }
+    if (error.status === 404) {
+      return "Gagal menambah transaksi. Route API tidak ditemukan.";
+    }
+  }
+
+  return "Gagal menambah transaksi.";
+}
+
+function getPayloadDetail(payload: unknown): string | null {
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "detail" in payload &&
+    typeof payload.detail === "string"
+  ) {
+    return payload.detail;
+  }
+
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "detail" in payload &&
+    Array.isArray(payload.detail)
+  ) {
+    return payload.detail
+      .map((item) => {
+        if (item && typeof item === "object" && "msg" in item) {
+          return String(item.msg);
+        }
+
+        return null;
+      })
+      .filter(Boolean)
+      .join(", ");
+  }
+
+  return null;
 }
