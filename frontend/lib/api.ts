@@ -1,5 +1,8 @@
 const DEFAULT_API_BASE_URL = "http://localhost:8000/api";
-const BROWSER_API_BASE_URL = "/api/backend";
+const BROWSER_API_BASE_URL = normalizeBaseUrl(
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api",
+);
+const BROWSER_SERVICE_BASE_URL = BROWSER_API_BASE_URL.replace(/\/api\/?$/, "");
 
 export const SERVER_API_BASE_URL = normalizeBaseUrl(
   process.env.NEXT_INTERNAL_API_BASE_URL ??
@@ -10,7 +13,7 @@ export const SERVER_SERVICE_BASE_URL = SERVER_API_BASE_URL.replace(/\/api\/?$/, 
 export const API_BASE_URL =
   typeof window === "undefined" ? SERVER_API_BASE_URL : BROWSER_API_BASE_URL;
 export const SERVICE_BASE_URL =
-  typeof window === "undefined" ? SERVER_SERVICE_BASE_URL : BROWSER_API_BASE_URL;
+  typeof window === "undefined" ? SERVER_SERVICE_BASE_URL : BROWSER_SERVICE_BASE_URL;
 
 export type HealthResponse = {
   status: string;
