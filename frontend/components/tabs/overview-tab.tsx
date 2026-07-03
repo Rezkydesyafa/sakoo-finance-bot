@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import type { Transaction, ChatMessage } from "@/app/(dashboard)/types";
 import { ConnectedBots } from "@/components/connected-bots";
 import { ChatSimulator } from "@/components/chat-simulator";
@@ -52,6 +55,8 @@ export function OverviewTab({
   quickActionStatus,
   filteredTransactions,
 }: OverviewTabProps) {
+  const [flowType, setFlowType] = useState<"income" | "expense">("income");
+
   return (
     <div className="grid grid-cols-12 gap-6">
       {/* Left Area (8 cols) */}
@@ -145,21 +150,35 @@ export function OverviewTab({
               <p className="text-xs text-[#6F6F6F]">Activity over the last 30 days</p>
             </div>
             <div className="bg-[#F1F2F0] rounded-full p-1 flex">
-              <button className="px-4 py-1.5 rounded-full bg-white card-shadow text-[13px] font-semibold text-[#191919]">Income</button>
-              <button className="px-4 py-1.5 rounded-full text-[13px] font-semibold text-[#6F6F6F] hover:text-[#191919] transition-colors">Expense</button>
+              <button 
+                onClick={() => setFlowType("income")}
+                className={`px-4 py-1.5 rounded-full text-[13px] font-semibold transition-colors cursor-pointer border-none ${
+                  flowType === "income" 
+                    ? "bg-white shadow-sm text-[#191919]" 
+                    : "bg-transparent text-[#6F6F6F] hover:text-[#191919]"
+                }`}
+              >Income</button>
+              <button 
+                onClick={() => setFlowType("expense")}
+                className={`px-4 py-1.5 rounded-full text-[13px] font-semibold transition-colors cursor-pointer border-none ${
+                  flowType === "expense" 
+                    ? "bg-white shadow-sm text-[#191919]" 
+                    : "bg-transparent text-[#6F6F6F] hover:text-[#191919]"
+                }`}
+              >Expense</button>
             </div>
           </div>
           <div className="flex-1 flex items-end justify-between px-4 pb-4">
-            <div className="w-8 sm:w-12 h-[30%] bg-[#eeeeec] rounded-t-full relative flex items-end justify-center"><div className="absolute w-full h-[60%] bg-[#E0F682] rounded-t-full bottom-0"></div></div>
-            <div className="w-8 sm:w-12 h-[40%] bg-[#eeeeec] rounded-t-full relative flex items-end justify-center"><div className="absolute w-full h-[70%] bg-[#E0F682] rounded-t-full bottom-0"></div></div>
-            <div className="w-8 sm:w-12 h-[70%] bg-[#eeeeec] rounded-t-full relative flex items-end justify-center"><div className="absolute w-full h-[50%] bg-[#E0F682] rounded-t-full bottom-0"></div></div>
-            <div className="w-8 sm:w-12 h-[100%] bg-[#eeeeec] rounded-t-full relative flex items-end justify-center">
-              <div className="absolute w-full h-[85%] bg-[#c7ff00] rounded-t-full bottom-0"></div>
-              <div className="absolute -top-8 bg-[#2A2A2A] text-white text-[10px] sm:text-xs px-2 py-1 rounded-md">Rp14m</div>
+            <div className="w-8 sm:w-12 h-[30%] bg-[#eeeeec] rounded-t-full relative flex items-end justify-center"><div className={`absolute w-full h-[60%] rounded-t-full bottom-0 ${flowType === 'income' ? 'bg-[#E0F682]' : 'bg-[#FFCDD2]'}`}></div></div>
+            <div className="w-8 sm:w-12 h-[40%] bg-[#eeeeec] rounded-t-full relative flex items-end justify-center"><div className={`absolute w-full h-[70%] rounded-t-full bottom-0 ${flowType === 'income' ? 'bg-[#E0F682]' : 'bg-[#FFCDD2]'}`}></div></div>
+            <div className="w-8 sm:w-12 h-[70%] bg-[#eeeeec] rounded-t-full relative flex items-end justify-center"><div className={`absolute w-full h-[50%] rounded-t-full bottom-0 ${flowType === 'income' ? 'bg-[#E0F682]' : 'bg-[#FFCDD2]'}`}></div></div>
+            <div className={`w-8 sm:w-12 ${flowType === 'income' ? 'h-[100%]' : 'h-[80%]'} bg-[#eeeeec] rounded-t-full relative flex items-end justify-center transition-all duration-300`}>
+              <div className={`absolute w-full h-[85%] rounded-t-full bottom-0 ${flowType === 'income' ? 'bg-[#c7ff00]' : 'bg-[#EF6B6B]'}`}></div>
+              <div className="absolute -top-8 bg-[#2A2A2A] text-white text-[10px] sm:text-xs px-2 py-1 rounded-md">{flowType === 'income' ? 'Rp14m' : 'Rp4.2m'}</div>
             </div>
-            <div className="w-8 sm:w-12 h-[50%] bg-[#eeeeec] rounded-t-full relative flex items-end justify-center"><div className="absolute w-full h-[65%] bg-[#E0F682] rounded-t-full bottom-0"></div></div>
-            <div className="w-8 sm:w-12 h-[35%] bg-[#eeeeec] rounded-t-full relative flex items-end justify-center"><div className="absolute w-full h-[80%] bg-[#E0F682] rounded-t-full bottom-0"></div></div>
-            <div className="w-8 sm:w-12 h-[45%] bg-[#eeeeec] rounded-t-full relative flex items-end justify-center"><div className="absolute w-full h-[90%] bg-[#E0F682] rounded-t-full bottom-0"></div></div>
+            <div className="w-8 sm:w-12 h-[50%] bg-[#eeeeec] rounded-t-full relative flex items-end justify-center"><div className={`absolute w-full h-[65%] rounded-t-full bottom-0 ${flowType === 'income' ? 'bg-[#E0F682]' : 'bg-[#FFCDD2]'}`}></div></div>
+            <div className="w-8 sm:w-12 h-[35%] bg-[#eeeeec] rounded-t-full relative flex items-end justify-center"><div className={`absolute w-full h-[80%] rounded-t-full bottom-0 ${flowType === 'income' ? 'bg-[#E0F682]' : 'bg-[#FFCDD2]'}`}></div></div>
+            <div className="w-8 sm:w-12 h-[45%] bg-[#eeeeec] rounded-t-full relative flex items-end justify-center"><div className={`absolute w-full h-[90%] rounded-t-full bottom-0 ${flowType === 'income' ? 'bg-[#E0F682]' : 'bg-[#FFCDD2]'}`}></div></div>
           </div>
           <div className="flex justify-between px-2 sm:px-6 text-[10px] sm:text-xs text-[#6F6F6F] uppercase tracking-wider mt-4">
             <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>

@@ -1,0 +1,396 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Sakoo Finance - Overview</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary": "#ffffff",
+                        "secondary-container": "#e2dfde",
+                        "on-surface-variant": "#434933",
+                        "primary-container": "#c7ff00",
+                        "surface-variant": "#e2e3e1",
+                        "on-primary-fixed": "#151f00",
+                        "surface-bright": "#f9f9f7",
+                        "border-light": "#E8E8E8",
+                        "primary-fixed-dim": "#a7d700",
+                        "surface-container-highest": "#e2e3e1",
+                        "surface": "#f9f9f7",
+                        "success-green": "#5FCF6A",
+                        "tertiary": "#556500",
+                        "surface-container": "#eeeeec",
+                        "surface-tint": "#4e6700",
+                        "on-primary": "#ffffff",
+                        "on-secondary-fixed-variant": "#474746",
+                        "outline-variant": "#c3caac",
+                        "secondary-fixed": "#e5e2e1",
+                        "on-tertiary": "#ffffff",
+                        "surface-container-lowest": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "error": "#ba1a1a",
+                        "inverse-on-surface": "#f1f1ef",
+                        "on-background": "#1a1c1b",
+                        "text-muted": "#6F6F6F",
+                        "primary": "#4e6700",
+                        "inverse-primary": "#a7d700",
+                        "glow-purple": "rgba(190, 140, 255, 0.18)",
+                        "glow-pink": "rgba(255, 160, 210, 0.20)",
+                        "text-primary": "#191919",
+                        "inverse-surface": "#2f3130",
+                        "background": "#f9f9f7",
+                        "surface-muted": "#F1F2F0",
+                        "on-error-container": "#93000a",
+                        "primary-fixed": "#bff500",
+                        "warning-amber": "#F6C85F",
+                        "surface-dim": "#dadad8",
+                        "on-primary-container": "#587300",
+                        "on-primary-fixed-variant": "#3a4d00",
+                        "tertiary-container": "#e0f682",
+                        "tertiary-fixed": "#d7ed7a",
+                        "on-tertiary-fixed-variant": "#404c00",
+                        "surface-white": "#FFFFFF",
+                        "on-surface": "#1a1c1b",
+                        "on-error": "#ffffff",
+                        "secondary": "#5f5e5e",
+                        "secondary-fixed-dim": "#c8c6c5",
+                        "on-tertiary-container": "#607105",
+                        "danger-red": "#EF6B6B",
+                        "glow-blue": "rgba(125, 180, 255, 0.25)",
+                        "on-secondary-fixed": "#1b1c1c",
+                        "tertiary-fixed-dim": "#bbd061",
+                        "surface-container-low": "#f4f4f2",
+                        "outline": "#747a60",
+                        "surface-container-high": "#e8e8e6",
+                        "on-tertiary-fixed": "#181e00",
+                        "on-secondary-container": "#636262"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px",
+                        "2xl": "1.5rem",
+                        "3xl": "1.75rem"
+                    },
+                    "spacing": {
+                        "sidebar-width": "240px",
+                        "container-max": "1440px",
+                        "stack-md": "16px",
+                        "card-padding": "24px",
+                        "outer-margin": "32px",
+                        "gutter": "24px",
+                        "stack-sm": "8px",
+                        "stack-lg": "32px"
+                    },
+                    "fontFamily": {
+                        "label-button": ["Plus Jakarta Sans"],
+                        "display-balance": ["Plus Jakarta Sans"],
+                        "label-muted": ["Inter"],
+                        "body-main": ["Inter"],
+                        "title-card": ["Plus Jakarta Sans"],
+                        "headline-hero": ["Plus Jakarta Sans"],
+                        "headline-section": ["Plus Jakarta Sans"],
+                        "headline-hero-mobile": ["Plus Jakarta Sans"],
+                        "body-strong": ["Inter"]
+                    },
+                    "fontSize": {
+                        "label-button": ["13px", { "lineHeight": "1.2", "fontWeight": "600" }],
+                        "display-balance": ["42px", { "lineHeight": "1.0", "letterSpacing": "-0.04em", "fontWeight": "800" }],
+                        "label-muted": ["12px", { "lineHeight": "1.4", "fontWeight": "400" }],
+                        "body-main": ["14px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "title-card": ["15px", { "lineHeight": "1.3", "fontWeight": "600" }],
+                        "headline-hero": ["32px", { "lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-section": ["20px", { "lineHeight": "1.25", "fontWeight": "700" }],
+                        "headline-hero-mobile": ["26px", { "lineHeight": "1.2", "fontWeight": "700" }],
+                        "body-strong": ["14px", { "lineHeight": "1.5", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { background-color: #F7F7F5; }
+        .ambient-glow {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none; z-index: -1;
+            background: 
+                radial-gradient(circle at 15% 50%, rgba(190, 140, 255, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 85% 30%, rgba(125, 180, 255, 0.08) 0%, transparent 40%);
+        }
+        .card-shadow { box-shadow: 0 10px 30px rgba(0,0,0,0.06); }
+        .hero-shadow { box-shadow: 0 18px 40px rgba(0,0,0,0.18); }
+        .hover-lift { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+        .hover-lift:hover { transform: translateY(-4px); box-shadow: 0 14px 34px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body class="font-body-main text-body-main text-on-surface antialiased">
+<div class="ambient-glow"></div>
+<!-- SideNavBar -->
+<nav class="hidden md:flex fixed left-0 top-0 h-screen w-sidebar-width bg-surface-white dark:bg-surface-container-lowest flex-col py-8 border-r border-border-light dark:border-outline-variant z-50">
+<div class="px-outer-margin mb-stack-lg">
+<h1 class="text-headline-section font-headline-section font-extrabold text-on-surface">Sakoo</h1>
+<p class="font-label-muted text-label-muted text-text-muted mt-1">Finance Bot</p>
+</div>
+<div class="flex-1 flex flex-col gap-2">
+<!-- Active Tab -->
+<a class="flex items-center gap-3 bg-primary-container text-on-primary-container rounded-xl px-4 py-3 mx-2 scale-[0.98] transition-transform duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: &quot;FILL&quot; 1;">dashboard</span>
+<span class="font-label-button text-label-button">Overview</span>
+</a>
+<!-- Inactive Tabs -->
+<a class="flex items-center gap-3 text-secondary hover:text-primary px-4 py-3 mx-2 transition-colors hover:bg-surface-variant/50" href="#">
+<span class="material-symbols-outlined">receipt_long</span>
+<span class="font-label-button text-label-button">Transactions</span>
+</a>
+<a class="flex items-center gap-3 text-secondary hover:text-primary px-4 py-3 mx-2 transition-colors hover:bg-surface-variant/50" href="#">
+<span class="material-symbols-outlined">bar_chart</span>
+<span class="font-label-button text-label-button">Reports</span>
+</a>
+<a class="flex items-center gap-3 text-secondary hover:text-primary px-4 py-3 mx-2 transition-colors hover:bg-surface-variant/50" href="#">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+<span class="font-label-button text-label-button">Budgets</span>
+</a>
+<a class="flex items-center gap-3 text-secondary hover:text-primary px-4 py-3 mx-2 transition-colors hover:bg-surface-variant/50" href="#">
+<span class="material-symbols-outlined">document_scanner</span>
+<span class="font-label-button text-label-button">Receipt Scan</span>
+</a>
+<a class="flex items-center gap-3 text-secondary hover:text-primary px-4 py-3 mx-2 transition-colors hover:bg-surface-variant/50" href="#">
+<span class="material-symbols-outlined">smart_toy</span>
+<span class="font-label-button text-label-button">Bot Channels</span>
+</a>
+<a class="flex items-center gap-3 text-secondary hover:text-primary px-4 py-3 mx-2 transition-colors hover:bg-surface-variant/50" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-button text-label-button">Settings</span>
+</a>
+</div>
+<div class="px-6 mb-8 mt-auto">
+<button class="w-full py-3 px-4 bg-primary text-white font-label-button text-label-button rounded-full hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
+<span class="material-symbols-outlined">add</span>
+                + New Transaction
+            </button>
+</div>
+<div class="flex flex-col gap-2 mt-auto border-t border-border-light pt-4 mx-4">
+<a class="flex items-center gap-3 text-secondary hover:text-primary px-4 py-3 transition-colors" href="#">
+<span class="material-symbols-outlined">headset_mic</span>
+<span class="font-label-button text-label-button">Support</span>
+</a>
+<a class="flex items-center gap-3 text-danger-red hover:opacity-80 px-4 py-3 transition-colors" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-label-button text-label-button">Sign Out</span>
+</a>
+</div>
+</nav>
+<!-- TopNavBar -->
+<header class="fixed top-0 right-0 w-[calc(100%-240px)] z-40 bg-surface dark:bg-surface flex justify-between items-center h-20 px-outer-margin">
+<div class="flex items-center w-96 relative">
+<span class="material-symbols-outlined absolute left-4 text-text-muted">search</span>
+<input class="w-full pl-12 pr-4 py-3 bg-surface-muted rounded-full border-none focus:ring-1 focus:ring-primary-container text-body-main font-body-main placeholder-text-muted" placeholder="Search transactions, assets..." type="text">
+</div>
+<div class="flex items-center gap-4">
+<button class="w-10 h-10 rounded-full flex items-center justify-center text-secondary hover:bg-surface-container-high transition-colors relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-primary-container rounded-full"></span>
+</button>
+<button class="w-10 h-10 rounded-full flex items-center justify-center text-secondary hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined">help</span>
+</button>
+<button class="w-10 h-10 rounded-full flex items-center justify-center text-secondary hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<div class="h-8 w-px bg-border-light mx-2"></div>
+<button class="flex items-center gap-2 px-3 py-1.5 rounded-full border border-border-light text-body-strong font-body-strong">
+                IDR
+                <span class="material-symbols-outlined text-sm">expand_more</span>
+</button>
+<img class="w-10 h-10 rounded-full object-cover ml-2" data-alt="A small circular avatar portrait of a modern professional, soft lighting, minimalist background, signifying an account profile in a clean UI." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDk0sNGvqKxmynzBYRQ9ZDfbkfro_qLyzxcspTigFcDrnAY5nEIRjRsgpwLzCpXGAm3meuPrdgAEnLd088ISztISxZSo1MHU5qxPxRhtyYdOoZKz-EBj4T1igdq9iwJIW_7QR9wJv6oE_loS9FrEEvj_Qsb6RzGFpPVjm-WDWii_VD9zCE0W5YwED6GtwqTasiepITaPkEPDao6a6_0XOn9StLKLXEw3tQn_qKx1_xe3bwKey22g02qfqYcIFRKmRXokUSS0wBxpSg">
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="ml-sidebar-width pt-20 p-outer-margin max-w-container-max min-h-screen">
+<div class="grid grid-cols-12 gap-gutter">
+<!-- Left Area (8 cols) -->
+<div class="col-span-8 flex flex-col gap-stack-lg">
+<!-- Greeting Header -->
+<div class="flex justify-between items-end">
+<div>
+<h2 class="font-headline-hero text-headline-hero text-on-surface mb-2">Hello, Fajar 👋</h2>
+<p class="font-body-main text-body-main text-text-muted">Your financial assistant is ready to help today.</p>
+</div>
+</div>
+<!-- Hero Grid: Balance + Actions -->
+<div class="grid grid-cols-12 gap-stack-md h-64">
+<!-- Balance Card -->
+<div class="col-span-7 bg-[#2A2A2A] rounded-3xl p-card-padding hero-shadow flex flex-col justify-between relative overflow-hidden text-white">
+<!-- Abstract Pattern via CSS -->
+<div class="absolute inset-0 opacity-10" style="background-image: radial-gradient(circle at 100% 0%, #C7FF00 0%, transparent 50%); pointer-events: none;"></div>
+<div class="flex justify-between items-start relative z-10">
+<span class="font-body-main text-body-main text-gray-300">Total Balance</span>
+<span class="bg-primary-container text-on-primary-container font-label-button text-label-button px-3 py-1 rounded-full flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">trending_up</span> +12.4%
+                            </span>
+</div>
+<div class="relative z-10">
+<div class="font-display-balance text-display-balance">Rp1.425.000</div>
+</div>
+<div class="flex justify-between items-end relative z-10 text-sm text-gray-400">
+<div class="">
+<span class="block text-xs uppercase tracking-wider mb-1">Account ID</span>
+                                SAKO-992-104
+                            </div>
+<div class="flex -space-x-2">
+<div class="w-6 h-6 rounded-full bg-gray-400 opacity-80"></div>
+<div class="w-6 h-6 rounded-full bg-primary-container"></div>
+</div>
+</div>
+</div>
+<!-- Quick Actions Grid -->
+<div class="col-span-5 grid grid-cols-2 grid-rows-2 gap-stack-sm h-full">
+<button class="bg-primary-container rounded-[20px] p-4 flex flex-col items-center justify-center gap-2 hover:opacity-90 transition-opacity">
+<span class="material-symbols-outlined text-3xl">send_money</span>
+<span class="font-label-button text-label-button text-on-primary-container">Add Expense</span>
+</button>
+<button class="bg-surface-white card-shadow rounded-[20px] p-4 flex flex-col items-center justify-center gap-2 hover-lift">
+<span class="material-symbols-outlined text-3xl text-text-muted">account_balance_wallet</span>
+<span class="font-label-button text-label-button text-text-primary">Add Income</span>
+</button>
+<button class="bg-surface-white card-shadow rounded-[20px] p-4 flex flex-col items-center justify-center gap-2 hover-lift">
+<span class="material-symbols-outlined text-3xl text-text-muted">document_scanner</span>
+<span class="font-label-button text-label-button text-text-primary">Scan Receipt</span>
+</button>
+<button class="bg-surface-white card-shadow rounded-[20px] p-4 flex flex-col items-center justify-center gap-2 hover-lift">
+<span class="material-symbols-outlined text-3xl text-text-muted">picture_as_pdf</span>
+<span class="font-label-button text-label-button text-text-primary">Export PDF</span>
+</button>
+</div>
+</div><div class="grid grid-cols-2 gap-stack-md">
+    <div class="bg-surface-white rounded-[24px] p-4 card-shadow flex items-center gap-4">
+        <div class="w-10 h-10 rounded-full bg-success-green/10 flex items-center justify-center text-success-green">
+            <span class="material-symbols-outlined">arrow_upward</span>
+        </div>
+        <div>
+            <p class="text-label-muted text-text-muted">Total Income</p>
+            <p class="text-title-card font-title-card text-on-surface">Rp2.500.000</p>
+        </div>
+    </div>
+    <div class="bg-surface-white rounded-[24px] p-4 card-shadow flex items-center gap-4">
+        <div class="w-10 h-10 rounded-full bg-danger-red/10 flex items-center justify-center text-danger-red">
+            <span class="material-symbols-outlined">arrow_downward</span>
+        </div>
+        <div>
+            <p class="text-label-muted text-text-muted">Total Expense</p>
+            <p class="text-title-card font-title-card text-on-surface">Rp1.075.000</p>
+        </div>
+    </div>
+</div>
+<!-- Money Flow Chart -->
+<div class="bg-surface-white rounded-[28px] p-card-padding card-shadow h-[400px] flex flex-col">
+<div class="flex justify-between items-center mb-8">
+<div>
+<h3 class="font-title-card text-title-card text-on-surface mb-1">Money Flow</h3>
+<p class="font-label-muted text-label-muted text-text-muted">Activity over the last 30 days</p>
+</div>
+<div class="bg-surface-muted rounded-full p-1 flex">
+<button class="px-4 py-1.5 rounded-full bg-surface-white card-shadow font-label-button text-label-button text-text-primary">Income</button>
+<button class="px-4 py-1.5 rounded-full font-label-button text-label-button text-text-muted hover:text-text-primary transition-colors">Expense</button>
+</div>
+</div>
+<!-- Abstract Vertical Bar Chart representation -->
+<div class="flex-1 flex items-end justify-between px-4 pb-4">
+<!-- Bars -->
+<div class="w-12 h-[30%] bg-surface-container rounded-t-full relative flex items-end justify-center">
+<div class="absolute w-full h-[60%] bg-[#E0F682] rounded-t-full bottom-0"></div>
+</div>
+<div class="w-12 h-[40%] bg-surface-container rounded-t-full relative flex items-end justify-center">
+<div class="absolute w-full h-[70%] bg-[#E0F682] rounded-t-full bottom-0"></div>
+</div>
+<div class="w-12 h-[70%] bg-surface-container rounded-t-full relative flex items-end justify-center">
+<div class="absolute w-full h-[50%] bg-[#E0F682] rounded-t-full bottom-0"></div>
+</div>
+<!-- Active Bar -->
+<div class="w-12 h-[100%] bg-surface-container rounded-t-full relative flex items-end justify-center">
+<div class="absolute w-full h-[85%] bg-primary-container rounded-t-full bottom-0"></div>
+<div class="absolute -top-8 bg-[#2A2A2A] text-white text-xs px-2 py-1 rounded-md">Rp14m</div>
+</div>
+<div class="w-12 h-[50%] bg-surface-container rounded-t-full relative flex items-end justify-center">
+<div class="absolute w-full h-[65%] bg-[#E0F682] rounded-t-full bottom-0"></div>
+</div>
+<div class="w-12 h-[35%] bg-surface-container rounded-t-full relative flex items-end justify-center">
+<div class="absolute w-full h-[80%] bg-[#E0F682] rounded-t-full bottom-0"></div>
+</div>
+<div class="w-12 h-[45%] bg-surface-container rounded-t-full relative flex items-end justify-center">
+<div class="absolute w-full h-[90%] bg-[#E0F682] rounded-t-full bottom-0"></div>
+</div>
+</div>
+<div class="flex justify-between px-6 text-xs text-text-muted font-label-muted uppercase tracking-wider mt-4">
+<span class="">Mon</span><span class="">Tue</span><span class="">Wed</span><span class="">Thu</span><span class="">Fri</span><span class="">Sat</span><span class="">Sun</span>
+</div>
+</div>
+</div>
+<!-- Right Column (4 cols) -->
+<div class="col-span-4 flex flex-col gap-stack-lg mt-[72px]">
+<!-- Connected Bot Channels -->
+<div class="bg-surface-white rounded-[28px] p-card-padding card-shadow">
+<h3 class="font-title-card text-title-card text-on-surface mb-4">Connected Bots</h3>
+<div class="flex flex-col gap-4">
+<div class="flex items-center justify-between p-3 rounded-xl bg-surface-muted">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-blue-500">tram</span>
+<span class="font-body-strong text-body-strong">Telegram Bot</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="relative flex h-2.5 w-2.5">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-success-green opacity-75"></span>
+</span></div></div></div></div><div class="bg-surface-white rounded-[24px] p-card-padding card-shadow mt-stack-lg">
+    <div class="flex justify-between items-center mb-4">
+        <h3 class="font-title-card text-title-card text-on-surface">Recent Transactions</h3>
+        <button class="text-primary font-label-button text-xs hover:underline">View All</button>
+    </div>
+    <div class="flex flex-col gap-4">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-surface-muted flex items-center justify-center text-text-muted">
+                    <span class="material-symbols-outlined">restaurant</span>
+                </div>
+                <div>
+                    <p class="font-body-strong text-body-strong text-on-surface">Makan Mie Ayam</p>
+                    <p class="text-label-muted text-text-muted">Makanan • 12:30</p>
+                </div>
+            </div>
+            <span class="font-body-strong text-body-strong text-on-surface">-Rp25.000</span>
+        </div>
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-surface-muted flex items-center justify-center text-text-muted">
+                    <span class="material-symbols-outlined">payments</span>
+                </div>
+                <div>
+                    <p class="font-body-strong text-body-strong text-on-surface">Freelance Project</p>
+                    <p class="text-label-muted text-text-muted">Income • 10:15</p>
+                </div>
+            </div>
+            <span class="font-body-strong text-body-strong text-primary">+Rp500.000</span>
+        </div>
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-surface-muted flex items-center justify-center text-text-muted">
+                    <span class="material-symbols-outlined">shopping_bag</span>
+                </div>
+                <div>
+                    <p class="font-body-strong text-body-strong text-on-surface">Indomaret</p>
+                    <p class="text-label-muted text-text-muted">Belanja • Yesterday</p>
+                </div>
+            </div>
+            <span class="font-body-strong text-body-strong text-on-surface">-Rp142.000</span>
+        </div>
+    </div>
+</div></div></div></main>
+
+</body></html>
