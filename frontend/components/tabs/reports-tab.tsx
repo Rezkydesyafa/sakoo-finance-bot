@@ -225,18 +225,18 @@ export function ReportsTab({
       </div>
 
       <div className="w-full">
-        <h3 className="text-sm font-bold text-[#1a1c1b] mb-4">Export Options</h3>
-        <div className="flex flex-wrap gap-3">
-          <button onClick={handleDownloadPDF} disabled={isExporting} className="bg-[#2A2A2A] text-white px-6 py-2.5 rounded-full text-xs font-semibold flex items-center gap-2 hover:opacity-90 transition-opacity border-none cursor-pointer">
-            <span className="material-symbols-outlined text-[18px]">picture_as_pdf</span>
+        <h3 className="text-sm font-bold text-[#1a1c1b] mb-4 text-center md:text-left">Export Options</h3>
+        <div className="flex flex-wrap justify-center md:justify-start gap-3">
+          <button onClick={handleDownloadPDF} disabled={isExporting} className="bg-[#2A2A2A] text-white px-5 py-2.5 rounded-full text-xs font-semibold flex items-center gap-1.5 hover:opacity-90 transition-opacity border-none cursor-pointer">
+            <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>
             {isExporting ? "Export PDF..." : "Export PDF"}
           </button>
-          <button onClick={() => alert("CSV export is coming soon.")} className="bg-white border border-[#E8E8E8] text-[#1a1c1b] px-6 py-2.5 rounded-full text-xs font-semibold flex items-center gap-2 hover:bg-[#F1F2F0] transition-colors border-solid bg-transparent cursor-pointer">
-            <span className="material-symbols-outlined text-[18px]">download</span>
-            Download CSV
+          <button onClick={() => alert("CSV export is coming soon.")} className="bg-white border border-[#E8E8E8] text-[#1a1c1b] px-5 py-2.5 rounded-full text-xs font-semibold flex items-center gap-1.5 hover:bg-[#F1F2F0] transition-colors border-solid bg-transparent cursor-pointer">
+            <span className="material-symbols-outlined text-[16px]">download</span>
+            CSV
           </button>
-          <button onClick={() => alert("Share option coming soon.")} className="bg-[#c7ff00] text-[#151f00] px-6 py-2.5 rounded-full text-xs font-semibold flex items-center gap-2 hover:opacity-95 transition-opacity ml-auto md:ml-0 border-none cursor-pointer">
-            <span className="material-symbols-outlined text-[18px]">share</span>
+          <button onClick={() => alert("Share option coming soon.")} className="bg-[#c7ff00] text-[#151f00] px-5 py-2.5 rounded-full text-xs font-semibold flex items-center gap-1.5 hover:opacity-95 transition-opacity border-none cursor-pointer">
+            <span className="material-symbols-outlined text-[16px]">share</span>
             Share
           </button>
         </div>
