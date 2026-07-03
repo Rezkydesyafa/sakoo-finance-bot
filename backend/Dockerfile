@@ -12,10 +12,13 @@ RUN apt-get update \
         libcairo2 \
         libpango-1.0-0 \
         libpangoft2-1.0-0 \
-        libharfbuzz-subset0 \
-        libjpeg62-turbo \
         libffi-dev \
-        shared-mime-info \
+    && apt-get install -y --no-install-recommends \
+        libharfbuzz-subset0 || true \
+    && apt-get install -y --no-install-recommends \
+        libjpeg62-turbo || apt-get install -y --no-install-recommends libjpeg-dev \
+    && apt-get install -y --no-install-recommends \
+        shared-mime-info || true \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
