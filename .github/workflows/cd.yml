@@ -19,17 +19,38 @@ jobs:
     timeout-minutes: 15
 
     steps:
+      - name: Install cloudflared
+        run: |
+          curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb -o cloudflared.deb
+          sudo dpkg -i cloudflared.deb
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+          cat >> ~/.ssh/config << 'EOF'
+          Host ssh.lab-sigma.web.id
+            ProxyCommand cloudflared access ssh --hostname %h --id $CF_ACCESS_CLIENT_ID --secret $CF_ACCESS_CLIENT_SECRET
+            User ${{ secrets.VPS_USER }}
+            IdentityFile ~/.ssh/id_ed25519
+            StrictHostKeyChecking no
+            UserKnownHostsFile /dev/null
+          EOF
+        env:
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+
       - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT }}
-          script: |
+        env:
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: |
+          ssh ssh.lab-sigma.web.id << 'DEPLOY'
             set -e
 
-            cd /home/deploy/sakoo-finance-bot
+            cd ~/sakoo_bot/sakoo-finance-bot
 
             echo "📥 Pulling latest code..."
             git fetch origin main
@@ -37,8 +58,8 @@ jobs:
 
             echo "🔨 Building and restarting containers..."
             cd infra/docker
-            docker compose pull
-            docker compose up -d --build --remove-orphans
+            docker compose --env-file ../../.env pull
+            docker compose --env-file ../../.env up -d --build --remove-orphans
 
             echo "🧹 Cleaning up old images..."
             docker image prune -f
@@ -47,6 +68,7 @@ jobs:
             sleep 10
 
             echo "🏥 Health check..."
-            curl -f http://localhost/health || exit 1
+            curl -f http://localhost:8080/health || exit 1
 
             echo "✅ Deployment successful!"
+          DEPLOY
