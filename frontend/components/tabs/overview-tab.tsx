@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import type { Transaction, ChatMessage } from "@/app/(dashboard)/types";
 import { ConnectedBots } from "@/components/connected-bots";
 import { ChatSimulator } from "@/components/chat-simulator";
@@ -56,9 +59,10 @@ export function OverviewTab({
   quickActionStatus,
   filteredTransactions,
 }: OverviewTabProps) {
+  const [flowType, setFlowType] = useState<"income" | "expense">("income");
   const moneyFlow = buildMoneyFlow(transactions);
   const maxMoneyFlow = Math.max(
-    ...moneyFlow.map((item) => item.income + item.expense),
+    ...moneyFlow.map((item) => item[flowType]),
     1,
   );
 
@@ -155,28 +159,45 @@ export function OverviewTab({
               <p className="text-xs text-[#6F6F6F]">Activity over the last 30 days</p>
             </div>
             <div className="bg-[#F1F2F0] rounded-full p-1 flex">
-              <button className="px-4 py-1.5 rounded-full bg-white card-shadow text-[13px] font-semibold text-[#191919]">Income</button>
-              <button className="px-4 py-1.5 rounded-full text-[13px] font-semibold text-[#6F6F6F] hover:text-[#191919] transition-colors">Expense</button>
+              <button
+                onClick={() => setFlowType("income")}
+                className={`px-4 py-1.5 rounded-full text-[13px] font-semibold transition-colors cursor-pointer border-none ${
+                  flowType === "income"
+                    ? "bg-white shadow-sm text-[#191919]"
+                    : "bg-transparent text-[#6F6F6F] hover:text-[#191919]"
+                }`}
+              >Income</button>
+              <button
+                onClick={() => setFlowType("expense")}
+                className={`px-4 py-1.5 rounded-full text-[13px] font-semibold transition-colors cursor-pointer border-none ${
+                  flowType === "expense"
+                    ? "bg-white shadow-sm text-[#191919]"
+                    : "bg-transparent text-[#6F6F6F] hover:text-[#191919]"
+                }`}
+              >Expense</button>
             </div>
           </div>
           <div className="flex-1 flex items-end justify-between px-4 pb-4">
-            {moneyFlow.map((item) => (
-              <div
-                key={item.key}
-                className="w-8 sm:w-12 bg-[#eeeeec] rounded-t-full relative flex items-end justify-center"
-                style={{ height: `${heightPercent(item.income + item.expense, maxMoneyFlow)}%` }}
-              >
+            {moneyFlow.map((item) => {
+              const value = item[flowType];
+              return (
                 <div
-                  className="absolute w-full bg-[#E0F682] rounded-t-full bottom-0"
-                  style={{ height: `${heightPercent(item.income, item.income + item.expense || 1)}%` }}
-                />
-                {(item.income > 0 || item.expense > 0) && (
-                  <div className="absolute -top-8 bg-[#2A2A2A] text-white text-[10px] sm:text-xs px-2 py-1 rounded-md">
-                    {formatCurrency(item.income - item.expense)}
-                  </div>
-                )}
-              </div>
-            ))}
+                  key={item.key}
+                  className="w-8 sm:w-12 bg-[#eeeeec] rounded-t-full relative flex items-end justify-center"
+                  style={{ height: `${heightPercent(value, maxMoneyFlow)}%` }}
+                >
+                  <div
+                    className={`absolute w-full rounded-t-full bottom-0 ${flowType === "income" ? "bg-[#E0F682]" : "bg-[#FFCDD2]"}`}
+                    style={{ height: value > 0 ? "100%" : "0%" }}
+                  />
+                  {value > 0 && (
+                    <div className="absolute -top-8 bg-[#2A2A2A] text-white text-[10px] sm:text-xs px-2 py-1 rounded-md">
+                      {formatCurrency(value)}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
           <div className="flex justify-between px-2 sm:px-6 text-[10px] sm:text-xs text-[#6F6F6F] uppercase tracking-wider mt-4">
             {moneyFlow.map((item) => <span key={item.key}>{item.label}</span>)}
