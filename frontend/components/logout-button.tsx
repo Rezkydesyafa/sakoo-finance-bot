@@ -1,12 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { clearAuthToken } from "@/lib/auth-storage";
+import { createPortal } from "react-dom";
 
 export function LogoutButton({ className }: { className?: string }) {
   const router = useRouter();
   const [showModal, setShowModal] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   function handleLogout() {
     clearAuthToken();
@@ -24,8 +30,8 @@ export function LogoutButton({ className }: { className?: string }) {
         Sign Out
       </button>
 
-      {showModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200" style={{ margin: 0 }}>
+      {showModal && mounted && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200" style={{ margin: 0 }}>
           <div className="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl animate-in zoom-in-95 duration-200 relative">
             <div className="w-12 h-12 rounded-full flex items-center justify-center mb-4 mx-auto bg-neutral-100 text-[#1a1c1b]">
               <span className="material-symbols-outlined text-2xl">
@@ -49,7 +55,8 @@ export function LogoutButton({ className }: { className?: string }) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

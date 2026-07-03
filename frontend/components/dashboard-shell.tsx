@@ -15,8 +15,6 @@ const navigationItems = [
   { label: "Reports", icon: "bar_chart", href: "/?tab=reports", id: "reports" },
   { label: "Budgets", icon: "account_balance_wallet", href: "/?tab=budgets", id: "budgets" },
   { label: "Receipt Scan", icon: "document_scanner", href: "/?tab=receipt_scan", id: "receipt_scan" },
-  { label: "Bot Channels", icon: "smart_toy", href: "/?tab=integrations", id: "integrations" },
-  { label: "Settings", icon: "settings", href: "/?tab=settings", id: "settings" },
 ];
 
 const mobileNavigationItems = [
@@ -212,17 +210,6 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
             + New Transaction
           </Link>
         </div>
-        
-        <div className="flex flex-col gap-1 border-t border-[#E8E8E8] pt-4 mx-4">
-          <a className="flex items-center gap-3 text-[#5f5e5e] hover:text-[#4e6700] px-4 py-3 transition-colors" href="#">
-            <span className="material-symbols-outlined">headset_mic</span>
-            <span className="text-[13px] font-semibold">Support</span>
-          </a>
-          <div className="px-4 py-3 flex items-center gap-3 text-[#ba1a1a] hover:opacity-80 transition-opacity">
-            <span className="material-symbols-outlined">logout</span>
-            <LogoutButton className="text-[13px] font-semibold text-left" />
-          </div>
-        </div>
       </nav>
 
       {/* TopNavBar */}
@@ -318,22 +305,22 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
       </header>
       
       {/* Mobile Navigation */}
-      <nav className="flex items-center justify-between border-t border-[#E8E8E8] bg-white fixed bottom-0 left-0 right-0 z-50 py-1.5 md:hidden no-scrollbar shadow-[0_-4px_10px_rgba(0,0,0,0.05)] animate-fade-in">
+      <nav className="flex items-center justify-between border-t border-[#E8E8E8] bg-white fixed bottom-0 left-0 right-0 z-50 py-1 px-2 md:hidden no-scrollbar shadow-[0_-4px_12px_rgba(0,0,0,0.04)] rounded-t-[24px] animate-fade-in">
         {mobileNavigationItems.map((item) => {
           const isActive = currentTab === item.id;
           if (item.isScan) {
             return (
-              <div key={item.id} className="flex-1 flex justify-center items-center">
+              <div key={item.id} className="relative flex justify-center items-center w-[72px] shrink-0">
                 <button
                   onClick={() => setIsMobileScanOpen(true)}
                   type="button"
-                  className={`flex items-center justify-center w-12 h-12 rounded-full shadow-md active:scale-95 transition-all duration-200 ${
+                  className={`absolute left-1/2 -translate-x-1/2 -top-[28px] flex items-center justify-center w-[52px] h-[52px] rounded-full shadow-[0_2px_8px_rgba(0,0,0,0.12)] border-[2px] border-white active:scale-95 transition-all duration-200 ${
                     isMobileScanOpen
                       ? "bg-[#4e6700] text-white"
                       : "bg-[#c7ff00] text-[#151f00] hover:bg-[#bff500]"
-                  } border-none`}
+                  }`}
                 >
-                  <span className="material-symbols-outlined text-[24px]" style={isMobileScanOpen ? { fontVariationSettings: '"FILL" 1' } : {}}>{item.icon}</span>
+                  <span className="material-symbols-outlined text-[26px]" style={isMobileScanOpen ? { fontVariationSettings: '"FILL" 1' } : {}}>{item.icon}</span>
                 </button>
               </div>
             );
@@ -343,14 +330,16 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
             <div key={item.label} className="flex-1 flex justify-center items-center">
               <Link
                 href={item.href}
-                className={`flex flex-col items-center justify-center py-1.5 w-full rounded-xl transition duration-150 ${
+                className={`flex flex-col items-center justify-center py-1 w-full rounded-2xl transition duration-150 ${
                   isActive
-                    ? "text-[#4e6700] font-semibold"
-                    : "text-[#6F6F6F] hover:text-[#4e6700]"
+                    ? "text-[#4e6700]"
+                    : "text-[#6F6F6F] opacity-70 hover:opacity-100"
                 }`}
               >
-                <span className="material-symbols-outlined text-xl mb-0.5" style={isActive ? { fontVariationSettings: '"FILL" 1' } : {}}>{item.icon}</span>
-                <span className="text-[9px] font-semibold">{item.label}</span>
+                <div className={`flex items-center justify-center px-3 py-0.5 rounded-full mb-0.5 transition-colors ${isActive ? 'bg-[#c7ff00]/20' : 'bg-transparent'}`}>
+                  <span className="material-symbols-outlined text-[26px]" style={isActive ? { fontVariationSettings: '"FILL" 1' } : {}}>{item.icon}</span>
+                </div>
+                <span className={`text-[10px] font-semibold tracking-tight ${isActive ? 'text-[#4e6700]' : 'text-[#6F6F6F]'}`}>{item.label}</span>
               </Link>
             </div>
           );
@@ -358,7 +347,7 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
       </nav>
 
       {/* Main Content Area */}
-      <main className="md:ml-[240px] pt-20 px-4 pb-20 md:pt-28 md:px-8 md:pb-8 max-w-[1440px] min-h-screen">
+      <main className="md:ml-[240px] pt-28 px-4 pb-32 md:pt-28 md:px-8 md:pb-8 max-w-[1440px] min-h-screen">
         {children}
       </main>
 

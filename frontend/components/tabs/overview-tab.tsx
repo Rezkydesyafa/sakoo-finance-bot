@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import type { Transaction, ChatMessage } from "@/app/(dashboard)/types";
 import { ConnectedBots } from "@/components/connected-bots";
 import { ChatSimulator } from "@/components/chat-simulator";
@@ -155,8 +158,22 @@ export function OverviewTab({
               <p className="text-xs text-[#6F6F6F]">Activity over the last 30 days</p>
             </div>
             <div className="bg-[#F1F2F0] rounded-full p-1 flex">
-              <button className="px-4 py-1.5 rounded-full bg-white card-shadow text-[13px] font-semibold text-[#191919]">Income</button>
-              <button className="px-4 py-1.5 rounded-full text-[13px] font-semibold text-[#6F6F6F] hover:text-[#191919] transition-colors">Expense</button>
+              <button 
+                onClick={() => setFlowType("income")}
+                className={`px-4 py-1.5 rounded-full text-[13px] font-semibold transition-colors cursor-pointer border-none ${
+                  flowType === "income" 
+                    ? "bg-white shadow-sm text-[#191919]" 
+                    : "bg-transparent text-[#6F6F6F] hover:text-[#191919]"
+                }`}
+              >Income</button>
+              <button 
+                onClick={() => setFlowType("expense")}
+                className={`px-4 py-1.5 rounded-full text-[13px] font-semibold transition-colors cursor-pointer border-none ${
+                  flowType === "expense" 
+                    ? "bg-white shadow-sm text-[#191919]" 
+                    : "bg-transparent text-[#6F6F6F] hover:text-[#191919]"
+                }`}
+              >Expense</button>
             </div>
           </div>
           <div className="flex-1 flex items-end justify-between px-4 pb-4">
