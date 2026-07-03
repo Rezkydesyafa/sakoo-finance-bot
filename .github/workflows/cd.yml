@@ -1,0 +1,52 @@
+name: CD
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types:
+      - completed
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    timeout-minutes: 15
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            set -e
+
+            cd /home/deploy/sakoo-finance-bot
+
+            echo "📥 Pulling latest code..."
+            git fetch origin main
+            git reset --hard origin/main
+
+            echo "🔨 Building and restarting containers..."
+            cd infra/docker
+            docker compose pull
+            docker compose up -d --build --remove-orphans
+
+            echo "🧹 Cleaning up old images..."
+            docker image prune -f
+
+            echo "⏳ Waiting for services to start..."
+            sleep 10
+
+            echo "🏥 Health check..."
+            curl -f http://localhost/health || exit 1
+
+            echo "✅ Deployment successful!"
