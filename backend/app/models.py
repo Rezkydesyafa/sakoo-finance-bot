@@ -199,6 +199,10 @@ class Transaction(TimestampMixin, Base):
     receipts: Mapped[list["Receipt"]] = relationship(back_populates="transaction")
     voice_notes: Mapped[list["VoiceNote"]] = relationship(back_populates="transaction")
 
+    @property
+    def category_name(self) -> str | None:
+        return self.category.name if self.category else None
+
     __table_args__ = (
         CheckConstraint("type IN ('income', 'expense')", name="ck_transactions_type"),
         CheckConstraint(

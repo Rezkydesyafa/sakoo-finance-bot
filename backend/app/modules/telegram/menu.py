@@ -1,5 +1,7 @@
 from typing import Any
 
+from app.config import get_settings
+
 
 MENU_BALANCE = "MENU_BALANCE"
 MENU_ADD = "MENU_ADD"
@@ -98,6 +100,17 @@ def build_settings_menu() -> InlineKeyboard:
     )
 
 
+def build_link_menu() -> dict[str, Any]:
+    app_url = get_settings().app_base_url.rstrip("/")
+    return {
+        "inline_keyboard": [
+            [{"text": "Daftar/Login Dashboard", "url": f"{app_url}/register"}],
+            [{"text": "Buka Dashboard", "url": app_url}],
+            [{"text": "Kembali", "callback_data": BACK_HOME}],
+        ]
+    }
+
+
 def _keyboard(rows: list[list[tuple[str, str]]]) -> InlineKeyboard:
     return {
         "inline_keyboard": [
@@ -127,4 +140,3 @@ def callback_data_values() -> set[str]:
 
 def as_reply_markup(markup: InlineKeyboard | None) -> dict[str, Any] | None:
     return markup
-

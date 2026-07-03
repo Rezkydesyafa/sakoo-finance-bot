@@ -15,53 +15,13 @@ import { IntegrationsTab } from "@/components/tabs/integrations-tab";
 import { TransactionModal } from "@/components/add-transaction-modal";
 import type { Transaction, ChatMessage } from "./types";
 
-const initialMockTransactions: Transaction[] = [
-  {
-    id: 1,
-    type: "expense",
-    amount: 108000,
-    category_name: "Belanja",
-    description: "Tinek Detstar T-Shirt",
-    transaction_date: "2026-06-28T12:00:00Z",
-    source: "whatsapp_text",
-  },
-  {
-    id: 2,
-    type: "expense",
-    amount: 3200000,
-    category_name: "Hiburan",
-    description: "Playstation 5 Slim",
-    transaction_date: "2026-06-27T10:00:00Z",
-    source: "telegram_text",
-  },
-  {
-    id: 3,
-    type: "income",
-    amount: 5000000,
-    category_name: "Gaji",
-    description: "Gaji Bulanan Freelance",
-    transaction_date: "2026-06-25T09:00:00Z",
-    source: "dashboard_manual",
-  },
-  {
-    id: 4,
-    type: "expense",
-    amount: 45000,
-    category_name: "Makanan",
-    description: "Makan Siang Nasi Padang",
-    transaction_date: "2026-06-28T14:30:00Z",
-    source: "receipt_ocr",
-  },
-];
-
 export default function Home() {
   const searchParams = useSearchParams();
   const activeTab = searchParams.get("tab") || "overview";
 
-  const [userName, setUserName] = useState("Kevin Merico");
-  const [userEmail, setUserEmail] = useState("kevin.merico@example.com");
-  const [userPhone, setUserPhone] = useState("+62 812 3456 7890");
-  const [transactions, setTransactions] = useState<Transaction[]>(initialMockTransactions);
+  const [userId, setUserId] = useState<number | null>(null);
+  const [userName, setUserName] = useState("User");
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [expenseFilterType, setExpenseFilterType] = useState<"all" | "income" | "expense">("all");
   const [quickActionLoading, setQuickActionLoading] = useState<TransactionType | null>(null);
@@ -80,7 +40,7 @@ export default function Home() {
     {
       id: 1,
       sender: "bot",
-      text: "Halo! Saya Sakoo, asisten keuangan pribadimu.\n\nKamu bisa mencatat transaksi langsung dari sini. Coba ketik:\n• 'beli bakso 25rb'\n• 'gaji masuk 3.5jt'\n• 'laporan'\n• 'bantuan'",
+      text: "Halo! Saya Sakoo, asisten keuangan pribadimu.\n\nKamu bisa mencatat transaksi langsung dari sini. Coba ketik:\n- 'beli bakso 25rb'\n- 'gaji masuk 3.5jt'\n- 'laporan'\n- 'bantuan'",
       time: "Baru saja",
     },
   ]);
@@ -119,9 +79,8 @@ export default function Home() {
     if (token) {
       apiClient.me(token)
         .then((user) => {
+          setUserId(user.id);
           if (user.name) setUserName(user.name);
-          if (user.email) setUserEmail(user.email);
-          if (user.phone_number) setUserPhone(user.phone_number);
         })
         .catch((error) => {
           if (isAuthExpiredError(error)) {
@@ -164,18 +123,18 @@ export default function Home() {
     const cats: Record<string, number> = {};
     transactions.forEach(t => {
       if (t.type === "expense") {
-        cats[t.category_name] = (cats[t.category_name] || 0) + 1;
+        cats[t.category_name] = (cats[t.category_name] || 0) + t.amount;
       }
     });
     const sorted = Object.entries(cats).sort((a, b) => b[1] - a[1]);
     const items = sorted.slice(0, 4);
+    const colors = ["#9BE634", "#84cc16", "#4d7c0f", "#bef264"];
 
-    return [
-      { name: items[0]?.[0] || "Makanan", value: items[0]?.[1] * 80 || 3572, color: "#9BE634" },
-      { name: items[1]?.[0] || "Belanja", value: items[1]?.[1] * 60 || 2435, color: "#84cc16" },
-      { name: items[2]?.[0] || "Tagihan", value: items[2]?.[1] * 40 || 764, color: "#4d7c0f" },
-      { name: items[3]?.[0] || "Transportasi", value: items[3]?.[1] * 20 || 142, color: "#bef264" },
-    ];
+    return items.map(([name, value], index) => ({
+      name,
+      value,
+      color: colors[index] ?? "#bef264",
+    }));
   }, [transactions]);
 
   function formatCurrency(val: number) {
@@ -244,16 +203,45 @@ export default function Home() {
     setTransactions(res.items.map(item => toDashboardTransaction(item)));
   }
 
-  const [isExporting, setIsExporting] = useState(false);
-  function handleDownloadPDF() {
-    setIsExporting(true);
-    setTimeout(() => {
-      setIsExporting(false);
-      alert("Laporan PDF Keuangan Sakoo berhasil diunduh.");
-    }, 1500);
+  function appendBotMessage(text: string) {
+    const botReply: ChatMessage = {
+      id: Date.now() + 2,
+      sender: "bot",
+      text,
+      time: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
+    };
+    setChatMessages(prev => [...prev, botReply]);
   }
 
-  function handleSendChatMessage() {
+  const [isExporting, setIsExporting] = useState(false);
+  async function handleDownloadPDF() {
+    const token = getStoredAuthToken();
+    if (!token) {
+      alert("Silakan login terlebih dahulu.");
+      window.location.href = "/login?next=/";
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      const response = await apiClient.reports.pdfGenerate(token, {
+        period: "month",
+        generated_from: "dashboard",
+      });
+      const link = document.createElement("a");
+      link.href = response.download_url;
+      link.download = "";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch {
+      alert("Gagal membuat laporan PDF.");
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
+  async function handleSendChatMessage() {
     if (!chatInput.trim()) return;
     const text = chatInput;
     const userMsg: ChatMessage = {
@@ -266,72 +254,21 @@ export default function Home() {
     setChatMessages(prev => [...prev, userMsg]);
     setChatInput("");
 
-    setTimeout(() => {
-      const clean = text.toLowerCase().trim();
-      const parseAmount = (str: string): number => {
-        let multiplier = 1;
-        if (str.includes("juta") || str.includes("jt")) multiplier = 1000000;
-        else if (str.includes("ribu") || str.includes("rb") || str.includes("k")) multiplier = 1000;
-        const numMatch = str.match(/\d+(?:[.,]\d+)?/);
-        if (!numMatch) return 0;
-        const val = parseFloat(numMatch[0].replace(",", "."));
-        return val * multiplier;
-      };
+    const token = getStoredAuthToken();
+    if (!token) {
+      appendBotMessage("Silakan login terlebih dahulu agar Sakoo bisa mencatat transaksi ke dashboard.");
+      return;
+    }
 
-      let replyText = "";
-      if (clean.includes("beli") || clean.includes("bayar") || clean.includes("pengeluaran")) {
-        const amount = parseAmount(clean);
-        if (amount === 0) {
-          replyText = "Maaf, nominal tidak terbaca. Contoh: 'beli kopi 15rb'.";
-        } else {
-          let category = "Makanan";
-          if (clean.includes("baju") || clean.includes("kaos") || clean.includes("belanja")) category = "Belanja";
-          else if (clean.includes("bensin") || clean.includes("gojek")) category = "Transportasi";
-          else if (clean.includes("listrik") || clean.includes("kos")) category = "Tagihan";
-
-          const newTransaction: Transaction = {
-            id: Date.now() + 1,
-            type: "expense",
-            amount,
-            category_name: category,
-            description: text.replace(/beli|bayar|pengeluaran/gi, "").trim() || "Pengeluaran Baru",
-            transaction_date: new Date().toISOString(),
-            source: "whatsapp_text",
-          };
-          setTransactions(prev => [newTransaction, ...prev]);
-          replyText = `Transaksi dicatat: ${formatCurrency(amount)} kategori ${category}`;
-        }
-      } else if (clean.includes("gaji") || clean.includes("masuk") || clean.includes("pemasukan")) {
-        const amount = parseAmount(clean);
-        if (amount === 0) {
-          replyText = "Maaf, nominal pemasukan tidak terbaca. Contoh: 'gaji masuk 3.5 juta'.";
-        } else {
-          const newTransaction: Transaction = {
-            id: Date.now() + 1,
-            type: "income",
-            amount,
-            category_name: "Gaji",
-            description: text.replace(/gaji|masuk|pemasukan/gi, "").trim() || "Pemasukan Baru",
-            transaction_date: new Date().toISOString(),
-            source: "whatsapp_text",
-          };
-          setTransactions(prev => [newTransaction, ...prev]);
-          replyText = `Pemasukan dicatat: ${formatCurrency(amount)}`;
-        }
-      } else if (clean.includes("laporan") || clean.includes("saldo")) {
-        replyText = `Saldo Anda: ${formatCurrency(totalBalance)}\nPemasukan: ${formatCurrency(totalIncome)}\nPengeluaran: ${formatCurrency(totalExpense)}`;
-      } else {
-        replyText = "Ketik cth:\n• 'beli bensin 25rb'\n• 'gaji masuk 3jt'\n• 'laporan'";
+    try {
+      const result = await apiClient.transactions.parseText(token, { text });
+      appendBotMessage(result.reply_text);
+      if (result.transaction_id !== null) {
+        await refreshTransactions(token);
       }
-
-      const botReply: ChatMessage = {
-        id: Date.now() + 2,
-        sender: "bot",
-        text: replyText,
-        time: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
-      };
-      setChatMessages(prev => [...prev, botReply]);
-    }, 800);
+    } catch {
+      appendBotMessage("Maaf, dashboard belum bisa menghubungi backend. Coba lagi sebentar.");
+    }
   }
 
   async function handleSaveModalTransaction(data: { type: "income" | "expense"; title: string; amount: number }) {
@@ -388,9 +325,14 @@ export default function Home() {
   };
 
   // Receipt scanning handlers (Desktop)
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const token = getStoredAuthToken();
+    if (!token) {
+      alert("Silakan login terlebih dahulu.");
+      return;
+    }
 
     const reader = new FileReader();
     reader.onloadend = () => {
@@ -406,15 +348,25 @@ export default function Home() {
       amount: 0,
     });
 
-    setTimeout(() => {
+    try {
+      const media = await apiClient.media.upload(token, file, "receipt", "dashboard_upload");
+      const queued = await apiClient.ocr.runReceipt(token, media.id);
+      const job = await waitForJob(token, queued.job.id);
+      if (!job.result_id) {
+        throw new Error(job.error_message || "OCR tidak menghasilkan data.");
+      }
+      const receipt = await apiClient.ocr.receiptResult(token, job.result_id);
       setScanStatus("completed");
       setScannedData({
-        merchant: "Starbucks Coffee",
-        date: new Date().toISOString().split("T")[0],
-        category: "Makanan",
-        amount: 85000,
+        merchant: receipt.merchant_name || "Struk",
+        date: receipt.receipt_date || formatLocalDate(new Date()),
+        category: "Lainnya",
+        amount: Number(receipt.total_amount || 0),
       });
-    }, 2500);
+    } catch (error) {
+      setScanStatus("idle");
+      alert(error instanceof Error ? error.message : "Gagal memproses OCR struk.");
+    }
   };
 
   const handleCancelReceipt = () => {
@@ -437,9 +389,9 @@ export default function Home() {
         amount: scannedData.amount,
         description: scannedData.merchant,
         transaction_date: scannedData.date,
-      }).then(() => {
+      }).then(async () => {
         handleCancelReceipt();
-        window.location.reload();
+        await refreshTransactions(token);
       }).catch(() => {
         alert("Failed to save transaction.");
       });
@@ -455,9 +407,11 @@ export default function Home() {
         {(activeTab === "overview" || activeTab === "settings") && (
           <OverviewTab
             userName={userName}
+            accountId={userId ? `SAKOO-${String(userId).padStart(6, "0")}` : "SAKOO"}
             totalBalance={totalBalance}
             totalIncome={totalIncome}
             totalExpense={totalExpense}
+            transactions={transactions}
             formatCurrency={formatCurrency}
             handleDownloadPDF={handleDownloadPDF}
             isExporting={isExporting}
@@ -594,6 +548,19 @@ function formatLocalDate(date: Date): string {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+async function waitForJob(token: string, jobId: number) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const job = await apiClient.jobs.get(token, jobId);
+    if (job.status === "completed") return job;
+    if (job.status === "failed") {
+      throw new Error(job.error_message || "Job OCR gagal.");
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+  }
+
+  throw new Error("OCR masih diproses. Coba cek lagi beberapa saat.");
 }
 
 function isAuthExpiredError(error: unknown): boolean {

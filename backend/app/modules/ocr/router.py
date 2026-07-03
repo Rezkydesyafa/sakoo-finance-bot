@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import User
+from app.models import Receipt, User
 from app.modules.auth.dependencies import get_current_user
 from app.modules.jobs.service import (
     JobQueueError,
@@ -12,7 +12,7 @@ from app.modules.jobs.service import (
     get_receipt_ocr_enqueue,
     queue_receipt_ocr_job,
 )
-from app.modules.ocr.schemas import ReceiptOcrJobResponse
+from app.modules.ocr.schemas import ReceiptOcrJobResponse, ReceiptOcrResponse
 
 
 router = APIRouter(prefix="/ocr", tags=["ocr"])
@@ -41,3 +41,18 @@ def run_receipt_ocr(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
     return ReceiptOcrJobResponse(job=job)
+
+
+@router.get("/receipts/results/{receipt_id}", response_model=ReceiptOcrResponse)
+def get_receipt_ocr_result(
+    receipt_id: int,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> Receipt:
+    receipt = db.get(Receipt, receipt_id)
+    if receipt is None or receipt.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Receipt OCR result not found",
+        )
+    return receipt

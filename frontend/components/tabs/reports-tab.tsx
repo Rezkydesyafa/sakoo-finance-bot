@@ -26,20 +26,15 @@ export function ReportsTab({
   const [selectedTime, setSelectedTime] = useState("Bulan Ini");
   const timeOptions = ["Hari Ini", "Minggu Ini", "Bulan Ini", "Custom"];
 
-  const displayIncome = totalIncome > 0 ? totalIncome : 24500000;
-  const displayExpense = totalExpense > 0 ? totalExpense : 12800000;
-  const displayBalance = totalBalance !== 0 ? totalBalance : 11700000;
+  const displayIncome = totalIncome;
+  const displayExpense = totalExpense;
+  const displayBalance = totalBalance;
 
-  const savingRate = totalIncome > 0 ? Math.round((totalBalance / totalIncome) * 100) : 48;
+  const savingRate = totalIncome > 0 ? Math.round((totalBalance / totalIncome) * 100) : 0;
   const savingRateClamped = Math.max(0, Math.min(100, savingRate));
   const strokeDash = `${(savingRateClamped / 100) * 100} 100`;
 
-  const weeklyData = [
-    { label: "W1", income: "8.0M", expense: "5.0M", incHeight: "h-[40%]", expHeight: "h-[25%]" },
-    { label: "W2", income: "6.0M", expense: "9.0M", incHeight: "h-[30%]", expHeight: "h-[45%]" },
-    { label: "W3", income: "16.0M", expense: "7.0M", incHeight: "h-[80%]", expHeight: "h-[35%]" },
-    { label: "W4", income: "12.0M", expense: "11.0M", incHeight: "h-[60%]", expHeight: "h-[55%]" },
-  ];
+  const weeklyData = buildWeeklyData(transactions, formatCurrency);
 
   const categoryReportsList = transactions.length > 0 && categoryStats.length > 0
     ? categoryStats.map((c, i) => {
@@ -52,12 +47,7 @@ export function ReportsTab({
           colorClass: i === 0 ? "bg-[#c7ff00]" : i === 1 ? "bg-[#2A2A2A]" : "bg-neutral-300"
         };
       })
-    : [
-        { name: "Makanan", displayValue: "Rp4.2M", widthPercent: 70, icon: "restaurant", colorClass: "bg-[#c7ff00]" },
-        { name: "Transportasi", displayValue: "Rp1.5M", widthPercent: 35, icon: "commute", colorClass: "bg-[#2A2A2A]" },
-        { name: "Tagihan", displayValue: "Rp3.2M", widthPercent: 55, icon: "receipt", colorClass: "bg-neutral-300" },
-        { name: "Belanja", displayValue: "Rp2.1M", widthPercent: 40, icon: "shopping_bag", colorClass: "bg-neutral-300" },
-      ];
+    : [];
 
   return (
     <div className="space-y-6">
@@ -133,7 +123,7 @@ export function ReportsTab({
                 </div>
                 <div>
                   <div className="text-[11px] font-semibold text-white">Saving Rate</div>
-                  <div className="text-[9px] text-neutral-400">On track for goal</div>
+                <div className="text-[9px] text-neutral-400">Dari data transaksi</div>
                 </div>
               </div>
             </div>
@@ -160,10 +150,10 @@ export function ReportsTab({
               <div className="w-full h-full flex items-end justify-around ml-8">
                 {weeklyData.map((w, idx) => (
                   <div key={idx} className="flex items-end gap-1.5 group h-full">
-                    <div className={`w-6 md:w-8 rounded-t-lg bg-[#c7ff00] hover:opacity-90 transition-opacity ${w.incHeight} relative`}>
+                    <div className="w-6 md:w-8 rounded-t-lg bg-[#c7ff00] hover:opacity-90 transition-opacity relative" style={{ height: `${w.incomeHeight}%` }}>
                       <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-[#2A2A2A] text-white text-[9px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">{w.income}</div>
                     </div>
-                    <div className={`w-6 md:w-8 rounded-t-lg bg-neutral-200 hover:bg-neutral-300 transition-colors ${w.expHeight} relative`}>
+                    <div className="w-6 md:w-8 rounded-t-lg bg-neutral-200 hover:bg-neutral-300 transition-colors relative" style={{ height: `${w.expenseHeight}%` }}>
                       <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-[#2A2A2A] text-white text-[9px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">{w.expense}</div>
                     </div>
                   </div>
@@ -190,7 +180,9 @@ export function ReportsTab({
               <div>
                 <h4 className="text-sm font-bold text-[#1a1c1b] mb-1">Sakoo Insight</h4>
                 <p className="text-xs text-[#6F6F6F] leading-relaxed">
-                  Pengeluaran <strong className="text-[#1a1c1b]">makanan naik 18%</strong> bulan ini. Coba batasi jajan di luar untuk mencapai target menabungmu!
+                  {categoryStats[0]
+                    ? <>Kategori pengeluaran terbesar: <strong className="text-[#1a1c1b]">{categoryStats[0].name}</strong>.</>
+                    : "Belum ada transaksi untuk dibuat insight."}
                 </p>
               </div>
             </div>
@@ -214,6 +206,9 @@ export function ReportsTab({
                     </div>
                   </div>
                 ))}
+                {categoryReportsList.length === 0 && (
+                  <p className="text-xs text-[#6F6F6F]">Belum ada pengeluaran.</p>
+                )}
               </div>
             </div>
 
@@ -243,4 +238,50 @@ export function ReportsTab({
       </div>
     </div>
   );
+}
+
+function buildWeeklyData(
+  transactions: Transaction[],
+  formatCurrency: (val: number) => string,
+) {
+  const weeks = Array.from({ length: 4 }, (_, index) => ({
+    label: `W${index + 1}`,
+    incomeValue: 0,
+    expenseValue: 0,
+  }));
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+
+  transactions.forEach((transaction) => {
+    const date = new Date(transaction.transaction_date);
+    if (date.getMonth() !== currentMonth || date.getFullYear() !== currentYear) {
+      return;
+    }
+
+    const weekIndex = Math.min(3, Math.floor((date.getDate() - 1) / 7));
+    if (transaction.type === "income") {
+      weeks[weekIndex].incomeValue += transaction.amount;
+    } else {
+      weeks[weekIndex].expenseValue += transaction.amount;
+    }
+  });
+
+  const max = Math.max(
+    ...weeks.map((week) => Math.max(week.incomeValue, week.expenseValue)),
+    1,
+  );
+
+  return weeks.map((week) => ({
+    label: week.label,
+    income: formatCurrency(week.incomeValue),
+    expense: formatCurrency(week.expenseValue),
+    incomeHeight: barHeight(week.incomeValue, max),
+    expenseHeight: barHeight(week.expenseValue, max),
+  }));
+}
+
+function barHeight(value: number, max: number): number {
+  if (value <= 0) return 4;
+  return Math.max(8, Math.round((value / max) * 100));
 }

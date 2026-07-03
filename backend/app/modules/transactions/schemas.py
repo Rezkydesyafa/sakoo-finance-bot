@@ -32,11 +32,27 @@ class TransactionUpdateRequest(BaseModel):
         return normalized or None
 
 
+class TransactionTextParseRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=500)
+
+    @field_validator("text")
+    @classmethod
+    def normalize_text(cls, value: str) -> str:
+        return value.strip()
+
+
+class TransactionTextParseResponse(BaseModel):
+    status: str
+    reply_text: str
+    transaction_id: int | None = None
+
+
 class TransactionResponse(BaseModel):
     id: int
     type: str
     amount: Decimal
     category_id: int | None
+    category_name: str | None
     description: str | None
     transaction_date: date
     source: str

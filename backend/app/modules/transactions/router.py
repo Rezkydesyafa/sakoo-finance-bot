@@ -17,8 +17,11 @@ from app.modules.transactions.schemas import (
     TransactionCreateRequest,
     TransactionListResponse,
     TransactionResponse,
+    TransactionTextParseRequest,
+    TransactionTextParseResponse,
     TransactionUpdateRequest,
 )
+from app.modules.transactions.service import handle_text_transaction
 
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
@@ -109,6 +112,26 @@ def query_transaction_history(
         ),
     )
     return _to_list_response(result)
+
+
+@router.post("/parse", response_model=TransactionTextParseResponse)
+def parse_transaction_text_from_dashboard(
+    payload: TransactionTextParseRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> TransactionTextParseResponse:
+    result = handle_text_transaction(
+        db=db,
+        user_id=current_user.id,
+        text=payload.text,
+        source="dashboard_manual",
+    )
+    db.commit()
+    return TransactionTextParseResponse(
+        status=result.status,
+        reply_text=result.reply_text,
+        transaction_id=result.transaction_id,
+    )
 
 
 def _to_list_response(result: TransactionQueryResult) -> TransactionListResponse:

@@ -5,9 +5,11 @@ import Link from "next/link";
 
 type OverviewTabProps = {
   userName: string;
+  accountId: string;
   totalBalance: number;
   totalIncome: number;
   totalExpense: number;
+  transactions: Transaction[];
   formatCurrency: (val: number) => string;
   handleDownloadPDF: () => void;
   isExporting: boolean;
@@ -36,9 +38,11 @@ const CategoryIcon = ({ name }: { name: string }) => {
 
 export function OverviewTab({
   userName,
+  accountId,
   totalBalance,
   totalIncome,
   totalExpense,
+  transactions,
   formatCurrency,
   handleDownloadPDF,
   isExporting,
@@ -52,6 +56,12 @@ export function OverviewTab({
   quickActionStatus,
   filteredTransactions,
 }: OverviewTabProps) {
+  const moneyFlow = buildMoneyFlow(transactions);
+  const maxMoneyFlow = Math.max(
+    ...moneyFlow.map((item) => item.income + item.expense),
+    1,
+  );
+
   return (
     <div className="grid grid-cols-12 gap-6">
       {/* Left Area (8 cols) */}
@@ -72,7 +82,7 @@ export function OverviewTab({
             <div className="flex justify-between items-start relative z-10">
               <span className="text-sm text-gray-300">Total Balance</span>
               <span className="bg-[#c7ff00] text-[#151f00] text-[13px] font-semibold px-3 py-1 rounded-full flex items-center gap-1">
-                <span className="material-symbols-outlined text-[14px]">trending_up</span> +12.4%
+                <span className="material-symbols-outlined text-[14px]">receipt_long</span> {transactions.length} tx
               </span>
             </div>
             <div className="relative z-10">
@@ -81,7 +91,7 @@ export function OverviewTab({
             <div className="flex justify-between items-end relative z-10 text-sm text-gray-400">
               <div>
                 <span className="block text-xs uppercase tracking-wider mb-1">Account ID</span>
-                SAKO-992-104
+                {accountId}
               </div>
               <div className="flex -space-x-2">
                 <div className="w-6 h-6 rounded-full bg-gray-400 opacity-80"></div>
@@ -150,19 +160,26 @@ export function OverviewTab({
             </div>
           </div>
           <div className="flex-1 flex items-end justify-between px-4 pb-4">
-            <div className="w-8 sm:w-12 h-[30%] bg-[#eeeeec] rounded-t-full relative flex items-end justify-center"><div className="absolute w-full h-[60%] bg-[#E0F682] rounded-t-full bottom-0"></div></div>
-            <div className="w-8 sm:w-12 h-[40%] bg-[#eeeeec] rounded-t-full relative flex items-end justify-center"><div className="absolute w-full h-[70%] bg-[#E0F682] rounded-t-full bottom-0"></div></div>
-            <div className="w-8 sm:w-12 h-[70%] bg-[#eeeeec] rounded-t-full relative flex items-end justify-center"><div className="absolute w-full h-[50%] bg-[#E0F682] rounded-t-full bottom-0"></div></div>
-            <div className="w-8 sm:w-12 h-[100%] bg-[#eeeeec] rounded-t-full relative flex items-end justify-center">
-              <div className="absolute w-full h-[85%] bg-[#c7ff00] rounded-t-full bottom-0"></div>
-              <div className="absolute -top-8 bg-[#2A2A2A] text-white text-[10px] sm:text-xs px-2 py-1 rounded-md">Rp14m</div>
-            </div>
-            <div className="w-8 sm:w-12 h-[50%] bg-[#eeeeec] rounded-t-full relative flex items-end justify-center"><div className="absolute w-full h-[65%] bg-[#E0F682] rounded-t-full bottom-0"></div></div>
-            <div className="w-8 sm:w-12 h-[35%] bg-[#eeeeec] rounded-t-full relative flex items-end justify-center"><div className="absolute w-full h-[80%] bg-[#E0F682] rounded-t-full bottom-0"></div></div>
-            <div className="w-8 sm:w-12 h-[45%] bg-[#eeeeec] rounded-t-full relative flex items-end justify-center"><div className="absolute w-full h-[90%] bg-[#E0F682] rounded-t-full bottom-0"></div></div>
+            {moneyFlow.map((item) => (
+              <div
+                key={item.key}
+                className="w-8 sm:w-12 bg-[#eeeeec] rounded-t-full relative flex items-end justify-center"
+                style={{ height: `${heightPercent(item.income + item.expense, maxMoneyFlow)}%` }}
+              >
+                <div
+                  className="absolute w-full bg-[#E0F682] rounded-t-full bottom-0"
+                  style={{ height: `${heightPercent(item.income, item.income + item.expense || 1)}%` }}
+                />
+                {(item.income > 0 || item.expense > 0) && (
+                  <div className="absolute -top-8 bg-[#2A2A2A] text-white text-[10px] sm:text-xs px-2 py-1 rounded-md">
+                    {formatCurrency(item.income - item.expense)}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
           <div className="flex justify-between px-2 sm:px-6 text-[10px] sm:text-xs text-[#6F6F6F] uppercase tracking-wider mt-4">
-            <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+            {moneyFlow.map((item) => <span key={item.key}>{item.label}</span>)}
           </div>
         </div>
       </div>
@@ -209,4 +226,43 @@ export function OverviewTab({
       </div>
     </div>
   );
+}
+
+function buildMoneyFlow(transactions: Transaction[]) {
+  const days = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date();
+    date.setDate(date.getDate() - (6 - index));
+    const key = formatDateKey(date);
+    return {
+      key,
+      label: date.toLocaleDateString("id-ID", { weekday: "short" }),
+      income: 0,
+      expense: 0,
+    };
+  });
+  const byDate = new Map(days.map((day) => [day.key, day]));
+
+  transactions.forEach((transaction) => {
+    const day = byDate.get(formatDateKey(new Date(transaction.transaction_date)));
+    if (!day) return;
+    if (transaction.type === "income") {
+      day.income += transaction.amount;
+    } else {
+      day.expense += transaction.amount;
+    }
+  });
+
+  return days;
+}
+
+function formatDateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function heightPercent(value: number, max: number): number {
+  if (value <= 0) return 8;
+  return Math.max(12, Math.round((value / max) * 100));
 }
