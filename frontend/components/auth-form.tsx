@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useState, useEffect } from "react";
 import { ApiError, apiClient } from "@/lib/api";
-import { saveAuthToken } from "@/lib/auth-storage";
+import { saveAuthToken, getStoredAuthToken } from "@/lib/auth-storage";
 
 type AuthMode = "login" | "register";
 
@@ -25,6 +25,12 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isRegister = mode === "register";
+
+  useEffect(() => {
+    if (getStoredAuthToken()) {
+      router.replace("/");
+    }
+  }, [router]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -49,8 +55,7 @@ export function AuthForm({ mode }: AuthFormProps) {
 
       const token = await apiClient.login({ email, password });
       saveAuthToken(token.access_token);
-      router.replace(getNextPath());
-      router.refresh();
+      window.location.href = "/";
     } catch (submitError) {
       setError(getAuthErrorMessage(submitError));
     } finally {

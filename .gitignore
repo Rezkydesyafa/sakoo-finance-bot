@@ -25,6 +25,9 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Capacitor / Android
+frontend/android/
+
 # Docker and local runtime
 *.pid
 *.log

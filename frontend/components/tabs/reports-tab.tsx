@@ -97,22 +97,26 @@ export function ReportsTab({
         <div className="lg:col-span-8 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
             <div className="bg-white rounded-[24px] p-6 card-shadow hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between">
-              <div className="flex items-center gap-2 mb-2 text-[#6F6F6F]">
-                <span className="material-symbols-outlined text-[#5FCF6A] bg-[#5FCF6A]/10 p-1.5 rounded-full text-[18px]">arrow_downward</span>
-                <span className="text-xs font-semibold">Total Pemasukan</span>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-[#5FCF6A]/10 flex items-center justify-center text-[#5FCF6A]">
+                  <span className="material-symbols-outlined text-[20px]">arrow_downward</span>
+                </div>
+                <span className="text-sm font-semibold text-[#6F6F6F]">Total Pemasukan</span>
               </div>
-              <div className="text-xl font-bold text-[#1a1c1b] mb-2">{formatCurrency(displayIncome)}</div>
+              <div className="text-2xl font-bold text-[#1a1c1b] mb-2">{formatCurrency(displayIncome)}</div>
               <div className="inline-flex items-center gap-1 bg-[#5FCF6A]/10 text-[#5FCF6A] px-2 py-0.5 rounded-full text-[11px] font-semibold w-fit">
                 <span className="material-symbols-outlined text-[13px]">trending_up</span> +12%
               </div>
             </div>
 
             <div className="bg-white rounded-[24px] p-6 card-shadow hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between">
-              <div className="flex items-center gap-2 mb-2 text-[#6F6F6F]">
-                <span className="material-symbols-outlined text-[#EF6B6B] bg-[#EF6B6B]/10 p-1.5 rounded-full text-[18px]">arrow_upward</span>
-                <span className="text-xs font-semibold">Total Pengeluaran</span>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-[#EF6B6B]/10 flex items-center justify-center text-[#EF6B6B]">
+                  <span className="material-symbols-outlined text-[20px]">arrow_upward</span>
+                </div>
+                <span className="text-sm font-semibold text-[#6F6F6F]">Total Pengeluaran</span>
               </div>
-              <div className="text-xl font-bold text-[#1a1c1b] mb-2">{formatCurrency(displayExpense)}</div>
+              <div className="text-2xl font-bold text-[#1a1c1b] mb-2">{formatCurrency(displayExpense)}</div>
               <div className="inline-flex items-center gap-1 bg-[#5FCF6A]/10 text-[#5FCF6A] px-2 py-0.5 rounded-full text-[11px] font-semibold w-fit">
                 <span className="material-symbols-outlined text-[13px]">trending_down</span> -5%
               </div>
@@ -196,18 +200,27 @@ export function ReportsTab({
             </div>
           </div>
 
-          <div className="bg-white rounded-[24px] p-6 card-shadow flex flex-col justify-between">
+          <div className="bg-white rounded-[24px] card-shadow flex flex-col justify-between overflow-hidden">
             <div>
-              <h3 className="text-sm font-bold text-[#1a1c1b] mb-6">Spending by Category</h3>
-              <div className="space-y-5">
+              <div className="px-6 py-5 border-b border-[#E8E8E8]">
+                <h3 className="text-[15px] font-semibold text-[#1a1c1b]">Spending by Category</h3>
+              </div>
+              <div className="divide-y divide-[#E8E8E8]/50">
                 {categoryReportsList.map((c, i) => (
-                  <div key={i}>
-                    <div className="flex justify-between items-center mb-1.5">
-                      <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-[18px] text-[#5f5e5e]">{c.icon}</span>
-                        <span className="text-xs font-semibold text-[#1a1c1b]">{c.name}</span>
+                  <div key={i} className="px-6 py-4 hover:bg-[#F1F2F0]/30 transition-colors group">
+                    <div className="flex justify-between items-center mb-3">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-[#F1F2F0] flex items-center justify-center text-[#6F6F6F] transition-all group-hover:bg-white group-hover:shadow-sm">
+                          <span className="material-symbols-outlined text-[20px]">{c.icon}</span>
+                        </div>
+                        <div>
+                          <span className="text-sm font-semibold text-[#1a1c1b] block">{c.name}</span>
+                          <span className="text-xs text-[#6F6F6F] mt-0.5 block">{c.widthPercent}% of total</span>
+                        </div>
                       </div>
-                      <span className="text-xs font-bold text-[#1a1c1b]">{c.displayValue}</span>
+                      <div className="text-right">
+                        <span className="text-[15px] font-bold text-[#1a1c1b]">{c.displayValue}</span>
+                      </div>
                     </div>
                     <div className="w-full bg-[#F1F2F0] rounded-full h-2">
                       <div className={`${c.colorClass} h-2 rounded-full`} style={{ width: `${c.widthPercent}%` }}></div>
@@ -217,9 +230,11 @@ export function ReportsTab({
               </div>
             </div>
 
-            <button className="w-full mt-6 py-2.5 border border-[#E8E8E8] text-[#1a1c1b] text-xs font-semibold rounded-full hover:bg-[#F1F2F0] transition-colors border-solid bg-transparent cursor-pointer">
-              View All Categories
-            </button>
+            <div className="p-6 pt-2">
+              <button className="w-full py-2.5 border border-[#E8E8E8] text-[#1a1c1b] text-xs font-semibold rounded-full hover:bg-[#F1F2F0] transition-colors border-solid bg-transparent cursor-pointer">
+                View All Categories
+              </button>
+            </div>
           </div>
         </div>
       </div>

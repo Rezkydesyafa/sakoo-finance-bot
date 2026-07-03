@@ -31,7 +31,7 @@ export function IntegrationsTab() {
         {/* Active Integrations Grid */}
         <div className="grid grid-cols-3 gap-6">
           {/* Telegram Card */}
-          <div className="bg-white rounded-2xl p-6 card-shadow border border-[#E8E8E8] relative overflow-hidden group hover:scale-[1.02] transition-all duration-300">
+          <div className="bg-white rounded-[24px] p-6 card-shadow border border-[#E8E8E8] relative overflow-hidden group hover:scale-[1.02] transition-all duration-300">
             <div className="absolute top-0 right-0 w-24 h-24 bg-[#0088cc]/5 rounded-bl-full pointer-events-none"></div>
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">
@@ -65,7 +65,7 @@ export function IntegrationsTab() {
           </div>
 
           {/* WhatsApp Card */}
-          <div className="bg-white rounded-2xl p-6 card-shadow border border-[#E8E8E8] relative overflow-hidden group hover:scale-[1.02] transition-all duration-300">
+          <div className="bg-white rounded-[24px] p-6 card-shadow border border-[#E8E8E8] relative overflow-hidden group hover:scale-[1.02] transition-all duration-300">
             <div className="absolute top-0 right-0 w-24 h-24 bg-[#25D366]/5 rounded-bl-full pointer-events-none"></div>
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">
@@ -99,7 +99,7 @@ export function IntegrationsTab() {
           </div>
 
           {/* Discord Card */}
-          <div className="bg-white rounded-2xl p-6 card-shadow border border-[#E8E8E8] relative overflow-hidden group hover:scale-[1.02] transition-all duration-300">
+          <div className="bg-white rounded-[24px] p-6 card-shadow border border-[#E8E8E8] relative overflow-hidden group hover:scale-[1.02] transition-all duration-300">
             <div className="absolute top-0 right-0 w-24 h-24 bg-[#5865F2]/5 rounded-bl-full pointer-events-none"></div>
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">
@@ -134,7 +134,7 @@ export function IntegrationsTab() {
         </div>
 
         {/* Command Settings */}
-        <div className="bg-white rounded-2xl p-6 card-shadow border border-[#E8E8E8] mt-8">
+        <div className="bg-white rounded-[24px] p-6 card-shadow border border-[#E8E8E8] mt-8">
           <div className="flex items-center justify-between mb-6 pb-4 border-b border-[#E8E8E8]">
             <div>
               <h3 className="text-base font-bold text-[#1a1c1b]">Command Settings</h3>
@@ -224,7 +224,7 @@ export function IntegrationsTab() {
           <h3 className="text-xs font-semibold text-[#6F6F6F] px-1 uppercase tracking-wider">Active Integrations</h3>
 
           {/* Telegram Card (Dark Forest Green/Grey style exactly matching mockup) */}
-          <div className="bg-[#20221E] text-white rounded-2xl p-5 shadow-sm relative overflow-hidden flex items-center justify-between border border-[#3E423A]/30">
+          <div className="bg-[#20221E] text-white rounded-[24px] p-5 shadow-sm relative overflow-hidden flex items-center justify-between border border-[#3E423A]/30">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-white/10 text-[#0088cc] rounded-full flex items-center justify-center">
                 <span className="material-symbols-outlined text-xl text-[#c7ff00]">send</span>
@@ -240,7 +240,7 @@ export function IntegrationsTab() {
           </div>
 
           {/* WhatsApp Card (Light style exactly matching mockup) */}
-          <div className="bg-white text-[#1a1c1b] rounded-2xl p-5 shadow-sm relative overflow-hidden flex items-center justify-between border border-[#E8E8E8]">
+          <div className="bg-white text-[#1a1c1b] rounded-[24px] p-5 shadow-sm relative overflow-hidden flex items-center justify-between border border-[#E8E8E8]">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-neutral-100 text-[#25D366] rounded-full flex items-center justify-center">
                 <span className="material-symbols-outlined text-xl">chat</span>
@@ -256,7 +256,7 @@ export function IntegrationsTab() {
           </div>
 
           {/* Discord Card (Light style exactly matching mockup) */}
-          <div className="bg-white text-[#1a1c1b] rounded-2xl p-5 shadow-sm relative overflow-hidden flex items-center justify-between border border-[#E8E8E8]">
+          <div className="bg-white text-[#1a1c1b] rounded-[24px] p-5 shadow-sm relative overflow-hidden flex items-center justify-between border border-[#E8E8E8]">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-neutral-100 text-neutral-400 rounded-full flex items-center justify-center">
                 <span className="material-symbols-outlined text-xl">sports_esports</span>
@@ -276,7 +276,7 @@ export function IntegrationsTab() {
         <div className="space-y-4 pt-2">
           <h3 className="text-xs font-semibold text-[#6F6F6F] px-1 uppercase tracking-wider">Bot Features</h3>
 
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-[#E8E8E8] space-y-5">
+          <div className="bg-white rounded-[24px] p-4 shadow-sm border border-[#E8E8E8] space-y-5">
             {/* Auto-categorization toggle */}
             <div className="flex items-center justify-between">
               <div>

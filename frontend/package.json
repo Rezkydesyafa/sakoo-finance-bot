@@ -9,11 +9,14 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/core": "^8.4.1",
     "next": "^15.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.4.1",
     "@eslint/eslintrc": "^3.0.0",
     "@eslint/js": "^9.0.0",
     "@types/node": "^22.0.0",
