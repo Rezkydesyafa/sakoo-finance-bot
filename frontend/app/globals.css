@@ -65,3 +65,9 @@
   .hover-lift { transition: transform 0.2s ease, box-shadow 0.2s ease; }
   .hover-lift:hover { transform: translateY(-4px); box-shadow: 0 14px 34px rgba(0,0,0,0.1); }
 }
+/* Hide mobile navbar when keyboard is open (screen height is small) */
+@media (max-height: 600px) {
+  nav.fixed.bottom-0.md\:hidden {
+    display: none !important;
+  }
+}

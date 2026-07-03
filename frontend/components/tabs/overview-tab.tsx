@@ -16,10 +16,6 @@ type OverviewTabProps = {
   formatCurrency: (val: number) => string;
   handleDownloadPDF: () => void;
   isExporting: boolean;
-  chatMessages: ChatMessage[];
-  chatInput: string;
-  setChatInput: (val: string) => void;
-  handleSendChatMessage: () => void;
   handleQuickAddIncome: () => void;
   handleQuickAddExpense: () => void;
   quickActionLoading: "income" | "expense" | null;
@@ -49,10 +45,6 @@ export function OverviewTab({
   formatCurrency,
   handleDownloadPDF,
   isExporting,
-  chatMessages,
-  chatInput,
-  setChatInput,
-  handleSendChatMessage,
   handleQuickAddIncome,
   handleQuickAddExpense,
   quickActionLoading,
@@ -84,13 +76,13 @@ export function OverviewTab({
           <div className="md:col-span-7 bg-[#2A2A2A] rounded-[24px] p-6 hero-shadow flex flex-col justify-between relative overflow-hidden text-white min-h-[200px]">
             <div className="absolute inset-0 opacity-10" style={{ backgroundImage: "radial-gradient(circle at 100% 0%, #C7FF00 0%, transparent 50%)", pointerEvents: "none" }}></div>
             <div className="flex justify-between items-start relative z-10">
-              <span className="text-sm text-gray-300">Total Balance</span>
-              <span className="bg-[#c7ff00] text-[#151f00] text-[13px] font-semibold px-3 py-1 rounded-full flex items-center gap-1">
+              <div>
+                <span className="block text-sm text-gray-300 mb-1">Total Balance</span>
+                <div className="font-bold text-2xl sm:text-3xl">{formatCurrency(totalBalance)}</div>
+              </div>
+              <span className="bg-[#c7ff00] text-[#151f00] text-[13px] font-semibold px-3 py-1 rounded-full flex items-center gap-1 shrink-0">
                 <span className="material-symbols-outlined text-[14px]">receipt_long</span> {transactions.length} tx
               </span>
-            </div>
-            <div className="relative z-10">
-              <div className="font-extrabold text-4xl">{formatCurrency(totalBalance)}</div>
             </div>
             <div className="flex justify-between items-end relative z-10 text-sm text-gray-400">
               <div>
@@ -130,23 +122,23 @@ export function OverviewTab({
           </div>
         </div>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="bg-white rounded-[24px] p-4 card-shadow flex items-center gap-4">
-            <div className="w-10 h-10 rounded-full bg-[#5FCF6A]/10 flex items-center justify-center text-[#5FCF6A]">
-              <span className="material-symbols-outlined">arrow_upward</span>
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+          <div className="bg-white rounded-[24px] p-3 sm:p-4 card-shadow flex items-center gap-2 sm:gap-4">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 shrink-0 rounded-full bg-[#5FCF6A]/10 flex items-center justify-center text-[#5FCF6A]">
+              <span className="material-symbols-outlined text-[16px] sm:text-[24px]">arrow_upward</span>
             </div>
-            <div>
-              <p className="text-xs text-[#6F6F6F]">Total Income</p>
-              <p className="text-[15px] font-semibold text-[#1a1c1b]">{formatCurrency(totalIncome)}</p>
+            <div className="min-w-0">
+              <p className="text-[10px] sm:text-xs text-[#6F6F6F] truncate">Total Income</p>
+              <p className="text-[13px] sm:text-[15px] font-semibold text-[#1a1c1b] truncate">{formatCurrency(totalIncome)}</p>
             </div>
           </div>
-          <div className="bg-white rounded-[24px] p-4 card-shadow flex items-center gap-4">
-            <div className="w-10 h-10 rounded-full bg-[#EF6B6B]/10 flex items-center justify-center text-[#EF6B6B]">
-              <span className="material-symbols-outlined">arrow_downward</span>
+          <div className="bg-white rounded-[24px] p-3 sm:p-4 card-shadow flex items-center gap-2 sm:gap-4">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 shrink-0 rounded-full bg-[#EF6B6B]/10 flex items-center justify-center text-[#EF6B6B]">
+              <span className="material-symbols-outlined text-[16px] sm:text-[24px]">arrow_downward</span>
             </div>
-            <div>
-              <p className="text-xs text-[#6F6F6F]">Total Expense</p>
-              <p className="text-[15px] font-semibold text-[#1a1c1b]">{formatCurrency(totalExpense)}</p>
+            <div className="min-w-0">
+              <p className="text-[10px] sm:text-xs text-[#6F6F6F] truncate">Total Expense</p>
+              <p className="text-[13px] sm:text-[15px] font-semibold text-[#1a1c1b] truncate">{formatCurrency(totalExpense)}</p>
             </div>
           </div>
         </div>
@@ -161,7 +153,7 @@ export function OverviewTab({
             <div className="bg-[#F1F2F0] rounded-full p-1 flex">
               <button
                 onClick={() => setFlowType("income")}
-                className={`px-4 py-1.5 rounded-full text-[13px] font-semibold transition-colors cursor-pointer border-none ${
+                className={`px-3 py-1 rounded-full text-[11px] sm:text-xs font-semibold transition-colors cursor-pointer border-none ${
                   flowType === "income"
                     ? "bg-white shadow-sm text-[#191919]"
                     : "bg-transparent text-[#6F6F6F] hover:text-[#191919]"
@@ -169,7 +161,7 @@ export function OverviewTab({
               >Income</button>
               <button
                 onClick={() => setFlowType("expense")}
-                className={`px-4 py-1.5 rounded-full text-[13px] font-semibold transition-colors cursor-pointer border-none ${
+                className={`px-3 py-1 rounded-full text-[11px] sm:text-xs font-semibold transition-colors cursor-pointer border-none ${
                   flowType === "expense"
                     ? "bg-white shadow-sm text-[#191919]"
                     : "bg-transparent text-[#6F6F6F] hover:text-[#191919]"
@@ -177,30 +169,60 @@ export function OverviewTab({
               >Expense</button>
             </div>
           </div>
-          <div className="flex-1 flex items-end justify-between px-4 pb-4">
-            {moneyFlow.map((item) => {
-              const value = item[flowType];
-              return (
-                <div
-                  key={item.key}
-                  className="w-8 sm:w-12 bg-[#eeeeec] rounded-t-full relative flex items-end justify-center"
-                  style={{ height: `${heightPercent(value, maxMoneyFlow)}%` }}
-                >
-                  <div
-                    className={`absolute w-full rounded-t-full bottom-0 ${flowType === "income" ? "bg-[#E0F682]" : "bg-[#FFCDD2]"}`}
-                    style={{ height: value > 0 ? "100%" : "0%" }}
-                  />
-                  {value > 0 && (
-                    <div className="absolute -top-8 bg-[#2A2A2A] text-white text-[10px] sm:text-xs px-2 py-1 rounded-md">
-                      {formatCurrency(value)}
+          <div className="flex-1 flex flex-col justify-end px-4 sm:px-6 pb-6 relative">
+            <div className="relative h-44 mt-4">
+              {/* Y-axis grid lines */}
+              <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
+                {[4, 3, 2, 1, 0].map((step) => {
+                  const val = maxMoneyFlow * (step / 4);
+                  let label = "0";
+                  if (val > 0) {
+                    if (val >= 1000000) label = (val / 1000000).toFixed(1).replace(/\.0$/, "") + "M";
+                    else if (val >= 1000) label = (val / 1000).toFixed(1).replace(/\.0$/, "") + "k";
+                    else label = val.toString();
+                  }
+                  return (
+                    <div key={step} className="flex items-center w-full relative h-0">
+                      <span className="text-[9px] sm:text-[10px] font-semibold text-[#6F6F6F] opacity-50 absolute left-0 w-6 sm:w-8 text-right pr-2">
+                        {label}
+                      </span>
+                      <div className="w-full border-t border-dashed border-[#E8E8E8] ml-6 sm:ml-8"></div>
                     </div>
-                  )}
+                  );
+                })}
+              </div>
+
+              {/* Bars */}
+              <div className="absolute inset-0 flex items-end justify-around ml-6 sm:ml-8">
+                {moneyFlow.map((item) => {
+                  const value = item[flowType];
+                  return (
+                    <div
+                      key={item.key}
+                      className="w-7 sm:w-10 bg-[#eeeeec]/50 rounded-t-full relative flex items-end justify-center group cursor-pointer z-10 transition-all hover:bg-[#eeeeec]"
+                      style={{ height: `${heightPercent(value, maxMoneyFlow)}%` }}
+                    >
+                      <div
+                        className={`absolute w-full rounded-t-full bottom-0 transition-all ${flowType === "income" ? "bg-[#c7ff00] shadow-[0_0_15px_rgba(199,255,0,0.4)]" : "bg-[#EF6B6B] shadow-[0_0_15px_rgba(239,107,107,0.4)]"}`}
+                        style={{ height: value > 0 ? "100%" : "0%" }}
+                      />
+                      {value > 0 && (
+                        <div className="absolute -top-8 bg-[#2A2A2A] text-white text-[10px] sm:text-[11px] px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none whitespace-nowrap">
+                          {formatCurrency(value)}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="flex justify-around mt-3 text-[9px] sm:text-[10px] font-bold text-[#6F6F6F] uppercase tracking-wider ml-6 sm:ml-8">
+              {moneyFlow.map((item) => (
+                <div key={item.key} className="w-7 sm:w-10 text-center">
+                  {item.label}
                 </div>
-              );
-            })}
-          </div>
-          <div className="flex justify-between px-2 sm:px-6 text-[10px] sm:text-xs text-[#6F6F6F] uppercase tracking-wider mt-4">
-            {moneyFlow.map((item) => <span key={item.key}>{item.label}</span>)}
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -210,14 +232,6 @@ export function OverviewTab({
         
         {/* Connected Bot Channels */}
         <ConnectedBots />
-
-        {/* Chat Simulator Widget */}
-        <ChatSimulator 
-          chatMessages={chatMessages}
-          chatInput={chatInput}
-          setChatInput={setChatInput}
-          handleSendChatMessage={handleSendChatMessage}
-        />
 
         {/* Recent Transactions */}
         <div className="bg-white rounded-[24px] card-shadow flex-1 overflow-hidden flex flex-col">
@@ -264,12 +278,9 @@ export function OverviewTab({
                   </div>
                   <div className="text-right flex items-center gap-3">
                     <div>
-                      <div className={`font-semibold text-sm ${isIncome ? "text-[#4e6700]" : "text-[#1a1c1b]"}`}>
+                      <div className={`font-semibold text-[15px] sm:text-sm ${isIncome ? "text-[#4e6700]" : "text-[#1a1c1b]"}`}>
                         {isIncome ? "+" : "-"} {formatCurrency(t.amount)}
                       </div>
-                    </div>
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${sourceBg}`} title={sourceTitle}>
-                      <span className="material-symbols-outlined text-[16px]">{sourceIcon}</span>
                     </div>
                   </div>
                 </div>

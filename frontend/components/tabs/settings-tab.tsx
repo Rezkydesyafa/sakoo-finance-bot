@@ -95,7 +95,7 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
         >
           <span className="material-symbols-outlined text-[20px]">arrow_back</span>
         </button>
-        <h2 className="text-2xl font-bold text-[#1a1c1b]">Pengaturan Akun</h2>
+        <h2 className="text-2xl font-bold text-[#1a1c1b]">Profil</h2>
       </div>
 
       {/* Profile Header */}

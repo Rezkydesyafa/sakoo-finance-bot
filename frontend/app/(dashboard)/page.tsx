@@ -13,6 +13,7 @@ import { BudgetsTab } from "@/components/tabs/budgets-tab";
 import { SettingsTab } from "@/components/tabs/settings-tab";
 import { IntegrationsTab } from "@/components/tabs/integrations-tab";
 import { TransactionModal } from "@/components/add-transaction-modal";
+import { ChatSimulator } from "@/components/chat-simulator";
 import type { Transaction, ChatMessage } from "./types";
 
 export default function Home() {
@@ -300,6 +301,7 @@ export default function Home() {
       ]);
       await refreshTransactions(token);
       setQuickActionStatus(`${isIncome ? "Pemasukan" : "Pengeluaran"} berhasil ditambahkan.`);
+      setTimeout(() => setQuickActionStatus(null), 3000);
     } catch (error) {
       if (isAuthExpiredError(error)) {
         clearAuthToken();
@@ -415,10 +417,6 @@ export default function Home() {
             formatCurrency={formatCurrency}
             handleDownloadPDF={handleDownloadPDF}
             isExporting={isExporting}
-            chatMessages={chatMessages}
-            chatInput={chatInput}
-            setChatInput={setChatInput}
-            handleSendChatMessage={handleSendChatMessage}
             handleQuickAddIncome={handleQuickAddIncome}
             handleQuickAddExpense={handleQuickAddExpense}
             quickActionLoading={quickActionLoading}
@@ -476,6 +474,13 @@ export default function Home() {
 
         {activeTab === "integrations" && <IntegrationsTab />}
       </div>
+
+      <ChatSimulator 
+        chatMessages={chatMessages}
+        chatInput={chatInput}
+        setChatInput={setChatInput}
+        handleSendChatMessage={handleSendChatMessage}
+      />
 
       <TransactionModal 
         isOpen={isAddTxModalOpen} 
