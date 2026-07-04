@@ -530,6 +530,11 @@ def test_linked_telegram_user_can_save_text_transaction(
     assert payload["transaction_id"] is not None
     assert payload["reply_status"] == "sent"
     assert "Tercatat" in fake_telegram.sent_messages[0]["text"]
+    assert _keyboard_contains(fake_telegram.sent_messages[0]["reply_markup"], "MENU_BALANCE")
+    assert _keyboard_contains_web_app(
+        fake_telegram.sent_messages[0]["reply_markup"],
+        "https://sakoo.lab-sigma.web.id",
+    )
 
     with session_factory() as db:
         transaction = db.scalar(select(Transaction))

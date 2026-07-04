@@ -80,6 +80,11 @@ class User(TimestampMixin, Base):
         back_populates="user",
         cascade="all, delete-orphan",
     )
+    preference: Mapped["UserPreference | None"] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
     bot_logs: Mapped[list["BotLog"]] = relationship(back_populates="user")
 
     __table_args__ = (
@@ -173,6 +178,32 @@ class Category(Base):
     __table_args__ = (
         CheckConstraint("type IN ('income', 'expense')", name="ck_categories_type"),
         UniqueConstraint("name", "type", name="uq_categories_name_type"),
+    )
+
+
+class UserPreference(TimestampMixin, Base):
+    __tablename__ = "user_preferences"
+
+    id: Mapped[int] = mapped_column(BigIntPk, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    reply_style: Mapped[str] = mapped_column(
+        String(16),
+        default="friendly",
+        server_default="friendly",
+        nullable=False,
+    )
+
+    user: Mapped["User"] = relationship(back_populates="preference")
+
+    __table_args__ = (
+        CheckConstraint(
+            "reply_style IN ('friendly', 'detailed', 'short')",
+            name="ck_user_preferences_reply_style",
+        ),
+        UniqueConstraint("user_id", name="uq_user_preferences_user_id"),
     )
 
 

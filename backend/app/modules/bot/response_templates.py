@@ -88,6 +88,8 @@ def format_confirmation_request(
     transaction_type: str | None,
     amount: Decimal | None,
     category: str | None,
+    transaction_date: date | None = None,
+    description: str | None = None,
     missing_amount: bool,
 ) -> str:
     if missing_amount:
@@ -102,12 +104,17 @@ def format_confirmation_request(
     direction = _format_transaction_type(transaction_type)
     amount_label = format_rupiah(amount) if amount else "nominal belum terbaca"
     category_label = category or "kategori belum terbaca"
+    date_label = format_date_label(transaction_date)
+    description_label = description or "-"
     return (
         "Saya belum yakin membaca transaksinya. Aku membaca ini sebagai:\n\n"
         f"Jenis: {direction}\n"
         f"Nominal: {amount_label}\n"
-        f"Kategori: {category_label}\n\n"
-        "Apakah benar? Balas: Ya / Edit"
+        f"Kategori: {category_label}\n"
+        f"Tanggal: {date_label}\n"
+        f"Catatan: {description_label}\n\n"
+        "Balas YA untuk simpan, atau koreksi: edit kategori transport / "
+        "edit tanggal kemarin / edit catatan makan siang."
     )
 
 
@@ -118,6 +125,7 @@ def format_unknown_response() -> str:
         "- beli kopi 18 ribu\n"
         "- saldo\n"
         "- laporan bulan ini\n"
+        "- bulan ini aku boros gak?\n"
         "- /help"
     )
 

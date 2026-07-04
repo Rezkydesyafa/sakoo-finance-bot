@@ -1,9 +1,13 @@
 import re
 from dataclasses import asdict, dataclass
+from datetime import date
 from decimal import Decimal
 from typing import Any
 
-from app.models import Receipt
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.models import Receipt, Transaction
 from app.modules.parser.transaction_text import parse_transaction_text
 
 
@@ -67,22 +71,84 @@ def receipt_description(receipt: Receipt, *, fallback: str) -> str:
     return fallback
 
 
+def find_duplicate_receipt_transaction(
+    db: Session,
+    receipt: Receipt,
+    *,
+    fallback_description: str,
+) -> Transaction | None:
+    if receipt.transaction_id:
+        return db.get(Transaction, receipt.transaction_id)
+    if receipt.total_amount is None:
+        return None
+
+    transaction_date = receipt.receipt_date or date.today()
+    description = receipt_description(receipt, fallback=fallback_description)
+    return db.scalar(
+        select(Transaction)
+        .where(
+            Transaction.user_id == receipt.user_id,
+            Transaction.source == "receipt_ocr",
+            Transaction.type == "expense",
+            Transaction.amount == receipt.total_amount,
+            Transaction.transaction_date == transaction_date,
+            Transaction.description == description,
+        )
+        .order_by(Transaction.id.desc())
+    )
+
+
+def find_latest_saved_receipt_transaction(
+    db: Session,
+    *,
+    user_id: int,
+) -> Transaction | None:
+    return db.scalar(
+        select(Transaction)
+        .join(Receipt, Receipt.transaction_id == Transaction.id)
+        .where(
+            Receipt.user_id == user_id,
+            Receipt.transaction_id.is_not(None),
+            Receipt.status.in_(("confirmed", "duplicate")),
+        )
+        .order_by(Receipt.created_at.desc(), Receipt.id.desc())
+    )
+
+
+def format_duplicate_receipt_reply(
+    transaction: Transaction,
+    *,
+    subject: str = "Struk ini",
+) -> str:
+    return (
+        f"{subject} sudah pernah disimpan sebagai transaksi "
+        f"{format_rupiah(transaction.amount)} pada {transaction.transaction_date.isoformat()}. "
+        "Aku tidak simpan lagi supaya tidak dobel."
+    )
+
+
 def format_receipt_confirmation(receipt: Receipt) -> str:
     merchant = receipt.merchant_name or "merchant belum terbaca"
     receipt_date = receipt.receipt_date.isoformat() if receipt.receipt_date else "tanggal belum terbaca"
     confidence = f"{float(receipt.confidence or Decimal('0')) * 100:.0f}%"
+    date_note = (
+        " Tanggal tidak jelas, aku pakai tanggal hari ini kalau kamu simpan."
+        if receipt.receipt_date is None
+        else ""
+    )
 
     if receipt.total_amount is None:
         fallback_text = (
-            " Kalau foto kurang jelas, caption juga bisa dipakai. "
-            "Contoh caption: beli makan 20 ribu."
+            " Foto agak blur atau nominal tidak terlihat. Coba foto ulang dari atas, "
+            "atau kirim caption: beli makan 20 ribu."
             if not receipt.caption_text
             else " Caption yang kamu kirim belum punya nominal yang jelas."
         )
         return (
-            "Foto struk sudah diproses OCR, tetapi total belanja belum terbaca. "
+            "Total belum terbaca dari struk. "
             f"Merchant: {merchant}. Tanggal: {receipt_date}. "
-            "Kirim koreksi dengan format: edit total 20000."
+            "Kirim nominalnya, contoh: 20000 atau edit total 20000."
+            f"{date_note}"
             f"{fallback_text}"
         )
 
@@ -98,6 +164,7 @@ def format_receipt_confirmation(receipt: Receipt) -> str:
         f"Total: {format_rupiah(receipt.total_amount)}. "
         f"Confidence: {confidence}. "
         f"{fallback_note}"
+        f"{date_note}"
         "Balas YA untuk simpan, atau kirim koreksi seperti: 20000 / edit total 20000."
     )
 

@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import Category, Receipt, Transaction
+from app.modules.bot.conversation_state import get_pending_transaction
 from app.modules.jobs.service import (
     JobQueueError,
     ReceiptOcrEnqueue,
@@ -20,6 +21,9 @@ from app.modules.ocr.receipt_chat import (
     ReceiptOcrFlowResult as TelegramReceiptOcrFlowResult,
     YES_CONFIRMATION_RE,
     apply_caption_amount_if_possible,
+    find_duplicate_receipt_transaction,
+    find_latest_saved_receipt_transaction,
+    format_duplicate_receipt_reply,
     format_receipt_confirmation,
     format_rupiah,
     parse_total_correction,
@@ -276,6 +280,18 @@ def _handle_receipt_confirmation_text(
     if YES_CONFIRMATION_RE.match(text):
         receipt = _find_pending_receipt(db, user_id=user_id)
         if receipt is None:
+            if get_pending_transaction(db, user_id=user_id) is not None:
+                return None
+            latest_transaction = find_latest_saved_receipt_transaction(db, user_id=user_id)
+            if latest_transaction is not None:
+                return TelegramReceiptOcrFlowResult(
+                    status="duplicate",
+                    transaction_id=latest_transaction.id,
+                    reply_text=format_duplicate_receipt_reply(
+                        latest_transaction,
+                        subject="Struk terakhir",
+                    ),
+                )
             return TelegramReceiptOcrFlowResult(
                 status="no_pending_receipt",
                 reply_text="Tidak ada struk yang sedang menunggu konfirmasi.",
@@ -329,6 +345,22 @@ def _confirm_receipt_transaction(
             error_message="missing_total_amount",
         )
 
+    duplicate = find_duplicate_receipt_transaction(
+        db,
+        receipt,
+        fallback_description="Struk Telegram",
+    )
+    if duplicate is not None:
+        receipt.transaction_id = duplicate.id
+        receipt.status = "duplicate"
+        db.commit()
+        return TelegramReceiptOcrFlowResult(
+            status="duplicate",
+            receipt_id=receipt.id,
+            transaction_id=duplicate.id,
+            reply_text=format_duplicate_receipt_reply(duplicate),
+        )
+
     category = _find_default_expense_category(db)
     transaction = Transaction(
         user_id=receipt.user_id,
@@ -379,4 +411,3 @@ def _find_default_expense_category(db: Session) -> Category | None:
             Category.type == "expense",
         )
     )
-

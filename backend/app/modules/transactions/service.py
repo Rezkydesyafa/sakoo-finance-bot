@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.models import Category, Transaction
+from app.models import Category, Transaction, UserPreference
 from app.modules.bot.conversation_state import (
     CANCELLED_TRANSACTION_STATUS,
     CONFIRMED_TRANSACTION_STATUS,
@@ -68,6 +68,12 @@ THANKS_RE = re.compile(r"^\s*(?:makasih|terima kasih|thanks|thx|tengkyu)\s*[.!]*
 ACK_RE = re.compile(r"^\s*(?:oke|ok|sip|siap|noted)\s*[.!]*\s*$", re.IGNORECASE)
 SPENDING_CHECK_RE = re.compile(r"\b(?:boros|hemat|pengeluaran.*hari ini|hari ini.*keluar)\b", re.IGNORECASE)
 TOP_EXPENSE_RE = re.compile(r"\b(?:pengeluaran terbesar|paling gede|terbesar apa|top pengeluaran)\b", re.IGNORECASE)
+SAVING_ADVICE_RE = re.compile(r"\b(?:saran hemat|tips hemat|cara hemat|hemat minggu ini)\b", re.IGNORECASE)
+CASHFLOW_REASON_RE = re.compile(r"\b(?:kenapa.*(?:saldo|uang).*(?:habis|cepat habis)|saldo.*cepat habis)\b", re.IGNORECASE)
+REPLY_STYLE_PREFERENCE_RE = re.compile(
+    r"\b(?:gaya bahasa|bahasa|respon)\s+(?P<style>santai|formal|detail|rinci|singkat|pendek)\b",
+    re.IGNORECASE,
+)
 CATEGORY_SUMMARY_RE = re.compile(
     r"\b(?P<category>makan(?:an)?|kopi|transport|bensin|tagihan|belanja|hiburan|kesehatan|pendidikan|kos)\b.*\b(?:berapa|total|bulan ini|minggu ini|hari ini)\b",
     re.IGNORECASE,
@@ -358,6 +364,15 @@ def _handle_lightweight_message(
     source: str,
 ) -> TextTransactionResult | None:
     normalized = normalize_text(text)
+    reply_style = _detect_reply_style_preference(normalized)
+    if reply_style:
+        return _save_reply_style_preference(
+            db=db,
+            user_id=user_id,
+            text=text,
+            source=source,
+            reply_style=reply_style,
+        )
     if THANKS_RE.match(normalized):
         return TextTransactionResult(
             status="small_talk",
@@ -388,10 +403,30 @@ def _handle_lightweight_message(
                 intent="top_expense",
             ),
         )
+    if SAVING_ADVICE_RE.search(normalized):
+        return TextTransactionResult(
+            status="saving_advice",
+            reply_text=_format_saving_advice_response(db, user_id),
+            parse_result=_synthetic_parse_result(
+                text=text,
+                source=source,
+                intent="saving_advice",
+            ),
+        )
+    if CASHFLOW_REASON_RE.search(normalized):
+        return TextTransactionResult(
+            status="cashflow_reason",
+            reply_text=_format_cashflow_reason_response(db, user_id),
+            parse_result=_synthetic_parse_result(
+                text=text,
+                source=source,
+                intent="cashflow_reason",
+            ),
+        )
     if SPENDING_CHECK_RE.search(normalized):
         return TextTransactionResult(
             status="spending_check",
-            reply_text=_format_spending_check_response(db, user_id),
+            reply_text=_format_spending_check_response(db, user_id, text=normalized),
             parse_result=_synthetic_parse_result(
                 text=text,
                 source=source,
@@ -422,10 +457,19 @@ def _apply_pending_transaction_edit(
     text: str,
 ) -> ParsedMessage:
     amount = parse_amount(text) or parse_result.amount
+    description = _detect_description_edit(text)
     transaction_type = _detect_type_edit(text) or parse_result.type
-    category = _detect_category_edit(db, text) or parse_result.category
-    transaction_date = _detect_date_edit(text) or parse_result.transaction_date
-    description = _detect_description_edit(text) or parse_result.description
+    category = (
+        parse_result.category
+        if description is not None
+        else _detect_category_edit(db, text) or parse_result.category
+    )
+    transaction_date = (
+        parse_result.transaction_date
+        if description is not None
+        else _detect_date_edit(text) or parse_result.transaction_date
+    )
+    description = description or parse_result.description
     reasons = [reason for reason in parse_result.reasons if reason != "missing_amount"]
     if amount is None and "missing_amount" not in reasons:
         reasons.append("missing_amount")
@@ -614,6 +658,8 @@ def _format_confirmation_request(parse_result: ParsedMessage) -> str:
         transaction_type=parse_result.type,
         amount=parse_result.amount,
         category=parse_result.category,
+        transaction_date=parse_result.transaction_date,
+        description=parse_result.description,
         missing_amount=parse_result.amount is None,
     )
 
@@ -634,7 +680,7 @@ def _format_saved_transaction(
     return format_saved_transaction_template(
         transaction,
         category,
-        style=_reply_style(),
+        style=_reply_style(db, user_id),
         balance_after=balance_after,
         context_note=context_note,
     )
@@ -735,8 +781,11 @@ def _format_report_summary_response(
     )
 
 
-def _format_spending_check_response(db: Session, user_id: int) -> str:
+def _format_spending_check_response(db: Session, user_id: int, *, text: str) -> str:
     today = date.today()
+    if "hari ini" not in text:
+        return _format_month_spending_check_response(db, user_id)
+
     today_expense = sum_transactions(
         db,
         user_id,
@@ -769,6 +818,43 @@ def _format_spending_check_response(db: Session, user_id: int) -> str:
     )
 
 
+def _format_month_spending_check_response(db: Session, user_id: int) -> str:
+    today = date.today()
+    month_start = today.replace(day=1)
+    month_expense = sum_transactions(
+        db,
+        user_id,
+        transaction_type="expense",
+        start_date=month_start,
+        end_date=today,
+    )
+    month_income = sum_transactions(
+        db,
+        user_id,
+        transaction_type="income",
+        start_date=month_start,
+        end_date=today,
+    )
+    top_category = top_expense_category(db, user_id, start_date=month_start, end_date=today)
+    if month_income == 0 and month_expense > 0:
+        verdict = "Belum ada pemasukan bulan ini, jadi pengeluaran perlu dijaga."
+    elif month_expense <= month_income:
+        verdict = "Masih aman, pengeluaran belum melewati pemasukan bulan ini."
+    else:
+        verdict = "Perlu direm, pengeluaran sudah melewati pemasukan bulan ini."
+    top_line = (
+        f"\nKategori terbesar: {top_category[0]} {format_rupiah(top_category[1])}"
+        if top_category
+        else ""
+    )
+    return (
+        f"Pengeluaran bulan ini: {format_rupiah(month_expense)}\n"
+        f"Pemasukan bulan ini: {format_rupiah(month_income)}"
+        f"{top_line}\n\n"
+        f"{verdict}"
+    )
+
+
 def _format_top_expense_response(db: Session, user_id: int) -> str:
     today = date.today()
     start_date = today.replace(day=1)
@@ -785,6 +871,87 @@ def _format_top_expense_response(db: Session, user_id: int) -> str:
     return (
         "Pengeluaran terbesar bulan ini:\n\n"
         f"{category_name}: {format_rupiah(total)}"
+    )
+
+
+def _format_saving_advice_response(db: Session, user_id: int) -> str:
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday())
+    top_category = top_expense_category(db, user_id, start_date=week_start, end_date=today)
+    if not top_category:
+        return "Belum ada pengeluaran minggu ini. Mulai catat transaksi dulu biar sarannya akurat."
+
+    category_name, total = top_category
+    return (
+        f"Minggu ini paling besar di {category_name}: {format_rupiah(total)}.\n"
+        "Saran cepat: tahan transaksi kecil yang berulang di kategori itu dulu."
+    )
+
+
+def _format_cashflow_reason_response(db: Session, user_id: int) -> str:
+    today = date.today()
+    month_start = today.replace(day=1)
+    top_category = top_expense_category(db, user_id, start_date=month_start, end_date=today)
+    month_expense = sum_transactions(
+        db,
+        user_id,
+        transaction_type="expense",
+        start_date=month_start,
+        end_date=today,
+    )
+    if not top_category:
+        return "Aku belum lihat penyebabnya karena belum ada pengeluaran bulan ini."
+
+    category_name, total = top_category
+    return (
+        f"Saldo cepat habis paling mungkin karena {category_name}: {format_rupiah(total)}.\n"
+        f"Total pengeluaran bulan ini: {format_rupiah(month_expense)}."
+    )
+
+
+def _detect_reply_style_preference(text: str) -> str | None:
+    match = REPLY_STYLE_PREFERENCE_RE.search(text)
+    if not match:
+        return None
+    style = match.group("style").lower()
+    if style == "santai":
+        return "friendly"
+    if style in {"formal", "detail", "rinci"}:
+        return "detailed"
+    if style in {"singkat", "pendek"}:
+        return "short"
+    return None
+
+
+def _save_reply_style_preference(
+    *,
+    db: Session,
+    user_id: int,
+    text: str,
+    source: str,
+    reply_style: str,
+) -> TextTransactionResult:
+    preference = db.scalar(select(UserPreference).where(UserPreference.user_id == user_id))
+    if preference is None:
+        preference = UserPreference(user_id=user_id, reply_style=reply_style)
+        db.add(preference)
+    else:
+        preference.reply_style = reply_style
+    db.flush()
+
+    labels = {
+        "friendly": "lebih santai",
+        "detailed": "lebih formal dan detail",
+        "short": "lebih singkat",
+    }
+    return TextTransactionResult(
+        status="preference_updated",
+        reply_text=f"Oke, gaya bahasa aku buat {labels[reply_style]}.",
+        parse_result=_synthetic_parse_result(
+            text=text,
+            source=source,
+            intent="preference_updated",
+        ),
     )
 
 
@@ -880,6 +1047,26 @@ def _build_saved_transaction_context_note(
     category: Category | None,
 ) -> str | None:
     notes: list[str] = []
+    month_start = transaction.transaction_date.replace(day=1)
+    month_expense = sum_transactions(
+        db,
+        user_id,
+        transaction_type="expense",
+        start_date=month_start,
+        end_date=transaction.transaction_date,
+    )
+    top_category = top_expense_category(
+        db,
+        user_id,
+        start_date=month_start,
+        end_date=transaction.transaction_date,
+    )
+    notes.append(f"Pengeluaran bulan ini: {format_rupiah(month_expense)}.")
+    if top_category:
+        notes.append(
+            f"Kategori terbesar: {top_category[0]} {format_rupiah(top_category[1])}."
+        )
+
     if transaction.type == "expense":
         day_total = sum_transactions(
             db,
@@ -968,7 +1155,12 @@ def _platform_from_source(source: str) -> str:
     return "system"
 
 
-def _reply_style() -> str:
+def _reply_style(db: Session | None = None, user_id: int | None = None) -> str:
+    if db is not None and user_id is not None:
+        preference = db.scalar(select(UserPreference).where(UserPreference.user_id == user_id))
+        if preference and preference.reply_style in {"short", "friendly", "detailed"}:
+            return preference.reply_style
+
     style = get_settings().bot_reply_style.strip().lower()
     if style in {"short", "friendly", "detailed"}:
         return style

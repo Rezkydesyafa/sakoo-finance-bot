@@ -313,7 +313,10 @@ async def receive_telegram_webhook(
         chat_id=parsed.chat_id,
         reply_text=reply_text,
         bot_log=bot_log,
-        reply_markup=build_link_menu() if linking_result.action == "instruction" else None,
+        reply_markup=_resolve_reply_markup(
+            linking_action=linking_result.action,
+            transaction_result=transaction_result,
+        ),
     )
 
     return TelegramWebhookResponse(
@@ -485,6 +488,18 @@ def _resolve_reply_text(
     if transaction_result:
         return transaction_result.reply_text
     return linking_reply_text
+
+
+def _resolve_reply_markup(
+    *,
+    linking_action: str,
+    transaction_result: TextTransactionResult | None,
+) -> dict[str, Any] | None:
+    if linking_action == "instruction":
+        return build_link_menu()
+    if transaction_result and transaction_result.status == "saved":
+        return build_main_menu()
+    return None
 
 
 def _resolve_bot_log_message_type(
