@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
 
@@ -17,6 +17,8 @@ CONFIRMED_TRANSACTION_STATUS = "confirmed_transaction"
 CANCELLED_TRANSACTION_STATUS = "cancelled_transaction"
 EDITED_TRANSACTION_STATUS = "edited_transaction"
 EXPIRED_TRANSACTION_STATUS = "expired_transaction"
+# ponytail: fixed chat confirmation TTL; make configurable only if channel SLAs differ.
+PENDING_TRANSACTION_TTL = timedelta(minutes=30)
 
 
 def store_pending_transaction(
@@ -54,6 +56,10 @@ def get_pending_transaction(db: Session, *, user_id: int) -> tuple[BotLog, Parse
         .order_by(BotLog.created_at.desc(), BotLog.id.desc())
     )
     if pending_log is None:
+        return None
+    if _is_pending_expired(pending_log.created_at):
+        pending_log.status = EXPIRED_TRANSACTION_STATUS
+        db.flush()
         return None
 
     payload = pending_log.parsed_result or {}
@@ -135,3 +141,8 @@ def _decimal_or_none(value: Any) -> Decimal | None:
     if isinstance(value, Decimal):
         return value
     return Decimal(str(value))
+
+
+def _is_pending_expired(created_at: datetime) -> bool:
+    value = created_at if created_at.tzinfo else created_at.replace(tzinfo=timezone.utc)
+    return datetime.now(timezone.utc) - value > PENDING_TRANSACTION_TTL

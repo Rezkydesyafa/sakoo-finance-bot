@@ -36,6 +36,20 @@ class FakeOcrClient:
         return OcrResult(text=self.text)
 
 
+class FakeTelegramClient:
+    def __init__(self) -> None:
+        self.chat_actions: list[dict[str, str]] = []
+        self.sent_messages: list[dict[str, str]] = []
+
+    def send_chat_action(self, *, chat_id: str, action: str) -> dict[str, Any]:
+        self.chat_actions.append({"chat_id": chat_id, "action": action})
+        return {"ok": True}
+
+    def send_message(self, *, chat_id: str, text: str) -> dict[str, Any]:
+        self.sent_messages.append({"chat_id": chat_id, "text": text})
+        return {"ok": True}
+
+
 @pytest.fixture()
 def test_client(
     monkeypatch: pytest.MonkeyPatch,
@@ -187,6 +201,42 @@ def test_receipt_ocr_worker_saves_raw_text_and_completes_job(
         assert job.status == "completed"
         assert job.result_id == receipt.id
         assert job.completed_at is not None
+
+
+def test_receipt_ocr_worker_sends_telegram_loading_action(
+    test_client: tuple[
+        TestClient,
+        sessionmaker[Session],
+        FakeOcrClient,
+        list[dict[str, Any]],
+    ],
+) -> None:
+    client, _session_factory, fake_ocr, _queued_jobs = test_client
+    token = _register_and_login(client, "telegram-owner@example.com")
+    media_id = _upload_receipt(client, token)
+    queue_response = client.post(
+        f"/api/ocr/receipts/{media_id}",
+        headers=_auth_headers(token),
+    )
+    job_id = int(queue_response.json()["job"]["id"])
+    user_id = int(queue_response.json()["job"]["user_id"])
+    fake_telegram = FakeTelegramClient()
+
+    with _session_factory() as db:
+        run_receipt_ocr_job(
+            db,
+            job_id=job_id,
+            user_id=user_id,
+            media_id=media_id,
+            source="telegram",
+            ocr_client=fake_ocr,
+            telegram_client=fake_telegram,  # type: ignore[arg-type]
+            notify_chat_id="456",
+            notify_platform="telegram",
+        )
+
+    assert fake_telegram.chat_actions == [{"chat_id": "456", "action": "typing"}]
+    assert "Sedang membaca struk" in fake_telegram.sent_messages[0]["text"]
 
 
 def test_receipt_ocr_is_isolated_by_current_user(

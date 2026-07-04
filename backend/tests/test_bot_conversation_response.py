@@ -1,5 +1,6 @@
 import os
 from collections.abc import Iterator
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -13,7 +14,7 @@ os.environ["LLM_PROVIDER"] = "none"
 
 from app.config import get_settings
 from app.database import Base
-from app.models import BotLog, Category, Transaction, User
+from app.models import BotLog, Category, Transaction, User, UserPreference
 from app.modules.transactions.service import handle_text_transaction
 
 
@@ -68,7 +69,7 @@ def test_pending_transaction_can_be_confirmed(session_factory: sessionmaker[Sess
         db.commit()
 
         assert first.status == "needs_confirmation"
-        assert "Apakah benar" in first.reply_text
+        assert "Balas YA" in first.reply_text
         assert db.scalar(select(Transaction)) is None
 
         confirm = handle_text_transaction(
@@ -85,6 +86,40 @@ def test_pending_transaction_can_be_confirmed(session_factory: sessionmaker[Sess
         assert transaction.amount == Decimal("20000.00")
         assert transaction.type == "expense"
         assert "Saldo sekarang" in confirm.reply_text
+        assert "Pengeluaran bulan ini" in confirm.reply_text
+        assert "Kategori terbesar" in confirm.reply_text
+
+
+def test_pending_transaction_expires_before_confirmation(
+    session_factory: sessionmaker[Session],
+) -> None:
+    with session_factory() as db:
+        user = _create_user(db)
+        first = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="keluar 20 ribu",
+            source="telegram_text",
+        )
+        db.commit()
+        pending_log = db.scalar(select(BotLog).where(BotLog.status == "pending_transaction"))
+        assert first.status == "needs_confirmation"
+        assert pending_log is not None
+        pending_log.created_at = datetime.utcnow() - timedelta(minutes=31)
+        db.commit()
+
+        confirm = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="ya",
+            source="telegram_text",
+        )
+        db.commit()
+
+        assert confirm.status == "no_pending_confirmation"
+        assert "kedaluwarsa" in confirm.reply_text
+        assert db.scalar(select(Transaction)) is None
+        assert db.scalar(select(BotLog).where(BotLog.status == "expired_transaction")) is not None
 
 
 def test_missing_amount_can_be_filled_step_by_step(
@@ -169,6 +204,103 @@ def test_pending_transaction_can_be_edited_before_save(
         assert transaction.category.name == "Makanan"
 
 
+def test_pending_transaction_supports_category_date_description_edits(
+    session_factory: sessionmaker[Session],
+) -> None:
+    with session_factory() as db:
+        user = _create_user(db)
+        first = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="keluar 50rb",
+            source="telegram_text",
+        )
+        db.commit()
+        assert first.status == "needs_confirmation"
+
+        category_edit = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="edit kategori transport",
+            source="telegram_text",
+        )
+        db.commit()
+        assert category_edit.status == "edit_updated"
+        assert "Transportasi" in category_edit.reply_text
+
+        date_edit = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="edit tanggal kemarin",
+            source="telegram_text",
+        )
+        db.commit()
+        assert date_edit.status == "edit_updated"
+        assert (date.today() - timedelta(days=1)).isoformat() in date_edit.reply_text
+
+        note_edit = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="edit catatan makan siang",
+            source="telegram_text",
+        )
+        db.commit()
+        assert note_edit.status == "edit_updated"
+        assert "makan siang" in note_edit.reply_text
+
+        confirm = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="ya",
+            source="telegram_text",
+        )
+        db.commit()
+
+        transaction = db.scalar(select(Transaction))
+        assert confirm.status == "saved"
+        assert transaction is not None
+        assert transaction.category.name == "Transportasi"
+        assert transaction.transaction_date == date.today() - timedelta(days=1)
+        assert transaction.description == "makan siang"
+
+
+def test_pending_transaction_type_can_be_swapped_with_bukan_phrase(
+    session_factory: sessionmaker[Session],
+) -> None:
+    with session_factory() as db:
+        user = _create_user(db)
+        handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="keluar 50rb",
+            source="telegram_text",
+        )
+        db.commit()
+
+        edited = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="bukan pengeluaran, pemasukan",
+            source="telegram_text",
+        )
+        db.commit()
+        assert edited.status == "edit_updated"
+        assert "Pemasukan" in edited.reply_text
+
+        confirm = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="ya",
+            source="telegram_text",
+        )
+        db.commit()
+
+        transaction = db.scalar(select(Transaction))
+        assert confirm.status == "saved"
+        assert transaction is not None
+        assert transaction.type == "income"
+
+
 def test_lightweight_responses_and_spending_check(
     session_factory: sessionmaker[Session],
 ) -> None:
@@ -191,6 +323,157 @@ def test_lightweight_responses_and_spending_check(
         )
         assert spending.status == "spending_check"
         assert "Pengeluaran hari ini" in spending.reply_text
+
+
+def test_common_finance_questions_use_local_insights_before_llm(
+    session_factory: sessionmaker[Session],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_answer(*_args: object, **_kwargs: object) -> str:
+        raise AssertionError("LLM chat should not be called for supported insight questions")
+
+    monkeypatch.setattr(
+        "app.modules.transactions.service.answer_finance_question_with_llm",
+        fail_answer,
+    )
+
+    with session_factory() as db:
+        user = _create_user(db)
+        food = db.scalar(select(Category).where(Category.name == "Makanan"))
+        db.add_all(
+            [
+                Transaction(
+                    user_id=user.id,
+                    type="income",
+                    amount=Decimal("100000.00"),
+                    category_id=db.scalar(select(Category).where(Category.name == "Gaji")).id,
+                    description="gaji",
+                    transaction_date=date.today(),
+                    source="telegram_text",
+                ),
+                Transaction(
+                    user_id=user.id,
+                    type="expense",
+                    amount=Decimal("75000.00"),
+                    category_id=food.id if food else None,
+                    description="makan",
+                    transaction_date=date.today(),
+                    source="telegram_text",
+                ),
+            ]
+        )
+        db.commit()
+
+        spending = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="bulan ini aku boros gak?",
+            source="telegram_text",
+        )
+        advice = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="saran hemat minggu ini?",
+            source="telegram_text",
+        )
+        reason = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="kenapa saldo cepat habis?",
+            source="telegram_text",
+        )
+
+    assert spending.status == "spending_check"
+    assert "Pengeluaran bulan ini" in spending.reply_text
+    assert advice.status == "saving_advice"
+    assert "Saran cepat" in advice.reply_text
+    assert reason.status == "cashflow_reason"
+    assert "Saldo cepat habis" in reason.reply_text
+
+
+def test_reply_style_preference_is_saved_and_used(
+    session_factory: sessionmaker[Session],
+) -> None:
+    with session_factory() as db:
+        user = _create_user(db)
+        preference = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="gaya bahasa singkat",
+            source="telegram_text",
+        )
+        db.commit()
+
+        saved = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="beli makan 20 ribu",
+            source="telegram_text",
+        )
+        db.commit()
+
+        stored_preference = db.scalar(
+            select(UserPreference).where(UserPreference.user_id == user.id)
+        )
+        assert preference.status == "preference_updated"
+        assert stored_preference is not None
+        assert stored_preference.reply_style == "short"
+        assert saved.status == "saved"
+        assert saved.reply_text.startswith("Oke, Tercatat.")
+
+
+def test_unknown_finance_question_uses_llm_chat(
+    session_factory: sessionmaker[Session],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[dict[str, object]] = []
+
+    def fake_answer(message: str, **kwargs: object) -> str:
+        calls.append({"message": message, **kwargs})
+        return "Bulan ini pengeluaranmu masih aman. Mulai pantau kategori terbesar dulu."
+
+    monkeypatch.setattr(
+        "app.modules.transactions.service.answer_finance_question_with_llm",
+        fake_answer,
+    )
+
+    with session_factory() as db:
+        user = _create_user(db)
+        result = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="menurutmu keuangan bulan ini aman nggak?",
+            source="telegram_text",
+        )
+
+    assert result.status == "finance_chat"
+    assert "pengeluaranmu" in result.reply_text
+    assert calls and "Pengeluaran bulan ini" in str(calls[0]["context"])
+
+
+def test_unknown_non_finance_question_does_not_use_llm_chat(
+    session_factory: sessionmaker[Session],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_answer(*_args: object, **_kwargs: object) -> str:
+        raise AssertionError("LLM chat should not be called")
+
+    monkeypatch.setattr(
+        "app.modules.transactions.service.answer_finance_question_with_llm",
+        fail_answer,
+    )
+
+    with session_factory() as db:
+        user = _create_user(db)
+        result = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="ceritakan cuaca bandung",
+            source="telegram_text",
+        )
+
+    assert result.status == "unknown"
+    assert "Aku belum paham" in result.reply_text
 
 
 def test_cancel_pending_transaction(session_factory: sessionmaker[Session]) -> None:

@@ -8,7 +8,6 @@ from typing import Any
 
 SOURCE_WHATSAPP_TEXT = "whatsapp_text"
 CONFIRMATION_THRESHOLD = 0.85
-LLM_FALLBACK_THRESHOLD = 0.60
 
 INTENT_ADD_TRANSACTION = "add_transaction"
 INTENT_GET_BALANCE = "get_balance"
@@ -39,38 +38,6 @@ VALID_INTENTS = {
 }
 
 TRANSACTION_TYPES = {"income", "expense", "none"}
-
-COMPACT_INTENT_MAP = {
-    "ADD": INTENT_ADD_TRANSACTION,
-    "BAL": INTENT_GET_BALANCE,
-    "EXP": INTENT_LIST_EXPENSE,
-    "INC": INTENT_LIST_INCOME,
-    "REP": INTENT_GET_REPORT,
-    "PDF": INTENT_EXPORT_PDF,
-    "HELP": INTENT_HELP,
-    "UNK": INTENT_UNKNOWN,
-}
-
-CATEGORY_CODE_MAP = {
-    "MKN": "Makanan",
-    "TRP": "Transportasi",
-    "TGH": "Tagihan",
-    "BLJ": "Belanja",
-    "HBR": "Hiburan",
-    "KSH": "Kesehatan",
-    "PDD": "Pendidikan",
-    "GJI": "Gaji",
-    "USK": "Uang Saku",
-    "LNY": "Lainnya",
-}
-
-DATE_CODE_MAP = {
-    "today": "day",
-    "yesterday": "yesterday",
-    "this_week": "week",
-    "this_month": "month",
-    "unknown": None,
-}
 
 
 @dataclass(frozen=True)

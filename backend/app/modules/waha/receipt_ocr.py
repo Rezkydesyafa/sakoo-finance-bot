@@ -1,44 +1,33 @@
-import re
-from dataclasses import asdict, dataclass
 from datetime import date
-from decimal import Decimal
-from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Category, Receipt, Transaction
+from app.models import Receipt, Transaction
+from app.modules.bot.conversation_state import get_pending_transaction
 from app.modules.jobs.service import (
     JobQueueError,
     ReceiptOcrEnqueue,
     queue_receipt_ocr_job,
 )
 from app.modules.media.service import MediaStorageError, save_media_bytes
-from app.modules.parser.transaction_text import parse_transaction_text
+from app.modules.ocr.receipt_chat import (
+    PENDING_RECEIPT_STATUSES,
+    ReceiptOcrFlowResult,
+    YES_CONFIRMATION_RE,
+    apply_caption_amount_if_possible,
+    apply_receipt_correction,
+    find_duplicate_receipt_transaction,
+    find_latest_saved_receipt_transaction,
+    format_duplicate_receipt_reply,
+    format_receipt_confirmation,
+    format_rupiah,
+    receipt_category_name,
+    receipt_description,
+)
+from app.modules.transactions.repository import find_category
 from app.modules.waha.client import WahaClient, WahaClientError
 from app.modules.waha.parser import ParsedWahaMessage
-
-
-YES_CONFIRMATION_RE = re.compile(
-    r"^\s*(?:ya|iya|y|yes|ok|oke|benar|setuju|simpan)\s*$",
-    re.IGNORECASE,
-)
-EDIT_TOTAL_RE = re.compile(r"^\s*edit(?:\s+total)?\s+(?P<amount>.+?)\s*$", re.IGNORECASE)
-PENDING_RECEIPT_STATUSES = ("processed", "needs_confirmation", "manual_input_required")
-
-
-@dataclass(frozen=True)
-class ReceiptOcrFlowResult:
-    status: str
-    reply_text: str | None = None
-    media_file_id: int | None = None
-    receipt_id: int | None = None
-    job_id: int | None = None
-    transaction_id: int | None = None
-    error_message: str | None = None
-
-    def to_log_payload(self) -> dict[str, Any]:
-        return asdict(self)
 
 
 def handle_whatsapp_receipt_image(
@@ -72,7 +61,7 @@ def handle_whatsapp_receipt_image(
             mime_type=parsed.media_mimetype or downloaded.content_type,
             source="whatsapp_receipt",
         )
-        _store_receipt_caption(
+        receipt = _store_receipt_caption(
             db,
             user_id=user_id,
             media_file_id=media_file.id,
@@ -103,6 +92,7 @@ def handle_whatsapp_receipt_image(
             return ReceiptOcrFlowResult(
                 status="limit_reached",
                 media_file_id=media_file.id,
+                receipt_id=receipt.id,
                 reply_text=(
                     "Batas OCR harian kamu sudah tercapai. "
                     "Coba lagi besok agar kuota Google Vision tetap terkendali."
@@ -112,6 +102,7 @@ def handle_whatsapp_receipt_image(
         return ReceiptOcrFlowResult(
             status="queue_failed",
             media_file_id=media_file.id,
+            receipt_id=receipt.id,
             reply_text=(
                 "Foto struk sudah diterima, tetapi job OCR gagal masuk antrean. "
                 "Coba lagi beberapa saat lagi."
@@ -122,13 +113,9 @@ def handle_whatsapp_receipt_image(
     return ReceiptOcrFlowResult(
         status="queued",
         media_file_id=media_file.id,
+        receipt_id=receipt.id,
         job_id=job.id,
-        reply_text=(
-            "Aku lagi baca struknya...\n"
-            "[1/3] Foto diterima\n"
-            "[2/3] masuk antrean OCR\n"
-            "[3/3] Nanti aku kirim hasilnya setelah selesai diproses."
-        ),
+        reply_text=_queued_reply(has_caption=bool(parsed.text)),
     )
 
 
@@ -144,42 +131,80 @@ def handle_whatsapp_receipt_confirmation(
     if YES_CONFIRMATION_RE.match(text):
         receipt = _find_pending_receipt(db, user_id=user_id)
         if receipt is None:
+            if get_pending_transaction(db, user_id=user_id) is not None:
+                return None
+            latest_transaction = find_latest_saved_receipt_transaction(db, user_id=user_id)
+            if latest_transaction is not None:
+                return ReceiptOcrFlowResult(
+                    status="duplicate",
+                    transaction_id=latest_transaction.id,
+                    reply_text=format_duplicate_receipt_reply(
+                        latest_transaction,
+                        subject="Struk terakhir",
+                    ),
+                )
             return ReceiptOcrFlowResult(
                 status="no_pending_receipt",
                 reply_text="Tidak ada struk yang sedang menunggu konfirmasi.",
             )
         return _confirm_receipt_transaction(db=db, receipt=receipt)
 
-    edit_match = EDIT_TOTAL_RE.match(text)
-    if not edit_match:
-        return None
-
     receipt = _find_pending_receipt(db, user_id=user_id)
     if receipt is None:
-        return ReceiptOcrFlowResult(
-            status="no_pending_receipt",
-            reply_text="Tidak ada struk yang bisa diedit. Kirim foto struk terlebih dahulu.",
-        )
+        return _handle_receipt_caption_text(db=db, user_id=user_id, text=text)
 
-    amount = _parse_edit_amount(edit_match.group("amount"))
-    if amount is None:
+    correction = apply_receipt_correction(receipt, text)
+    if correction is None:
+        return _handle_receipt_caption_text(db=db, user_id=user_id, text=text)
+    if correction.error_message:
         return ReceiptOcrFlowResult(
             status="edit_invalid",
             receipt_id=receipt.id,
-            reply_text="Format edit belum terbaca. Contoh: edit total 20000",
-            error_message="invalid_edit_amount",
+            reply_text=correction.error_message,
+            error_message="invalid_receipt_edit",
         )
-
-    receipt.total_amount = amount
-    receipt.confidence = Decimal("0.8000")
-    receipt.status = "needs_confirmation"
     db.commit()
     db.refresh(receipt)
 
     return ReceiptOcrFlowResult(
         status="edit_updated",
         receipt_id=receipt.id,
-        reply_text=_format_receipt_confirmation(receipt),
+        reply_text=format_receipt_confirmation(receipt),
+    )
+
+
+def _handle_receipt_caption_text(
+    *,
+    db: Session,
+    user_id: int,
+    text: str,
+) -> ReceiptOcrFlowResult | None:
+    receipt = _find_pending_receipt(db, user_id=user_id)
+    if receipt is None or receipt.caption_text:
+        return None
+
+    receipt.caption_text = text.strip()
+    apply_caption_amount_if_possible(receipt, merchant_name="Caption WhatsApp")
+    db.commit()
+    db.refresh(receipt)
+
+    if receipt.total_amount is not None:
+        reply_text = (
+            "Oke, keterangan struk sudah kusimpan.\n\n"
+            f"{format_receipt_confirmation(receipt)}"
+        )
+    else:
+        reply_text = (
+            f"Oke, keterangan struk kusimpan: {receipt.caption_text}.\n"
+            "Aku tetap lanjut baca OCR. Kalau total belum terbaca nanti, "
+            "kamu bisa koreksi dengan format: 20000 atau edit total 20000."
+        )
+
+    return ReceiptOcrFlowResult(
+        status="caption_saved",
+        receipt_id=receipt.id,
+        media_file_id=receipt.media_file_id,
+        reply_text=reply_text,
     )
 
 
@@ -198,13 +223,33 @@ def _confirm_receipt_transaction(
             error_message="missing_total_amount",
         )
 
-    category = _find_default_expense_category(db)
+    duplicate = find_duplicate_receipt_transaction(
+        db,
+        receipt,
+        fallback_description="Struk WhatsApp",
+    )
+    if duplicate is not None:
+        receipt.transaction_id = duplicate.id
+        receipt.status = "duplicate"
+        db.commit()
+        return ReceiptOcrFlowResult(
+            status="duplicate",
+            receipt_id=receipt.id,
+            transaction_id=duplicate.id,
+            reply_text=format_duplicate_receipt_reply(duplicate),
+        )
+
+    category = find_category(
+        db=db,
+        category_name=receipt_category_name(receipt),
+        transaction_type="expense",
+    )
     transaction = Transaction(
         user_id=receipt.user_id,
         type="expense",
         amount=receipt.total_amount,
         category_id=category.id if category else None,
-        description=_receipt_description(receipt),
+        description=receipt_description(receipt, fallback="Struk WhatsApp"),
         transaction_date=receipt.receipt_date or date.today(),
         source="receipt_ocr",
     )
@@ -222,7 +267,7 @@ def _confirm_receipt_transaction(
         transaction_id=transaction.id,
         reply_text=(
             "Transaksi struk tersimpan: "
-            f"Pengeluaran {_format_rupiah(transaction.amount)} "
+            f"Pengeluaran {format_rupiah(transaction.amount)} "
             f"untuk {receipt.merchant_name or 'Struk'} "
             f"pada {transaction.transaction_date.isoformat()}."
         ),
@@ -247,10 +292,7 @@ def _store_receipt_caption(
     user_id: int,
     media_file_id: int,
     caption_text: str | None,
-) -> Receipt | None:
-    if not caption_text or not caption_text.strip():
-        return None
-
+) -> Receipt:
     receipt = db.scalar(
         select(Receipt).where(
             Receipt.user_id == user_id,
@@ -266,74 +308,23 @@ def _store_receipt_caption(
         db.add(receipt)
         db.flush()
 
-    receipt.caption_text = caption_text.strip()
+    if caption_text and caption_text.strip():
+        receipt.caption_text = caption_text.strip()
     return receipt
 
-
-def _find_default_expense_category(db: Session) -> Category | None:
-    return db.scalar(
-        select(Category).where(
-            func.lower(Category.name) == "lainnya",
-            Category.type == "expense",
-        )
-    )
-
-
-def _parse_edit_amount(value: str) -> Decimal | None:
-    parsed = parse_transaction_text(f"beli struk {value}")
-    return parsed.amount
-
-
-def _receipt_description(receipt: Receipt) -> str:
-    if receipt.caption_text:
-        parsed_caption = parse_transaction_text(receipt.caption_text)
-        if parsed_caption.description:
-            return parsed_caption.description
-    if receipt.merchant_name:
-        return f"Struk {receipt.merchant_name}"
-    return "Struk WhatsApp"
-
-
-def _format_receipt_confirmation(receipt: Receipt) -> str:
-    merchant = receipt.merchant_name or "merchant belum terbaca"
-    receipt_date = receipt.receipt_date.isoformat() if receipt.receipt_date else "tanggal belum terbaca"
-    confidence = f"{float(receipt.confidence or Decimal('0')) * 100:.0f}%"
-
-    if receipt.total_amount is None:
-        fallback_text = (
-            " Kalau foto kurang jelas, caption juga bisa dipakai. "
-            "Contoh caption: beli makan 20 ribu."
-            if not receipt.caption_text
-            else " Caption yang kamu kirim belum punya nominal yang jelas."
-        )
+def _queued_reply(*, has_caption: bool) -> str:
+    if has_caption:
         return (
-            "Foto struk sudah diproses OCR, tetapi total belanja belum terbaca. "
-            f"Merchant: {merchant}. Tanggal: {receipt_date}. "
-            "Kirim koreksi dengan format: edit total 20000."
-            f"{fallback_text}"
+            "Aku lagi baca struknya...\n"
+            "[1/3] Foto diterima\n"
+            "[2/3] masuk antrean OCR\n"
+            "[3/3] Nanti aku kirim hasilnya setelah selesai diproses."
         )
-
-    used_caption_fallback = (
-        bool(receipt.caption_text)
-        and receipt.status == "needs_confirmation"
-        and (receipt.confidence or Decimal("0")) == Decimal("0.7000")
-    )
-    fallback_note = " Total ini aku ambil dari caption karena OCR belum cukup jelas. " if used_caption_fallback else ""
     return (
-        "Foto struk sudah diproses OCR. "
-        f"Merchant: {merchant}. Tanggal: {receipt_date}. "
-        f"Total: {_format_rupiah(receipt.total_amount)}. "
-        f"Confidence: {confidence}. "
-        f"{fallback_note}"
-        "Ketik YA untuk menyimpan transaksi, atau edit total 20000 untuk koreksi."
+        "Aku lagi baca struknya...\n"
+        "[1/3] Foto diterima\n"
+        "[2/3] masuk antrean OCR\n"
+        "[3/3] Nanti aku kirim hasilnya setelah selesai diproses.\n\n"
+        "Kalau struknya tidak punya keterangan, balas captionnya ya. "
+        "Contoh: makan siang 20 ribu atau parkir kantor 5 ribu."
     )
-
-
-def format_receipt_confirmation(receipt: Receipt) -> str:
-    return _format_receipt_confirmation(receipt)
-
-
-def _format_rupiah(value: Decimal | None) -> str:
-    if value is None:
-        return "Rp0"
-    return f"Rp{int(value):,}".replace(",", ".")

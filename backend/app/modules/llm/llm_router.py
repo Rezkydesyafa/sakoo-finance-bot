@@ -15,7 +15,6 @@ from app.modules.llm.base import (
     BaseLlmProvider,
     LlmProviderConfig,
     LlmProviderError,
-    expand_llm_response,
 )
 from app.modules.llm.deepseek_provider import DeepSeekProvider
 from app.modules.llm.gemini_provider import GeminiProvider
@@ -23,7 +22,7 @@ from app.modules.llm.glm_provider import GlmProvider
 from app.modules.llm.openrouter_provider import OpenRouterProvider
 
 
-LLM_MESSAGE_TYPE = "llm_fallback"
+LLM_MESSAGE_TYPE = "llm_chat"
 LLM_USAGE_STATUS = "llm_usage"
 LLM_LIMIT_REACHED_STATUS = "llm_limit_reached"
 DEFAULT_RATE_LIMIT_TIMEZONE = "Asia/Jakarta"
@@ -59,15 +58,14 @@ class LlmRateLimitState:
         }
 
 
-def parse_transaction_with_llm(
+def answer_finance_question_with_llm(
     message: str,
     *,
-    source: str = "llm_fallback",
+    context: str,
     user_id: int | None = None,
     db: Session | None = None,
-    today: Any = None,
     settings: Settings | None = None,
-) -> dict[str, Any]:
+) -> str:
     active_settings = settings or get_settings()
     providers = get_llm_providers(active_settings)
     if not providers:
@@ -84,26 +82,33 @@ def parse_transaction_with_llm(
     errors: list[str] = []
     for provider in providers:
         try:
-            compact_result = provider.parse_transaction(message)
-            expanded = expand_llm_response(compact_result, source=source, today=today)
+            answer = provider.answer_finance_question(message, context=context)
         except LlmProviderError as exc:
             errors.append(f"{provider.provider_name}:{exc.detail}")
             continue
 
-        metadata = dict(expanded.get("metadata") or {})
-        metadata["llm_provider"] = provider.provider_name
-        expanded["metadata"] = metadata
+        cleaned = _clean_answer(answer)
+        if not cleaned:
+            errors.append(f"{provider.provider_name}:empty_answer")
+            continue
 
         if db is not None and user_id is not None and state is not None:
             log_llm_usage(
                 db,
                 user_id=user_id,
                 provider=provider.provider_name,
-                result=expanded,
+                result={
+                    "intent": "finance_chat",
+                    "type": None,
+                    "amount": None,
+                    "category": None,
+                    "confidence": 1,
+                    "need_confirmation": False,
+                },
                 state=state,
             )
 
-        return expanded
+        return cleaned
 
     detail = ";".join(errors) if errors else "no_provider_attempted"
     raise LlmProviderError(f"llm_all_providers_failed:{detail}")
@@ -116,7 +121,7 @@ def get_llm_provider(settings: Settings | None = None) -> BaseLlmProvider | None
 
 def get_llm_providers(settings: Settings | None = None) -> list[BaseLlmProvider]:
     active_settings = settings or get_settings()
-    provider_names = _parse_provider_names(active_settings.llm_provider)
+    provider_names = _resolve_provider_names(active_settings)
     timeout = active_settings.llm_timeout_seconds
 
     providers: list[BaseLlmProvider] = []
@@ -185,12 +190,30 @@ def get_llm_providers(settings: Settings | None = None) -> list[BaseLlmProvider]
     return providers
 
 
+def _resolve_provider_names(settings: Settings) -> list[str]:
+    provider_names = _parse_provider_names(settings.llm_provider)
+    if provider_names and provider_names != ["none"]:
+        return provider_names
+
+    inferred: list[str] = []
+    if _gemini_api_keys(settings):
+        inferred.append("gemini")
+    if settings.openrouter_api_key.strip():
+        inferred.append("openrouter")
+    return inferred or provider_names
+
+
 def _parse_provider_names(value: str) -> list[str]:
     return [
         item
         for item in re.split(r"[\s,;|+>]+", value.strip().lower())
         if item
     ]
+
+
+def _clean_answer(value: str) -> str:
+    text = re.sub(r"\s+\n", "\n", str(value or "")).strip()
+    return text[:1200]
 
 
 def _gemini_api_keys(settings: Settings) -> list[str]:
