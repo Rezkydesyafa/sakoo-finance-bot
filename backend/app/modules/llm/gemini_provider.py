@@ -7,10 +7,8 @@ import httpx
 from app.modules.llm.base import (
     BaseLlmProvider,
     LlmProviderError,
-    build_llm_prompt,
+    build_finance_chat_prompt,
     compact_error_detail,
-    parse_json_object,
-    validate_llm_response,
 )
 
 
@@ -18,7 +16,7 @@ class GeminiProvider(BaseLlmProvider):
     provider_name = "gemini"
     model = "gemini-1.5-flash"
 
-    def parse_transaction(self, message: str) -> dict[str, Any]:
+    def answer_finance_question(self, message: str, *, context: str) -> str:
         if not self.config.api_key:
             raise LlmProviderError("gemini_api_key_missing")
 
@@ -28,12 +26,14 @@ class GeminiProvider(BaseLlmProvider):
             f"{model}:generateContent"
         )
         payload = {
-            "contents": [{"parts": [{"text": build_llm_prompt(message)}]}],
-            "generationConfig": {
-                "temperature": 0,
-                "maxOutputTokens": 120,
-                "responseMimeType": "application/json",
-            },
+            "contents": [
+                {
+                    "parts": [
+                        {"text": build_finance_chat_prompt(message, context=context)}
+                    ]
+                }
+            ],
+            "generationConfig": {"temperature": 0.4, "maxOutputTokens": 160},
         }
         try:
             response = httpx.post(
@@ -57,7 +57,6 @@ class GeminiProvider(BaseLlmProvider):
             raise LlmProviderError("gemini_response_invalid_json") from exc
 
         try:
-            text = data["candidates"][0]["content"]["parts"][0]["text"]
+            return str(data["candidates"][0]["content"]["parts"][0]["text"]).strip()
         except (KeyError, IndexError, TypeError) as exc:
             raise LlmProviderError("gemini_response_missing_text") from exc
-        return validate_llm_response(parse_json_object(str(text)))

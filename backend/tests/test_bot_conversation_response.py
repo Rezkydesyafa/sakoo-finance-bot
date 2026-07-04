@@ -193,6 +193,60 @@ def test_lightweight_responses_and_spending_check(
         assert "Pengeluaran hari ini" in spending.reply_text
 
 
+def test_unknown_finance_question_uses_llm_chat(
+    session_factory: sessionmaker[Session],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[dict[str, object]] = []
+
+    def fake_answer(message: str, **kwargs: object) -> str:
+        calls.append({"message": message, **kwargs})
+        return "Bulan ini pengeluaranmu masih aman. Mulai pantau kategori terbesar dulu."
+
+    monkeypatch.setattr(
+        "app.modules.transactions.service.answer_finance_question_with_llm",
+        fake_answer,
+    )
+
+    with session_factory() as db:
+        user = _create_user(db)
+        result = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="menurutmu keuangan bulan ini aman nggak?",
+            source="telegram_text",
+        )
+
+    assert result.status == "finance_chat"
+    assert "pengeluaranmu" in result.reply_text
+    assert calls and "Pengeluaran bulan ini" in str(calls[0]["context"])
+
+
+def test_unknown_non_finance_question_does_not_use_llm_chat(
+    session_factory: sessionmaker[Session],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_answer(*_args: object, **_kwargs: object) -> str:
+        raise AssertionError("LLM chat should not be called")
+
+    monkeypatch.setattr(
+        "app.modules.transactions.service.answer_finance_question_with_llm",
+        fail_answer,
+    )
+
+    with session_factory() as db:
+        user = _create_user(db)
+        result = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="ceritakan cuaca bandung",
+            source="telegram_text",
+        )
+
+    assert result.status == "unknown"
+    assert "Aku belum paham" in result.reply_text
+
+
 def test_cancel_pending_transaction(session_factory: sessionmaker[Session]) -> None:
     with session_factory() as db:
         user = _create_user(db)

@@ -18,6 +18,8 @@ from app.modules.bot.conversation_state import (
     store_pending_transaction,
     update_pending_transaction,
 )
+from app.modules.llm.base import LlmProviderError
+from app.modules.llm.llm_router import answer_finance_question_with_llm
 from app.modules.bot.response_templates import (
     format_cancelled_response,
     format_confirmation_request,
@@ -68,6 +70,12 @@ SPENDING_CHECK_RE = re.compile(r"\b(?:boros|hemat|pengeluaran.*hari ini|hari ini
 TOP_EXPENSE_RE = re.compile(r"\b(?:pengeluaran terbesar|paling gede|terbesar apa|top pengeluaran)\b", re.IGNORECASE)
 CATEGORY_SUMMARY_RE = re.compile(
     r"\b(?P<category>makan(?:an)?|kopi|transport|bensin|tagihan|belanja|hiburan|kesehatan|pendidikan|kos)\b.*\b(?:berapa|total|bulan ini|minggu ini|hari ini)\b",
+    re.IGNORECASE,
+)
+FINANCE_CHAT_RE = re.compile(
+    r"\b(?:uang|keuangan|finansial|saldo|pengeluaran|pemasukan|transaksi|laporan|"
+    r"budget|anggaran|hemat|boros|tabung|tabungan|gaji|struk|ocr|kategori|"
+    r"dashboard|sakoo|utang|hutang|piutang|cashflow|pdf)\b",
     re.IGNORECASE,
 )
 
@@ -154,6 +162,16 @@ def handle_text_transaction(
             transaction_type=forced_transaction_type,
         )
     if parse_result.intent != INTENT_ADD_TRANSACTION:
+        if parse_result.intent == INTENT_UNKNOWN:
+            llm_chat = _handle_llm_finance_chat(
+                db=db,
+                user_id=user_id,
+                text=text,
+                source=source,
+                parse_result=parse_result,
+            )
+            if llm_chat is not None:
+                return llm_chat
         return TextTransactionResult(
             status=parse_result.intent,
             reply_text=_format_command_response(db, user_id, parse_result),
@@ -293,6 +311,43 @@ def _handle_pending_transaction_reply(
         )
 
     return None
+
+
+def _handle_llm_finance_chat(
+    *,
+    db: Session,
+    user_id: int,
+    text: str,
+    source: str,
+    parse_result: ParsedMessage,
+) -> TextTransactionResult | None:
+    if not FINANCE_CHAT_RE.search(normalize_text(text)):
+        return None
+
+    try:
+        answer = answer_finance_question_with_llm(
+            text,
+            context=_build_llm_finance_context(db, user_id),
+            user_id=user_id,
+            db=db,
+        )
+    except LlmProviderError as exc:
+        return TextTransactionResult(
+            status=INTENT_UNKNOWN,
+            reply_text=_format_command_response(db, user_id, parse_result),
+            parse_result=parse_result,
+            error_message=exc.detail,
+        )
+
+    return TextTransactionResult(
+        status="finance_chat",
+        reply_text=answer,
+        parse_result=_synthetic_parse_result(
+            text=text,
+            source=source,
+            intent="finance_chat",
+        ),
+    )
 
 
 def _handle_lightweight_message(
@@ -750,6 +805,56 @@ def _format_category_summary_response(
     return (
         f"{category_name} bulan ini: {format_rupiah(total)}.\n"
         "Aku hitung dari transaksi yang sudah tercatat."
+    )
+
+
+def _build_llm_finance_context(db: Session, user_id: int) -> str:
+    today = date.today()
+    month_start = today.replace(day=1)
+    income_total = sum_transactions(db, user_id, transaction_type="income")
+    expense_total = sum_transactions(db, user_id, transaction_type="expense")
+    month_expense = sum_transactions(
+        db,
+        user_id,
+        transaction_type="expense",
+        start_date=month_start,
+        end_date=today,
+    )
+    month_income = sum_transactions(
+        db,
+        user_id,
+        transaction_type="income",
+        start_date=month_start,
+        end_date=today,
+    )
+    top_category = top_expense_category(
+        db,
+        user_id,
+        start_date=month_start,
+        end_date=today,
+    )
+    recent = list_transactions(db, user_id, limit=5)
+    recent_lines = [
+        f"{item.transaction_date.isoformat()} {item.type} {format_rupiah(item.amount)} "
+        f"{item.category.name if item.category else 'Tanpa kategori'} "
+        f"{item.description or ''}".strip()
+        for item in recent
+    ]
+    top_text = (
+        f"{top_category[0]} {format_rupiah(top_category[1])}"
+        if top_category
+        else "belum ada"
+    )
+    return "\n".join(
+        [
+            f"Saldo total: {format_rupiah(income_total - expense_total)}",
+            f"Pemasukan total: {format_rupiah(income_total)}",
+            f"Pengeluaran total: {format_rupiah(expense_total)}",
+            f"Pemasukan bulan ini: {format_rupiah(month_income)}",
+            f"Pengeluaran bulan ini: {format_rupiah(month_expense)}",
+            f"Kategori pengeluaran terbesar bulan ini: {top_text}",
+            "Transaksi terbaru: " + ("; ".join(recent_lines) if recent_lines else "belum ada"),
+        ]
     )
 
 

@@ -1,47 +1,24 @@
 from __future__ import annotations
 
-import json
 import re
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import date, timedelta
-from decimal import Decimal
 from typing import Any
 
-from app.modules.parser.schemas import (
-    CATEGORY_CODE_MAP,
-    COMPACT_INTENT_MAP,
-    DATE_CODE_MAP,
-    INTENT_ADD_TRANSACTION,
+import httpx
+
+
+FINANCE_CHAT_PROMPT_TEMPLATE = (
+    "Role:Sakoo finance bot. Reply ID, max 4 short lines. "
+    "Use ctx numbers only; do not invent. "
+    "If outside finance/Sakoo, say you only help finance/Sakoo. "
+    'Ctx:{context} Q:"{message}"'
 )
-
-
-LLM_PROMPT_TEMPLATE = """Parse pesan ke JSON saja.
-
-Cat:
-MKN makanan, TRP transport, TGH tagihan, BLJ belanja, HBR hiburan, KSH kesehatan, PDD pendidikan, GJI gaji, USK uang_saku, LNY lainnya.
-
-Intent:
-ADD transaksi, BAL saldo, EXP pengeluaran, INC pemasukan, REP laporan, PDF export_pdf, HELP bantuan, UNK unknown.
-
-JSON:
-{"i":"","t":"","a":0,"c":"","d":"","dt":"","cf":0,"ask":false}
-
-Rule:
-i pakai kode intent. t=income/expense/none. a=rupiah integer. c=kode cat. dt=today/yesterday/this_week/this_month/unknown. Jika ragu/nominal kosong ask=true cf rendah. Jangan tambah teks.
-
-Msg: "{message}"
-"""
 
 
 class LlmProviderError(Exception):
     def __init__(self, detail: str) -> None:
         super().__init__(detail)
         self.detail = detail
-
-
-class LlmResponseValidationError(LlmProviderError):
-    pass
 
 
 @dataclass(frozen=True)
@@ -51,21 +28,24 @@ class LlmProviderConfig:
     model: str | None = None
 
 
-class BaseLlmProvider(ABC):
+class BaseLlmProvider:
     provider_name: str
 
     def __init__(self, config: LlmProviderConfig) -> None:
         self.config = config
 
-    @abstractmethod
-    def parse_transaction(self, message: str) -> dict[str, Any]:
-        """Return compact validated LLM JSON."""
+    def answer_finance_question(self, message: str, *, context: str) -> str:
+        raise LlmProviderError(f"{self.provider_name}_finance_chat_not_supported")
 
 
-def build_llm_prompt(message: str) -> str:
+def build_finance_chat_prompt(message: str, *, context: str) -> str:
     compact_message = re.sub(r"\s+", " ", message.strip())
-    escaped_message = compact_message[:500].replace("\\", "\\\\").replace('"', '\\"')
-    return LLM_PROMPT_TEMPLATE.replace("{message}", escaped_message)
+    escaped_message = compact_message[:300].replace("\\", "\\\\").replace('"', '\\"')
+    compact_context = re.sub(r"\s+", " ", context.strip())[:900]
+    return FINANCE_CHAT_PROMPT_TEMPLATE.replace("{message}", escaped_message).replace(
+        "{context}",
+        compact_context,
+    )
 
 
 def compact_error_detail(raw_text: str, *, limit: int = 240) -> str:
@@ -75,151 +55,50 @@ def compact_error_detail(raw_text: str, *, limit: int = 240) -> str:
     return text[:limit]
 
 
-def parse_json_object(raw_text: str) -> dict[str, Any]:
-    text = raw_text.strip()
-    try:
-        payload = json.loads(text)
-    except json.JSONDecodeError:
-        match = re.search(r"\{.*\}", text, re.DOTALL)
-        if not match:
-            raise LlmResponseValidationError("llm_response_not_json")
-        try:
-            payload = json.loads(match.group(0))
-        except json.JSONDecodeError as exc:
-            raise LlmResponseValidationError("llm_response_not_json") from exc
-
-    if not isinstance(payload, dict):
-        raise LlmResponseValidationError("llm_response_must_be_object")
-    return payload
-
-
-def validate_llm_response(payload: dict[str, Any]) -> dict[str, Any]:
-    required_fields = {"i", "t", "a", "c", "d", "dt", "cf", "ask"}
-    missing = required_fields - payload.keys()
-    if missing:
-        raise LlmResponseValidationError(f"llm_response_missing_fields:{sorted(missing)}")
-
-    intent_code = str(payload["i"]).upper()
-    transaction_type = str(payload["t"]).lower()
-    category_code = str(payload["c"]).upper()
-    date_code = str(payload["dt"]).lower()
-
-    if intent_code not in COMPACT_INTENT_MAP:
-        raise LlmResponseValidationError("llm_response_invalid_intent")
-    if transaction_type not in {"income", "expense", "none"}:
-        raise LlmResponseValidationError("llm_response_invalid_type")
-    if category_code not in CATEGORY_CODE_MAP:
-        raise LlmResponseValidationError("llm_response_invalid_category")
-    if date_code not in DATE_CODE_MAP:
-        raise LlmResponseValidationError("llm_response_invalid_date")
-    ask = _parse_bool(payload["ask"])
-
-    try:
-        amount = int(payload["a"])
-    except (TypeError, ValueError) as exc:
-        raise LlmResponseValidationError("llm_response_invalid_amount") from exc
-    if amount < 0:
-        raise LlmResponseValidationError("llm_response_invalid_amount")
-
-    confidence = _parse_confidence(payload["cf"])
-
-    description = payload["d"]
-    if description is None:
-        description = ""
-    if not isinstance(description, str):
-        raise LlmResponseValidationError("llm_response_invalid_description")
-
-    return {
-        "i": intent_code,
-        "t": transaction_type,
-        "a": amount,
-        "c": category_code,
-        "d": description.strip(),
-        "dt": date_code,
-        "cf": confidence,
-        "ask": ask,
-    }
-
-
-def expand_llm_response(
-    payload: dict[str, Any],
+def request_openai_chat_completion(
     *,
-    source: str,
-    today: date | None = None,
-) -> dict[str, Any]:
-    compact = validate_llm_response(payload)
-    current_date = today or date.today()
-    intent = COMPACT_INTENT_MAP[compact["i"]]
-    amount = Decimal(compact["a"]) if compact["a"] > 0 else None
-    transaction_type = compact["t"] if compact["t"] != "none" else None
-    transaction_date = _resolve_transaction_date(compact["dt"], current_date)
-    confidence = compact["cf"]
-    need_confirmation = bool(
-        compact["ask"]
-        or confidence < 0.85
-        or (intent == INTENT_ADD_TRANSACTION and amount is None)
-        or (intent == INTENT_ADD_TRANSACTION and transaction_type is None)
-    )
+    provider_name: str,
+    api_url: str,
+    api_key: str,
+    model: str,
+    prompt: str,
+    timeout_seconds: float,
+    temperature: float = 0.4,
+    max_tokens: int = 160,
+) -> str:
+    if not api_key:
+        raise LlmProviderError(f"{provider_name}_api_key_missing")
 
-    return {
-        "intent": intent,
-        "type": transaction_type,
-        "amount": amount,
-        "category": CATEGORY_CODE_MAP[compact["c"]],
-        "description": compact["d"] or None,
-        "transaction_date": transaction_date,
-        "source": source,
-        "confidence": confidence,
-        "need_confirmation": need_confirmation,
-        "reasons": ["llm_fallback"],
-        "period": DATE_CODE_MAP[compact["dt"]],
-        "metadata": {
-            "llm_intent_code": compact["i"],
-            "llm_category_code": compact["c"],
-            "llm_date_code": compact["dt"],
-        },
+    payload = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": temperature,
+        "max_tokens": max_tokens,
     }
-
-
-def _resolve_transaction_date(date_code: str, current_date: date) -> date:
-    if date_code == "yesterday":
-        return current_date - timedelta(days=1)
-    return current_date
-
-
-def _parse_confidence(value: Any) -> float:
-    is_percent = False
-    parsed_value = value
-    if isinstance(value, str):
-        text = value.strip()
-        is_percent = text.endswith("%")
-        if is_percent:
-            text = text[:-1].strip()
-        parsed_value = text
-
     try:
-        confidence = float(parsed_value)
-    except (TypeError, ValueError) as exc:
-        raise LlmResponseValidationError("llm_response_invalid_confidence") from exc
+        response = httpx.post(
+            api_url,
+            headers={"Authorization": f"Bearer {api_key}"},
+            json=payload,
+            timeout=timeout_seconds,
+        )
+        response.raise_for_status()
+        data = response.json()
+    except httpx.HTTPStatusError as exc:
+        detail = compact_error_detail(exc.response.text)
+        raise LlmProviderError(
+            f"{provider_name}_request_failed:{exc.response.status_code}:{detail}"
+        ) from None
+    except httpx.HTTPError as exc:
+        raise LlmProviderError(f"{provider_name}_request_failed:{type(exc).__name__}") from None
+    except ValueError as exc:
+        raise LlmProviderError(f"{provider_name}_response_invalid_json") from exc
 
-    if is_percent or confidence > 1:
-        if 0 <= confidence <= 100:
-            confidence /= 100
-
-    if confidence < 0 or confidence > 1:
-        raise LlmResponseValidationError("llm_response_invalid_confidence")
-    return confidence
+    return _extract_openai_chat_text(data, provider_name).strip()
 
 
-def _parse_bool(value: Any) -> bool:
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, str):
-        normalized = value.strip().lower()
-        if normalized in {"true", "1", "yes", "y"}:
-            return True
-        if normalized in {"false", "0", "no", "n"}:
-            return False
-    if isinstance(value, int) and value in {0, 1}:
-        return bool(value)
-    raise LlmResponseValidationError("llm_response_invalid_ask")
+def _extract_openai_chat_text(data: dict[str, Any], provider_name: str) -> str:
+    try:
+        return str(data["choices"][0]["message"]["content"])
+    except (KeyError, IndexError, TypeError) as exc:
+        raise LlmProviderError(f"{provider_name}_response_missing_text") from exc
