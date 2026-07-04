@@ -52,6 +52,22 @@ class TelegramClient:
             payload["reply_markup"] = reply_markup
         return self._post("sendMessage", payload)
 
+    def send_chat_action(self, *, chat_id: str, action: str) -> dict[str, Any]:
+        return self._post("sendChatAction", {"chat_id": chat_id, "action": action})
+
+    def set_chat_menu_button(self, *, chat_id: str, text: str, url: str) -> dict[str, Any]:
+        return self._post(
+            "setChatMenuButton",
+            {
+                "chat_id": chat_id,
+                "menu_button": {
+                    "type": "web_app",
+                    "text": text,
+                    "web_app": {"url": url},
+                },
+            },
+        )
+
     def edit_message_text(
         self,
         *,

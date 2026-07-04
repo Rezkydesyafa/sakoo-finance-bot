@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     celery_result_backend: str | None = None
 
     frontend_origin: str = "http://localhost:3001"
-    app_base_url: str = "http://localhost"
+    app_base_url: str = "https://sakoo.lab-sigma.web.id"
     storage_path: str = "storage"
     media_receipt_max_bytes: int = 5 * 1024 * 1024
     media_default_max_bytes: int = 10 * 1024 * 1024
@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     telegram_timeout_seconds: float = 10.0
     telegram_webhook_secret: str = ""
     telegram_register_commands_on_startup: bool = False
+    telegram_dashboard_url: str = "https://sakoo.lab-sigma.web.id"
     waha_base_url: str = "http://localhost:3002"
     waha_api_key: str = ""
     waha_session_name: str = "default"
