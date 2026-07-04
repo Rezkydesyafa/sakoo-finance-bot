@@ -264,7 +264,11 @@ def _handle_pending_transaction_reply(
     normalized = normalize_text(text)
 
     if pending is None:
-        if CANCEL_RE.match(normalized):
+        if (
+            CANCEL_RE.match(normalized)
+            or YES_CONFIRMATION_RE.match(normalized)
+            or EDIT_RE.match(normalized)
+        ):
             return TextTransactionResult(
                 status="no_pending_confirmation",
                 reply_text=format_no_pending_response(),

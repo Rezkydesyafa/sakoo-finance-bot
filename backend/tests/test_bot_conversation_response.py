@@ -1,6 +1,6 @@
 import os
 from collections.abc import Iterator
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -88,6 +88,38 @@ def test_pending_transaction_can_be_confirmed(session_factory: sessionmaker[Sess
         assert "Saldo sekarang" in confirm.reply_text
         assert "Pengeluaran bulan ini" in confirm.reply_text
         assert "Kategori terbesar" in confirm.reply_text
+
+
+def test_pending_transaction_expires_before_confirmation(
+    session_factory: sessionmaker[Session],
+) -> None:
+    with session_factory() as db:
+        user = _create_user(db)
+        first = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="keluar 20 ribu",
+            source="telegram_text",
+        )
+        db.commit()
+        pending_log = db.scalar(select(BotLog).where(BotLog.status == "pending_transaction"))
+        assert first.status == "needs_confirmation"
+        assert pending_log is not None
+        pending_log.created_at = datetime.utcnow() - timedelta(minutes=31)
+        db.commit()
+
+        confirm = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="ya",
+            source="telegram_text",
+        )
+        db.commit()
+
+        assert confirm.status == "no_pending_confirmation"
+        assert "kedaluwarsa" in confirm.reply_text
+        assert db.scalar(select(Transaction)) is None
+        assert db.scalar(select(BotLog).where(BotLog.status == "expired_transaction")) is not None
 
 
 def test_missing_amount_can_be_filled_step_by_step(

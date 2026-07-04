@@ -336,14 +336,20 @@ def _resolve_reply_text(
     linking_reply_text: str | None,
 ) -> str | None:
     if receipt_result:
-        return receipt_result.reply_text
+        return _with_dashboard_link(receipt_result.reply_text, status=receipt_result.status)
     if voice_result:
         return voice_result.reply_text
     if report_pdf_result:
         return report_pdf_result.reply_text
     if transaction_result:
-        return transaction_result.reply_text
+        return _with_dashboard_link(transaction_result.reply_text, status=transaction_result.status)
     return linking_reply_text
+
+
+def _with_dashboard_link(reply_text: str | None, *, status: str) -> str | None:
+    if not reply_text or status != "saved":
+        return reply_text
+    return f"{reply_text}\n\nLihat dashboard: {get_settings().app_base_url.rstrip('/')}"
 
 
 def _resolve_bot_log_message_type(

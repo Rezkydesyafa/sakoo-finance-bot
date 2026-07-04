@@ -135,7 +135,7 @@ def format_cancelled_response() -> str:
 
 
 def format_no_pending_response() -> str:
-    return "Belum ada transaksi yang menunggu konfirmasi."
+    return "Belum ada transaksi yang menunggu konfirmasi, atau konfirmasi lama sudah kedaluwarsa."
 
 
 def format_rupiah(value: Decimal | int | None) -> str:

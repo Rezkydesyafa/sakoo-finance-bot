@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 from datetime import date
-from decimal import Decimal
 from pathlib import Path
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Category, Receipt, Transaction
+from app.models import Receipt, Transaction
 from app.modules.bot.conversation_state import get_pending_transaction
 from app.modules.jobs.service import (
     JobQueueError,
@@ -16,17 +15,17 @@ from app.modules.jobs.service import (
 )
 from app.modules.media.service import MediaStorageError, save_media_bytes
 from app.modules.ocr.receipt_chat import (
-    EDIT_TOTAL_RE,
     PENDING_RECEIPT_STATUSES,
     ReceiptOcrFlowResult as TelegramReceiptOcrFlowResult,
     YES_CONFIRMATION_RE,
     apply_caption_amount_if_possible,
+    apply_receipt_correction,
     find_duplicate_receipt_transaction,
     find_latest_saved_receipt_transaction,
     format_duplicate_receipt_reply,
     format_receipt_confirmation,
     format_rupiah,
-    parse_total_correction,
+    receipt_category_name,
     receipt_description,
 )
 from app.modules.telegram.callback_handler import (
@@ -37,6 +36,7 @@ from app.modules.telegram.callback_handler import (
 from app.modules.telegram.client import TelegramClient, TelegramClientError
 from app.modules.telegram.client import DownloadedTelegramFile
 from app.modules.telegram.parser import ParsedTelegramMessage
+from app.modules.transactions.repository import find_category
 
 
 def handle_telegram_receipt_photo(
@@ -298,29 +298,20 @@ def _handle_receipt_confirmation_text(
             )
         return _confirm_receipt_transaction(db=db, receipt=receipt)
 
-    edit_requested = EDIT_TOTAL_RE.match(text) is not None
-    amount = parse_total_correction(text)
-    if amount is None:
-        if edit_requested:
-            receipt = _find_pending_receipt(db, user_id=user_id)
-            return TelegramReceiptOcrFlowResult(
-                status="edit_invalid",
-                receipt_id=receipt.id if receipt else None,
-                reply_text="Format edit belum terbaca. Contoh: edit total 20000",
-                error_message="invalid_edit_amount",
-            )
-        return None
-
     receipt = _find_pending_receipt(db, user_id=user_id)
     if receipt is None:
-        return TelegramReceiptOcrFlowResult(
-            status="no_pending_receipt",
-            reply_text="Tidak ada struk yang bisa diedit. Kirim foto struk terlebih dahulu.",
-        )
+        return None
 
-    receipt.total_amount = amount
-    receipt.confidence = Decimal("0.8000")
-    receipt.status = "needs_confirmation"
+    correction = apply_receipt_correction(receipt, text)
+    if correction is None:
+        return None
+    if correction.error_message:
+        return TelegramReceiptOcrFlowResult(
+            status="edit_invalid",
+            receipt_id=receipt.id,
+            reply_text=correction.error_message,
+            error_message="invalid_receipt_edit",
+        )
     db.commit()
     db.refresh(receipt)
     return TelegramReceiptOcrFlowResult(
@@ -361,7 +352,11 @@ def _confirm_receipt_transaction(
             reply_text=format_duplicate_receipt_reply(duplicate),
         )
 
-    category = _find_default_expense_category(db)
+    category = find_category(
+        db=db,
+        category_name=receipt_category_name(receipt),
+        transaction_type="expense",
+    )
     transaction = Transaction(
         user_id=receipt.user_id,
         type="expense",
@@ -401,13 +396,4 @@ def _find_pending_receipt(db: Session, *, user_id: int) -> Receipt | None:
             Receipt.status.in_(PENDING_RECEIPT_STATUSES),
         )
         .order_by(Receipt.created_at.desc(), Receipt.id.desc())
-    )
-
-
-def _find_default_expense_category(db: Session) -> Category | None:
-    return db.scalar(
-        select(Category).where(
-            func.lower(Category.name) == "lainnya",
-            Category.type == "expense",
-        )
     )
