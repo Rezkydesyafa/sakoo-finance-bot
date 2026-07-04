@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
@@ -15,7 +14,17 @@ from app.modules.jobs.service import (
     queue_receipt_ocr_job,
 )
 from app.modules.media.service import MediaStorageError, save_media_bytes
-from app.modules.parser.transaction_text import parse_transaction_text
+from app.modules.ocr.receipt_chat import (
+    EDIT_TOTAL_RE,
+    PENDING_RECEIPT_STATUSES,
+    ReceiptOcrFlowResult as TelegramReceiptOcrFlowResult,
+    YES_CONFIRMATION_RE,
+    apply_caption_amount_if_possible,
+    format_receipt_confirmation,
+    format_rupiah,
+    parse_total_correction,
+    receipt_description,
+)
 from app.modules.telegram.callback_handler import (
     WAITING_RECEIPT_CAPTION,
     consume_waiting_input_state_payload,
@@ -24,25 +33,6 @@ from app.modules.telegram.callback_handler import (
 from app.modules.telegram.client import TelegramClient, TelegramClientError
 from app.modules.telegram.client import DownloadedTelegramFile
 from app.modules.telegram.parser import ParsedTelegramMessage
-from app.modules.waha.receipt_ocr import (
-    EDIT_TOTAL_RE,
-    PENDING_RECEIPT_STATUSES,
-    YES_CONFIRMATION_RE,
-    format_receipt_confirmation,
-)
-
-
-@dataclass(frozen=True)
-class TelegramReceiptOcrFlowResult:
-    status: str
-    reply_text: str | None = None
-    media_file_id: int | None = None
-    receipt_id: int | None = None
-    job_id: int | None = None
-    error_message: str | None = None
-
-    def to_log_payload(self) -> dict[str, object]:
-        return asdict(self)
 
 
 def handle_telegram_receipt_photo(
@@ -174,7 +164,7 @@ def handle_telegram_receipt_text(
         )
 
     receipt.caption_text = text.strip()
-    _apply_caption_amount_if_possible(receipt)
+    apply_caption_amount_if_possible(receipt, merchant_name="Caption Telegram")
     db.commit()
     db.refresh(receipt)
 
@@ -286,11 +276,23 @@ def _handle_receipt_confirmation_text(
     if YES_CONFIRMATION_RE.match(text):
         receipt = _find_pending_receipt(db, user_id=user_id)
         if receipt is None:
-            return None
+            return TelegramReceiptOcrFlowResult(
+                status="no_pending_receipt",
+                reply_text="Tidak ada struk yang sedang menunggu konfirmasi.",
+            )
         return _confirm_receipt_transaction(db=db, receipt=receipt)
 
-    edit_match = EDIT_TOTAL_RE.match(text)
-    if not edit_match:
+    edit_requested = EDIT_TOTAL_RE.match(text) is not None
+    amount = parse_total_correction(text)
+    if amount is None:
+        if edit_requested:
+            receipt = _find_pending_receipt(db, user_id=user_id)
+            return TelegramReceiptOcrFlowResult(
+                status="edit_invalid",
+                receipt_id=receipt.id if receipt else None,
+                reply_text="Format edit belum terbaca. Contoh: edit total 20000",
+                error_message="invalid_edit_amount",
+            )
         return None
 
     receipt = _find_pending_receipt(db, user_id=user_id)
@@ -298,15 +300,6 @@ def _handle_receipt_confirmation_text(
         return TelegramReceiptOcrFlowResult(
             status="no_pending_receipt",
             reply_text="Tidak ada struk yang bisa diedit. Kirim foto struk terlebih dahulu.",
-        )
-
-    amount = parse_transaction_text(f"beli struk {edit_match.group('amount')}").amount
-    if amount is None:
-        return TelegramReceiptOcrFlowResult(
-            status="edit_invalid",
-            receipt_id=receipt.id,
-            reply_text="Format edit belum terbaca. Contoh: edit total 20000",
-            error_message="invalid_edit_amount",
         )
 
     receipt.total_amount = amount
@@ -342,7 +335,7 @@ def _confirm_receipt_transaction(
         type="expense",
         amount=receipt.total_amount,
         category_id=category.id if category else None,
-        description=_receipt_description(receipt),
+        description=receipt_description(receipt, fallback="Struk Telegram"),
         transaction_date=receipt.receipt_date or date.today(),
         source="receipt_ocr",
     )
@@ -360,7 +353,7 @@ def _confirm_receipt_transaction(
         transaction_id=transaction.id,
         reply_text=(
             "Transaksi struk tersimpan: "
-            f"Pengeluaran Rp{int(transaction.amount):,}".replace(",", ".")
+            f"Pengeluaran {format_rupiah(transaction.amount)}"
             + f" untuk {receipt.merchant_name or receipt.caption_text or 'Struk'} "
             f"pada {transaction.transaction_date.isoformat()}."
         ),
@@ -387,25 +380,3 @@ def _find_default_expense_category(db: Session) -> Category | None:
         )
     )
 
-
-def _receipt_description(receipt: Receipt) -> str:
-    if receipt.caption_text:
-        parsed_caption = parse_transaction_text(receipt.caption_text)
-        if parsed_caption.description:
-            return parsed_caption.description
-    if receipt.merchant_name:
-        return f"Struk {receipt.merchant_name}"
-    return "Struk Telegram"
-
-
-def _apply_caption_amount_if_possible(receipt: Receipt) -> None:
-    if not receipt.caption_text:
-        return
-    parsed_caption = parse_transaction_text(receipt.caption_text)
-    if parsed_caption.intent != "add_transaction" or parsed_caption.amount is None:
-        return
-    receipt.total_amount = receipt.total_amount or parsed_caption.amount
-    receipt.receipt_date = receipt.receipt_date or parsed_caption.transaction_date
-    receipt.merchant_name = receipt.merchant_name or "Caption Telegram"
-    receipt.confidence = max(receipt.confidence or 0, Decimal("0.7000"))
-    receipt.status = "needs_confirmation"

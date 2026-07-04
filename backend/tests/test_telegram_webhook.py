@@ -38,6 +38,8 @@ from app.modules.telegram.client import DownloadedTelegramFile, get_telegram_cli
 class FakeTelegramClient:
     def __init__(self) -> None:
         self.sent_messages: list[dict[str, Any]] = []
+        self.chat_actions: list[dict[str, str]] = []
+        self.menu_buttons: list[dict[str, Any]] = []
         self.edited_messages: list[dict[str, Any]] = []
         self.answered_callback_queries: list[dict[str, Any]] = []
         self.commands: list[dict[str, str]] | None = None
@@ -65,6 +67,14 @@ class FakeTelegramClient:
             }
         )
         return {"ok": True, "result": {"message_id": len(self.sent_messages)}}
+
+    def send_chat_action(self, *, chat_id: str, action: str) -> dict[str, Any]:
+        self.chat_actions.append({"chat_id": chat_id, "action": action})
+        return {"ok": True, "result": True}
+
+    def set_chat_menu_button(self, *, chat_id: str, text: str, url: str) -> dict[str, Any]:
+        self.menu_buttons.append({"chat_id": chat_id, "text": text, "url": url})
+        return {"ok": True, "result": True}
 
     def edit_message_text(
         self,
@@ -219,6 +229,15 @@ def test_unlinked_telegram_user_gets_linking_instruction(
     assert "Silakan daftar atau login" in fake_telegram.sent_messages[0]["text"]
     assert "hubungkan KODE" in fake_telegram.sent_messages[0]["text"]
     assert _keyboard_contains_url(fake_telegram.sent_messages[0]["reply_markup"], "/register")
+    assert _keyboard_contains_web_app(
+        fake_telegram.sent_messages[0]["reply_markup"],
+        "https://sakoo.lab-sigma.web.id",
+    )
+    assert fake_telegram.menu_buttons[-1] == {
+        "chat_id": "456",
+        "text": "Sakoo",
+        "url": "https://sakoo.lab-sigma.web.id",
+    }
 
     with session_factory() as db:
         assert db.scalar(select(Transaction)) is None
@@ -257,6 +276,11 @@ def test_start_command_shows_main_menu_without_linking(
     assert "Sakoo Finance Bot" in fake_telegram.sent_messages[0]["text"]
     assert _keyboard_contains(fake_telegram.sent_messages[0]["reply_markup"], "MENU_BALANCE")
     assert _keyboard_contains(fake_telegram.sent_messages[0]["reply_markup"], "MENU_ADD")
+    assert _keyboard_contains_web_app(
+        fake_telegram.sent_messages[0]["reply_markup"],
+        "https://sakoo.lab-sigma.web.id",
+    )
+    assert fake_telegram.menu_buttons[-1]["url"] == "https://sakoo.lab-sigma.web.id"
 
 
 def test_add_menu_callback_edits_message_without_transaction_parser(
@@ -618,6 +642,59 @@ def test_telegram_photo_without_caption_asks_for_receipt_context(
         assert db.scalar(select(Transaction)) is None
 
 
+def test_telegram_receipt_confirmation_saves_pending_receipt(
+    test_client: tuple[TestClient, sessionmaker[Session], FakeTelegramClient, list[dict[str, Any]]],
+) -> None:
+    client, session_factory, fake_telegram, _queued_jobs = test_client
+    with session_factory() as db:
+        user = _create_user(db)
+        _link_telegram_user(db, user.id)
+        _create_pending_receipt(db, user.id, total=Decimal("15415.00"))
+        db.commit()
+
+    response = _post_telegram_update(client, text="YA", update_id=3201)
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["message_type"] == "receipt_ocr"
+    assert payload["transaction_status"] == "saved"
+    assert payload["transaction_id"] is not None
+    assert "Transaksi struk tersimpan" in fake_telegram.sent_messages[-1]["text"]
+
+    with session_factory() as db:
+        receipt = db.scalar(select(Receipt))
+        transaction = db.scalar(select(Transaction))
+        assert receipt is not None
+        assert receipt.status == "confirmed"
+        assert transaction is not None
+        assert transaction.amount == Decimal("15415.00")
+
+
+def test_telegram_receipt_total_can_be_corrected_with_plain_amount(
+    test_client: tuple[TestClient, sessionmaker[Session], FakeTelegramClient, list[dict[str, Any]]],
+) -> None:
+    client, session_factory, fake_telegram, _queued_jobs = test_client
+    with session_factory() as db:
+        user = _create_user(db)
+        _link_telegram_user(db, user.id)
+        _create_pending_receipt(db, user.id, total=Decimal("15415.00"))
+        db.commit()
+
+    edit_response = _post_telegram_update(client, text="20000", update_id=3301)
+    confirm_response = _post_telegram_update(client, text="ya", update_id=3302)
+
+    assert edit_response.status_code == 200, edit_response.text
+    assert edit_response.json()["transaction_status"] == "edit_updated"
+    assert "Rp20.000" in fake_telegram.sent_messages[-1]["text"]
+    assert confirm_response.status_code == 200, confirm_response.text
+    assert confirm_response.json()["transaction_status"] == "saved"
+
+    with session_factory() as db:
+        transaction = db.scalar(select(Transaction))
+        assert transaction is not None
+        assert transaction.amount == Decimal("20000.00")
+
+
 def _post_telegram_update(
     client: TestClient,
     *,
@@ -765,6 +842,16 @@ def _keyboard_contains_url(reply_markup: dict[str, Any] | None, url_part: str) -
     )
 
 
+def _keyboard_contains_web_app(reply_markup: dict[str, Any] | None, url: str) -> bool:
+    if not reply_markup:
+        return False
+    return any(
+        button.get("web_app", {}).get("url") == url
+        for row in reply_markup.get("inline_keyboard", [])
+        for button in row
+    )
+
+
 def _create_user(db: Session) -> User:
     user = User(
         name="Telegram User",
@@ -785,3 +872,33 @@ def _link_telegram_user(db: Session, user_id: int) -> None:
             chat_id="456",
         )
     )
+
+
+def _create_pending_receipt(
+    db: Session,
+    user_id: int,
+    *,
+    total: Decimal,
+) -> Receipt:
+    media_file = MediaFile(
+        user_id=user_id,
+        file_type="receipt",
+        original_filename="receipt.jpg",
+        stored_path="receipts/test.jpg",
+        mime_type="image/jpeg",
+        size=10,
+        source="telegram_receipt",
+    )
+    db.add(media_file)
+    db.flush()
+    receipt = Receipt(
+        user_id=user_id,
+        media_file_id=media_file.id,
+        merchant_name="WARUNG AI",
+        receipt_date=datetime.now(timezone.utc).date(),
+        total_amount=total,
+        confidence=Decimal("1.0000"),
+        status="processed",
+    )
+    db.add(receipt)
+    return receipt

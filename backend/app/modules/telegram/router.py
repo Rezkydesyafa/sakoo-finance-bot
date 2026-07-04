@@ -37,7 +37,7 @@ from app.modules.telegram.callback_handler import (
     handle_callback_query,
 )
 from app.modules.telegram.linking import handle_telegram_account_linking
-from app.modules.telegram.menu import build_link_menu, build_main_menu
+from app.modules.telegram.menu import build_link_menu, build_main_menu, dashboard_url
 from app.modules.telegram.parser import (
     parse_telegram_update,
     telegram_identifier_candidates,
@@ -330,6 +330,7 @@ async def receive_telegram_webhook(
         ),
         transaction_id=_resolve_response_transaction_id(
             voice_result,
+            receipt_result,
             transaction_result,
         ),
         voice_note_id=voice_result.voice_note_id if voice_result else None,
@@ -560,10 +561,13 @@ def _resolve_response_transaction_status(
 
 def _resolve_response_transaction_id(
     voice_result: VoiceSttFlowResult | None,
+    receipt_result: TelegramReceiptOcrFlowResult | None,
     transaction_result: TextTransactionResult | None,
 ) -> int | None:
     if voice_result and voice_result.transaction_id:
         return voice_result.transaction_id
+    if receipt_result and receipt_result.transaction_id:
+        return receipt_result.transaction_id
     return transaction_result.transaction_id if transaction_result else None
 
 
@@ -599,6 +603,7 @@ def _send_reply_if_needed(
         return "failed"
 
     try:
+        _set_dashboard_launcher_if_needed(client=client, chat_id=chat_id)
         message_kwargs: dict[str, Any] = {"chat_id": chat_id, "text": reply_text}
         if reply_markup:
             message_kwargs["reply_markup"] = reply_markup
@@ -610,6 +615,21 @@ def _send_reply_if_needed(
         return "failed"
 
     return "sent"
+
+
+def _set_dashboard_launcher_if_needed(*, client: TelegramClient, chat_id: str) -> None:
+    set_chat_menu_button = getattr(client, "set_chat_menu_button", None)
+    if set_chat_menu_button is None:
+        return
+
+    try:
+        set_chat_menu_button(
+            chat_id=chat_id,
+            text="Sakoo",
+            url=dashboard_url(),
+        )
+    except TelegramClientError:
+        pass
 
 
 def _verify_webhook_secret(secret_header: str | None) -> None:

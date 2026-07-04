@@ -12,6 +12,7 @@ from app.modules.jobs.service import (
 )
 from app.modules.media.service import resolve_media_file_path
 from app.modules.ocr.client import OcrClient, get_ocr_client
+from app.modules.ocr.receipt_chat import format_receipt_confirmation
 from app.modules.ocr.service import process_receipt_ocr
 from app.modules.reports.pdf import (
     PdfRenderer,
@@ -23,7 +24,6 @@ from app.modules.stt.client import SttClient, get_stt_client
 from app.modules.stt.service import format_voice_note_result, process_voice_stt
 from app.modules.telegram.client import TelegramClient, get_telegram_client
 from app.modules.waha.client import WahaClient, get_waha_client
-from app.modules.waha.receipt_ocr import format_receipt_confirmation
 from app.workers.celery_app import celery_app
 
 
@@ -470,6 +470,7 @@ def _send_receipt_processing_notification_if_needed(
     )
     if notify_platform == "telegram":
         client = telegram_client or next(get_telegram_client())
+        client.send_chat_action(chat_id=notify_chat_id, action="typing")
         client.send_message(chat_id=notify_chat_id, text=text)
         return
 

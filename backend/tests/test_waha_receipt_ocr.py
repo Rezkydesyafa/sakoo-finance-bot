@@ -151,7 +151,7 @@ def test_waha_receipt_image_is_queued_then_processed_and_confirmed(
     assert image_payload["message_type"] == "receipt_ocr"
     assert image_payload["transaction_status"] == "queued"
     assert image_payload["transaction_id"] is None
-    assert image_payload["receipt_id"] is None
+    assert image_payload["receipt_id"] is not None
     assert image_payload["job_id"] is not None
     assert image_payload["reply_status"] == "sent"
     assert fake_waha.downloaded_urls == ["https://waha.local/media/receipt-1"]
@@ -167,12 +167,15 @@ def test_waha_receipt_image_is_queued_then_processed_and_confirmed(
         assert job is not None
         assert job.status == "queued"
         assert job.result_id is None
-        assert db.scalar(select(Receipt)) is None
+        receipt = db.scalar(select(Receipt))
+        assert receipt is not None
+        assert receipt.status == "pending"
+        assert receipt.caption_text is None
 
     _run_queued_ocr_job(session_factory, fake_ocr, fake_waha, queued_jobs[0])
 
     assert fake_ocr.calls == 1
-    assert "Ketik YA" in fake_waha.sent_messages[-1]["text"]
+    assert "Balas YA" in fake_waha.sent_messages[-1]["text"]
 
     with session_factory() as db:
         receipt = db.scalar(select(Receipt))
@@ -229,7 +232,7 @@ def test_waha_receipt_total_can_be_edited_after_worker_confirmation(
 
     assert "edit total" in fake_waha.sent_messages[-1]["text"].lower()
 
-    edit_response = client.post("/webhook/waha", json=_waha_text_update("edit total 21000"))
+    edit_response = client.post("/webhook/waha", json=_waha_text_update("21000"))
     assert edit_response.status_code == 200, edit_response.text
     assert edit_response.json()["transaction_status"] == "edit_updated"
     assert "Rp21.000" in fake_waha.sent_messages[-1]["text"]
@@ -279,6 +282,44 @@ def test_waha_receipt_caption_is_used_when_ocr_total_is_missing(
         assert receipt.caption_text == "beli kopi 18 ribu"
         assert receipt.total_amount == Decimal("18000.00")
         assert receipt.status == "needs_confirmation"
+
+
+def test_waha_receipt_without_caption_asks_and_saves_caption_reply(
+    test_client: tuple[
+        TestClient,
+        sessionmaker[Session],
+        FakeWahaClient,
+        FakeOcrClient,
+        list[dict[str, Any]],
+    ],
+) -> None:
+    client, session_factory, fake_waha, fake_ocr, queued_jobs = test_client
+    _create_linked_whatsapp_user(session_factory)
+    fake_ocr.text = "TOKO SAKOO\nKopi dan roti"
+
+    image_response = client.post("/webhook/waha", json=_waha_image_update())
+    assert image_response.status_code == 200, image_response.text
+    assert "balas captionnya" in fake_waha.sent_messages[-1]["text"].lower()
+
+    caption_response = client.post(
+        "/webhook/waha",
+        json=_waha_text_update("beli kopi 18 ribu"),
+    )
+    assert caption_response.status_code == 200, caption_response.text
+    assert caption_response.json()["message_type"] == "receipt_ocr"
+    assert caption_response.json()["transaction_status"] == "caption_saved"
+    assert "keterangan struk sudah kusimpan" in fake_waha.sent_messages[-1]["text"]
+    assert "Rp18.000" in fake_waha.sent_messages[-1]["text"]
+
+    _run_queued_ocr_job(session_factory, fake_ocr, fake_waha, queued_jobs[0])
+
+    with session_factory() as db:
+        receipt = db.scalar(select(Receipt))
+        assert receipt is not None
+        assert receipt.caption_text == "beli kopi 18 ribu"
+        assert receipt.total_amount == Decimal("18000.00")
+        assert receipt.status == "needs_confirmation"
+        assert db.scalar(select(Transaction)) is None
 
 
 def test_waha_receipt_image_returns_limit_message_before_second_queue(
