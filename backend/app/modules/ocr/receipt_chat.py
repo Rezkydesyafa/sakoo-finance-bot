@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Receipt, Transaction
+from app.modules.ocr.receipt_parser import extract_receipt_item_names
 from app.modules.parser.date_parser import parse_transaction_date
 from app.modules.parser.transaction_text import parse_transaction_text
 
@@ -81,6 +82,10 @@ def receipt_description(receipt: Receipt, *, fallback: str) -> str:
         if parsed_caption.description:
             return parsed_caption.description
         return caption_text
+    if receipt.ocr_text:
+        item_names = extract_receipt_item_names(receipt.ocr_text, limit=3)
+        if item_names:
+            return ", ".join(item_names)
     if receipt.merchant_name:
         return f"Struk {receipt.merchant_name}"
     return fallback
@@ -206,9 +211,12 @@ def format_receipt_confirmation(receipt: Receipt) -> str:
     confidence = f"{float(receipt.confidence or Decimal('0')) * 100:.0f}%"
     category = receipt_category_name(receipt)
     note = receipt_caption_note(receipt)
+    item_names = extract_receipt_item_names(receipt.ocr_text or "", limit=3)
+    item_note = f" Item: {', '.join(item_names)}." if item_names and not note else ""
     extra_note = (
         f" Kategori: {category or 'belum dipilih'}."
         f"{f' Catatan: {note}.' if note else ''}"
+        f"{item_note}"
     )
     date_note = (
         " Tanggal tidak jelas, aku pakai tanggal hari ini kalau kamu simpan."

@@ -38,7 +38,7 @@ def handle_account_linking(
     current_user_id: int | None,
 ) -> LinkingResult:
     if parsed.from_me:
-        return LinkingResult(action="ignored", status="from_me", user_id=current_user_id)
+        return LinkingResult(action="from_me", status="from_me", user_id=current_user_id)
 
     code_value = extract_linking_code(parsed.text)
     if code_value:
