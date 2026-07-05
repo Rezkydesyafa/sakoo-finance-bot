@@ -52,6 +52,11 @@ MERCHANT_NOISE_RE = re.compile(
     r"receipt|struk|telp|tanggal|tax|time|waktu)\b",
     re.IGNORECASE,
 )
+ITEM_NOISE_RE = re.compile(
+    r"\b(?:admin|balance|bayar|dpp|gratis|kembali|kontak|member|ongkir|"
+    r"pajak|payment|ppn|qr|subtotal|total|tunai)\b",
+    re.IGNORECASE,
+)
 LETTER_RE = re.compile(r"[A-Za-z]")
 
 MONTH_ALIASES = {
@@ -99,6 +104,7 @@ class ReceiptParseResult:
     total_amount: Decimal | None
     merchant_name: str | None
     receipt_date: date | None
+    item_names: list[str]
     confidence: Decimal
     status: str
     need_confirmation: bool
@@ -117,6 +123,7 @@ def parse_receipt_text(text: str, current_year: int | None = None) -> ReceiptPar
     lines = _normalize_lines(text)
     merchant_name = _extract_merchant(lines)
     receipt_date = _extract_date(lines, current_year=current_year)
+    item_names = _extract_item_names(lines)
     total_candidate, ambiguous_total = _extract_total(lines)
     reasons: list[str] = []
 
@@ -134,6 +141,7 @@ def parse_receipt_text(text: str, current_year: int | None = None) -> ReceiptPar
             total_amount=None,
             merchant_name=merchant_name,
             receipt_date=receipt_date,
+            item_names=item_names,
             confidence=confidence,
             status="manual_input_required",
             need_confirmation=True,
@@ -154,6 +162,7 @@ def parse_receipt_text(text: str, current_year: int | None = None) -> ReceiptPar
         total_amount=total_candidate.amount,
         merchant_name=merchant_name,
         receipt_date=receipt_date,
+        item_names=item_names,
         confidence=confidence,
         status="needs_confirmation" if need_confirmation else "processed",
         need_confirmation=need_confirmation,
@@ -235,6 +244,41 @@ def _extract_amounts_from_line(line: str) -> list[Decimal]:
         if amount is not None:
             amounts.append(amount)
     return amounts
+
+
+def extract_receipt_item_names(text: str, limit: int = 5) -> list[str]:
+    return _extract_item_names(_normalize_lines(text), limit=limit)
+
+
+def _extract_item_names(lines: list[str], limit: int = 5) -> list[str]:
+    items: list[str] = []
+    seen: set[str] = set()
+    for line in lines:
+        if ITEM_NOISE_RE.search(line) or _extract_date_from_line(line, None):
+            continue
+        amount_match = next(
+            (
+                match
+                for match in AMOUNT_RE.finditer(line)
+                if _parse_amount(match.group("number")) is not None
+            ),
+            None,
+        )
+        if amount_match is None:
+            continue
+        name = re.sub(r"\b(?:rp|idr)\b", " ", line[: amount_match.start()], flags=re.IGNORECASE)
+        name = re.sub(r"[\d.,:/-]+", " ", name)
+        name = re.sub(r"\s+", " ", name).strip(" -:|.")
+        if len(name) < 3 or not LETTER_RE.search(name):
+            continue
+        key = name.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        items.append(name[:80])
+        if len(items) >= limit:
+            break
+    return items
 
 
 def _parse_amount(raw_number: str) -> Decimal | None:

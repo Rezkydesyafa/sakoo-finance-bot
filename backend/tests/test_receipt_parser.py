@@ -19,9 +19,24 @@ def test_receipt_parser_extracts_grand_total_merchant_and_date() -> None:
     assert result.total_amount == Decimal("20000.00")
     assert result.merchant_name == "TOKO SAKOO"
     assert result.receipt_date == date(2026, 6, 27)
+    assert result.item_names == ["Kopi", "Roti"]
     assert result.confidence >= Decimal("0.8500")
     assert result.status == "processed"
     assert result.need_confirmation is False
+
+
+def test_receipt_parser_extracts_pos_item_rows() -> None:
+    result = parse_receipt_text(
+        """
+        V KINCLONG MANDIRI 21
+        MILK COFFEE 180   1   4900   4,900
+        DELI ANNA BANGSA  1   1000   1,000
+        TOTAL BELANJA     5,900
+        TUNAI             20,000
+        """,
+    )
+
+    assert result.item_names == ["MILK COFFEE", "DELI ANNA BANGSA"]
 
 
 def test_receipt_parser_extracts_total_bayar_with_amount_on_next_line() -> None:
