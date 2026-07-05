@@ -18,24 +18,24 @@ class CategoryLike(Protocol):
 
 def format_help_response() -> str:
     return (
-        "Halo, aku Sakoo.\n"
+        "👋 Halo, aku *Sakoo*!\n"
         "Aku bisa bantu catat dan cek keuangan kamu lewat chat.\n\n"
-        "Contoh catat transaksi:\n"
-        "- beli makan 20 ribu\n"
-        "- bayar bensin 30rb\n"
-        "- gaji masuk 2 juta\n"
-        "- dapet uang saku 100k\n\n"
-        "Cek laporan:\n"
-        "- saldo\n"
-        "- list pengeluaran\n"
-        "- list pemasukan\n"
-        "- laporan bulan ini\n"
-        "- export laporan bulan ini\n\n"
-        "Command:\n"
-        "- /saldo\n"
-        "- /laporan\n"
-        "- /export\n"
-        "- /help"
+        "✏️ *Catat transaksi:*\n"
+        "• beli makan 20 ribu\n"
+        "• bayar bensin 30rb\n"
+        "• gaji masuk 2 juta\n"
+        "• dapet uang saku 100k\n\n"
+        "📊 *Cek laporan:*\n"
+        "• saldo\n"
+        "• list pengeluaran\n"
+        "• list pemasukan\n"
+        "• laporan bulan ini\n"
+        "• export laporan bulan ini\n\n"
+        "⚡ *Command:*\n"
+        "• /saldo\n"
+        "• /laporan\n"
+        "• /export\n"
+        "• /help"
     )
 
 
@@ -47,17 +47,19 @@ def format_saved_transaction(
     balance_after: Decimal | None = None,
     context_note: str | None = None,
 ) -> str:
-    direction = "Pemasukan" if transaction.type == "income" else "Pengeluaran"
-    title = "Pemasukan tercatat!" if transaction.type == "income" else "Transaksi Tercatat!"
+    is_income = transaction.type == "income"
+    emoji = "💰" if is_income else "💸"
+    direction = "Pemasukan" if is_income else "Pengeluaran"
+    title = f"{emoji} Pemasukan tercatat!" if is_income else f"{emoji} Transaksi Tercatat!"
     category_name = category.name if category else "Tanpa kategori"
     description = transaction.description or "-"
-    balance_line = f"\nSaldo sekarang: {format_rupiah(balance_after)}" if balance_after is not None else ""
-    note_line = f"\n\n{context_note}" if context_note else ""
+    balance_line = f"\n💳 Saldo sekarang: *{format_rupiah(balance_after)}*" if balance_after is not None else ""
+    note_line = f"\n\n📌 {context_note}" if context_note else ""
 
     if style == "short":
         return (
-            "Oke, Tercatat.\n"
-            f"{direction} {format_rupiah(transaction.amount)} - {category_name}"
+            "✅ Tercatat.\n"
+            f"{direction} *{format_rupiah(transaction.amount)}* — {category_name}"
             f"{balance_line}"
         )
 
@@ -65,7 +67,7 @@ def format_saved_transaction(
         return (
             f"{title}\n\n"
             f"Jenis: {direction}\n"
-            f"Nominal: {format_rupiah(transaction.amount)}\n"
+            f"Nominal: *{format_rupiah(transaction.amount)}*\n"
             f"Kategori: {category_name}\n"
             f"Catatan: {description}\n"
             f"Tanggal: {format_date_label(transaction.transaction_date)}"
@@ -75,7 +77,7 @@ def format_saved_transaction(
     return (
         f"{title}\n\n"
         f"Jenis: {direction}\n"
-        f"Nominal: {format_rupiah(transaction.amount)}\n"
+        f"Nominal: *{format_rupiah(transaction.amount)}*\n"
         f"Kategori: {category_name}\n"
         f"Catatan: {description}\n"
         f"Tanggal: {format_date_label(transaction.transaction_date)}"
@@ -94,11 +96,11 @@ def format_confirmation_request(
 ) -> str:
     if missing_amount:
         return (
-            "Aku belum menemukan nominalnya (nominal belum terbaca).\n\n"
+            "⚠️ Aku belum menemukan nominalnya.\n\n"
             "Contoh:\n"
-            "- beli kopi 18 ribu\n"
-            "- bayar bensin 30rb\n"
-            "- gaji masuk 2 juta"
+            "• beli kopi 18 ribu\n"
+            "• bayar bensin 30rb\n"
+            "• gaji masuk 2 juta"
         )
 
     direction = _format_transaction_type(transaction_type)
@@ -107,35 +109,61 @@ def format_confirmation_request(
     date_label = format_date_label(transaction_date)
     description_label = description or "-"
     return (
-        "Saya belum yakin membaca transaksinya. Aku membaca ini sebagai:\n\n"
+        "🤔 Aku belum yakin membaca transaksinya:\n\n"
         f"Jenis: {direction}\n"
-        f"Nominal: {amount_label}\n"
+        f"Nominal: *{amount_label}*\n"
         f"Kategori: {category_label}\n"
         f"Tanggal: {date_label}\n"
         f"Catatan: {description_label}\n\n"
-        "Balas YA untuk simpan, atau koreksi: edit kategori transport / "
-        "edit tanggal kemarin / edit catatan makan siang."
+        "Balas *YA* untuk simpan, atau koreksi:\n"
+        "_edit kategori transport_\n"
+        "_edit tanggal kemarin_\n"
+        "_edit catatan makan siang_"
     )
 
 
 def format_unknown_response() -> str:
     return (
-        "Aku belum paham maksudnya.\n\n"
+        "🤷 Aku belum paham maksudnya.\n\n"
         "Coba kirim seperti:\n"
-        "- beli kopi 18 ribu\n"
-        "- saldo\n"
-        "- laporan bulan ini\n"
-        "- bulan ini aku boros gak?\n"
-        "- /help"
+        "• beli kopi 18 ribu\n"
+        "• saldo\n"
+        "• laporan bulan ini\n"
+        "• bulan ini aku boros gak?\n"
+        "• /help"
+    )
+
+
+def format_llm_error_response() -> str:
+    """Shown when LLM provider fails (API error, timeout, etc.)."""
+    return (
+        "⚠️ Maaf, aku sedang tidak bisa menjawab.\n"
+        "Coba lagi dalam beberapa saat.\n\n"
+        "Atau coba kirim perintah langsung:\n"
+        "• saldo\n"
+        "• laporan bulan ini\n"
+        "• /help"
+    )
+
+
+def format_rate_limit_response() -> str:
+    """Shown when user hits daily LLM request limit."""
+    return (
+        "⏳ Kamu sudah mencapai batas chat harian.\n"
+        "Kuota akan reset besok.\n\n"
+        "Kamu masih bisa pakai perintah langsung:\n"
+        "• saldo\n"
+        "• list pengeluaran\n"
+        "• laporan bulan ini"
     )
 
 
 def format_cancelled_response() -> str:
-    return "Oke, aku batalin. Tidak ada transaksi yang disimpan."
+    return "❌ Oke, aku batalin. Tidak ada transaksi yang disimpan."
 
 
 def format_no_pending_response() -> str:
-    return "Belum ada transaksi yang menunggu konfirmasi, atau konfirmasi lama sudah kedaluwarsa."
+    return "ℹ️ Belum ada transaksi yang menunggu konfirmasi, atau konfirmasi lama sudah kedaluwarsa."
 
 
 def format_rupiah(value: Decimal | int | None) -> str:
