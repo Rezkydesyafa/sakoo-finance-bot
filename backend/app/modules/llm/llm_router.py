@@ -19,6 +19,7 @@ from app.modules.llm.base import (
 from app.modules.llm.deepseek_provider import DeepSeekProvider
 from app.modules.llm.gemini_provider import GeminiProvider
 from app.modules.llm.glm_provider import GlmProvider
+from app.modules.llm.ollama_provider import OllamaProvider
 from app.modules.llm.openrouter_provider import OpenRouterProvider
 
 
@@ -182,6 +183,18 @@ def get_llm_providers(settings: Settings | None = None) -> list[BaseLlmProvider]
                         timeout_seconds=timeout,
                         model=active_settings.deepseek_model,
                     )
+                )
+            )
+            continue
+        if provider_name == "ollama":
+            providers.append(
+                OllamaProvider(
+                    LlmProviderConfig(
+                        api_key="",
+                        timeout_seconds=active_settings.ollama_timeout_seconds,
+                        model=active_settings.ollama_model,
+                    ),
+                    base_url=active_settings.ollama_base_url,
                 )
             )
             continue

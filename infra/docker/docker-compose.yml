@@ -4,6 +4,8 @@ services:
       context: ../../backend
     command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
     restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     env_file:
       - ../../.env
     environment:
@@ -16,6 +18,9 @@ services:
       WAHA_SESSION_NAME: ${WAHA_SESSION_NAME:-default}
       WAHA_TIMEOUT_SECONDS: ${WAHA_TIMEOUT_SECONDS:-10}
       WAHA_WEBHOOK_HMAC_KEY: ${WAHA_WEBHOOK_HMAC_KEY:-}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:1.5b}
+      OLLAMA_TIMEOUT_SECONDS: ${OLLAMA_TIMEOUT_SECONDS:-30}
       STORAGE_PATH: /app/storage
     volumes:
       - ../../storage:/app/storage
@@ -76,6 +81,8 @@ services:
       context: ../../backend
     restart: unless-stopped
     command: celery -A app.workers.celery_app.celery_app worker --loglevel=info --concurrency=${CELERY_CONCURRENCY:-1}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     env_file:
       - ../../.env
     environment:
@@ -87,6 +94,9 @@ services:
       WAHA_API_KEY: ${WAHA_API_KEY:?WAHA_API_KEY is required}
       WAHA_SESSION_NAME: ${WAHA_SESSION_NAME:-default}
       WAHA_TIMEOUT_SECONDS: ${WAHA_TIMEOUT_SECONDS:-10}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:1.5b}
+      OLLAMA_TIMEOUT_SECONDS: ${OLLAMA_TIMEOUT_SECONDS:-30}
       STORAGE_PATH: /app/storage
     volumes:
       - ../../storage:/app/storage

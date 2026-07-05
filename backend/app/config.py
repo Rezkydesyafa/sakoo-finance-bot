@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     stt_max_duration_seconds: int = 30
     stt_enable_automatic_punctuation: bool = True
     llm_provider: str = "none"
+    ollama_base_url: str = "http://host.docker.internal:11434"
+    ollama_model: str = "qwen2.5:1.5b"
+    ollama_timeout_seconds: float = 30.0
     gemini_api_key: str = ""
     gemini_api_key_1: str = ""
     gemini_api_key_2: str = ""

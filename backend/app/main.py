@@ -51,6 +51,30 @@ def create_app() -> FastAPI:
         check_database_connection()
         return {"status": "ok"}
 
+    @app.get("/health/ollama", tags=["health"])
+    def ollama_health_check() -> dict[str, object]:
+        from app.modules.llm.ollama_provider import OllamaProvider
+        from app.modules.llm.base import LlmProviderConfig
+
+        provider = OllamaProvider(
+            LlmProviderConfig(
+                api_key="",
+                timeout_seconds=settings.ollama_timeout_seconds,
+                model=settings.ollama_model,
+            ),
+            base_url=settings.ollama_base_url,
+        )
+        server_ok = provider.is_available()
+        model_ok = provider.has_model() if server_ok else False
+        status = "ok" if server_ok and model_ok else "degraded" if server_ok else "unavailable"
+        return {
+            "status": status,
+            "server_reachable": server_ok,
+            "model": settings.ollama_model,
+            "model_available": model_ok,
+            "base_url": settings.ollama_base_url,
+        }
+
     return app
 
 
