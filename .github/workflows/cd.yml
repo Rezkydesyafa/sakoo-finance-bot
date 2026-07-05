@@ -36,59 +36,68 @@ jobs:
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
 
-          # Tulis SSH config dengan variabel yang sudah di-expand
+          # SSH config — no leading indentation on keywords
           cat > ~/.ssh/config << EOF
-          Host sakoo-server
-            HostName ssh.lab-sigma.web.id
-            User ${SSH_USER}
-            IdentityFile ~/.ssh/id_ed25519
-            ProxyCommand cloudflared access ssh --hostname %h --id ${CF_CLIENT_ID} --secret ${CF_CLIENT_SECRET}
-            StrictHostKeyChecking no
-            UserKnownHostsFile /dev/null
-          EOF
+Host sakoo-server
+  HostName ssh.lab-sigma.web.id
+  User ${SSH_USER}
+  IdentityFile ~/.ssh/id_ed25519
+  ProxyCommand cloudflared access ssh --hostname %h --id ${CF_CLIENT_ID} --secret ${CF_CLIENT_SECRET}
+  StrictHostKeyChecking no
+  UserKnownHostsFile /dev/null
+  ServerAliveInterval 30
+  ServerAliveCountMax 10
+EOF
 
           chmod 600 ~/.ssh/config
 
       - name: Deploy via SSH
         run: |
-          ssh -T sakoo-server << 'DEPLOY'
-            set -e
+          # Tulis script ke file sementara, lalu kirim dan eksekusi via SSH
+          # Ini menghindari broken pipe karena heredoc menutup stdin
+          cat > /tmp/deploy.sh << 'SCRIPT'
+          #!/usr/bin/env bash
+          set -e
 
-            cd ~/sakoo_bot/sakoo-finance-bot
+          cd ~/sakoo_bot/sakoo-finance-bot
 
-            echo "📥 Pulling latest code..."
-            git fetch origin main
-            git reset --hard origin/main
+          echo "📥 Pulling latest code..."
+          git fetch origin main
+          git reset --hard origin/main
 
-            echo "🔨 Building and restarting containers..."
-            cd infra/docker
-            docker compose --env-file ../../.env pull
-            docker compose --env-file ../../.env up -d --build --remove-orphans
-            docker compose --env-file ../../.env restart nginx
+          echo "🔨 Building and restarting containers..."
+          cd infra/docker
+          docker compose --env-file ../../.env pull
+          docker compose --env-file ../../.env up -d --build --remove-orphans
+          docker compose --env-file ../../.env restart nginx
 
-            echo "🧹 Cleaning up old images..."
-            docker image prune -f
+          echo "🧹 Cleaning up old images..."
+          docker image prune -f
 
-            echo "⏳ Waiting for services to be healthy..."
-            port="$(grep -E '^NGINX_HTTP_PORT=' ../../.env | tail -n 1 | cut -d '=' -f 2- | tr -d '\r')"
-            port="${port:-8080}"
-            health_url="http://127.0.0.1:${port}/health"
+          echo "⏳ Waiting for services to be healthy..."
+          port="$(grep -E '^NGINX_HTTP_PORT=' ../../.env | tail -n 1 | cut -d '=' -f 2- | tr -d '\r')"
+          port="${port:-8080}"
+          health_url="http://127.0.0.1:${port}/health"
 
-            for i in 1 2 3 4 5 6; do
-              echo "  Attempt $i/6..."
-              if curl -sf "$health_url" > /dev/null 2>&1; then
-                echo "  ✅ Health check passed!"
-                break
-              fi
-              if [ "$i" = "6" ]; then
-                echo "  ❌ Health check failed after 6 attempts"
-                docker compose --env-file ../../.env ps
-                docker compose --env-file ../../.env logs --tail=20 backend
-                docker compose --env-file ../../.env logs --tail=20 nginx
-                exit 1
-              fi
-              sleep 10
-            done
+          for i in 1 2 3 4 5 6; do
+            echo "  Attempt $i/6..."
+            if curl -sf "$health_url" > /dev/null 2>&1; then
+              echo "  ✅ Health check passed!"
+              break
+            fi
+            if [ "$i" = "6" ]; then
+              echo "  ❌ Health check failed after 6 attempts"
+              docker compose --env-file ../../.env ps
+              docker compose --env-file ../../.env logs --tail=20 backend
+              docker compose --env-file ../../.env logs --tail=20 nginx
+              exit 1
+            fi
+            sleep 10
+          done
 
-            echo "✅ Deployment successful!"
-          DEPLOY
+          echo "✅ Deployment successful!"
+          SCRIPT
+
+          # Salin script ke server dan jalankan
+          scp /tmp/deploy.sh sakoo-server:/tmp/deploy.sh
+          ssh sakoo-server "bash /tmp/deploy.sh; rm -f /tmp/deploy.sh"
