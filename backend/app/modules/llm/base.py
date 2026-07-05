@@ -66,8 +66,12 @@ def request_openai_chat_completion(
     temperature: float = 0.4,
     max_tokens: int = 160,
 ) -> str:
-    if not api_key:
+    if not api_key and provider_name != "ollama":
         raise LlmProviderError(f"{provider_name}_api_key_missing")
+
+    headers: dict[str, str] = {}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
 
     payload = {
         "model": model,
@@ -78,7 +82,7 @@ def request_openai_chat_completion(
     try:
         response = httpx.post(
             api_url,
-            headers={"Authorization": f"Bearer {api_key}"},
+            headers=headers,
             json=payload,
             timeout=timeout_seconds,
         )
