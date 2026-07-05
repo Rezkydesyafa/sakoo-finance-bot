@@ -213,8 +213,6 @@ def _resolve_provider_names(settings: Settings) -> list[str]:
         inferred.append("gemini")
     if settings.openrouter_api_key.strip():
         inferred.append("openrouter")
-    if settings.ollama_base_url.strip():
-        inferred.append("ollama")
     return inferred or provider_names
 
 
