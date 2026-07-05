@@ -1,6 +1,6 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useState, useMemo } from "react";
 import { clearAuthToken, getStoredAuthToken } from "@/lib/auth-storage";
 import { ApiError, apiClient } from "@/lib/api";
@@ -13,17 +13,18 @@ import { BudgetsTab } from "@/components/tabs/budgets-tab";
 import { SettingsTab } from "@/components/tabs/settings-tab";
 import { IntegrationsTab } from "@/components/tabs/integrations-tab";
 import { TransactionModal } from "@/components/add-transaction-modal";
-import { ChatSimulator } from "@/components/chat-simulator";
-import type { Transaction, ChatMessage } from "./types";
+import { ChatTab } from "@/components/tabs/chat-tab";
+import type { Transaction } from "./types";
 
 export default function Home() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const activeTab = searchParams.get("tab") || "overview";
 
   const [userId, setUserId] = useState<number | null>(null);
   const [userName, setUserName] = useState("User");
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
+  const searchTerm = searchParams.get("q") || "";
   const [expenseFilterType, setExpenseFilterType] = useState<"all" | "income" | "expense">("all");
   const [quickActionLoading, setQuickActionLoading] = useState<TransactionType | null>(null);
   const [quickActionStatus, setQuickActionStatus] = useState<string | null>(null);
@@ -35,16 +36,9 @@ export default function Home() {
   const [editTxData, setEditTxData] = useState<{ type: TransactionType, title: string, amount: number } | null>(null);
 
   const [deleteTxId, setDeleteTxId] = useState<number | null>(null);
+  const [exitWarningShowing, setExitWarningShowing] = useState(false);
 
-  const [chatInput, setChatInput] = useState("");
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    {
-      id: 1,
-      sender: "bot",
-      text: "Halo! Saya Sakoo, asisten keuangan pribadimu.\n\nKamu bisa mencatat transaksi langsung dari sini. Coba ketik:\n- 'beli bakso 25rb'\n- 'gaji masuk 3.5jt'\n- 'laporan'\n- 'bantuan'",
-      time: "Baru saja",
-    },
-  ]);
+
 
   const [healthStatus, setHealthStatus] = useState({
     db: "checking",
@@ -61,6 +55,54 @@ export default function Home() {
     category: "---",
     amount: 0,
   });
+
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let listener: any = null;
+
+    if (typeof window !== "undefined") {
+      import("@capacitor/core").then(({ Capacitor }) => {
+        if (Capacitor.isNativePlatform()) {
+          import("@capacitor/app").then(({ App: CapacitorApp }) => {
+            CapacitorApp.addListener("backButton", ({ canGoBack }) => {
+              if (isAddTxModalOpen) {
+                setIsAddTxModalOpen(false);
+                return;
+              }
+              if (editTxId !== null) {
+                setEditTxId(null);
+                setEditTxData(null);
+                return;
+              }
+              if (deleteTxId !== null) {
+                setDeleteTxId(null);
+                return;
+              }
+
+              const currentParams = new URLSearchParams(window.location.search);
+              const currentTab = currentParams.get("tab") || "overview";
+
+              if (currentTab !== "overview") {
+                router.push("/?tab=overview");
+                return;
+              }
+
+              if (exitWarningShowing) {
+                CapacitorApp.exitApp();
+              } else {
+                setExitWarningShowing(true);
+                setTimeout(() => setExitWarningShowing(false), 2000);
+              }
+            }).then((l) => (listener = l));
+          });
+        }
+      });
+    }
+
+    return () => {
+      if (listener) listener.remove();
+    };
+  }, [exitWarningShowing, isAddTxModalOpen, editTxId, deleteTxId]);
 
   useEffect(() => {
     const token = getStoredAuthToken();
@@ -204,15 +246,7 @@ export default function Home() {
     setTransactions(res.items.map(item => toDashboardTransaction(item)));
   }
 
-  function appendBotMessage(text: string) {
-    const botReply: ChatMessage = {
-      id: Date.now() + 2,
-      sender: "bot",
-      text,
-      time: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
-    };
-    setChatMessages(prev => [...prev, botReply]);
-  }
+
 
   const [isExporting, setIsExporting] = useState(false);
   async function handleDownloadPDF() {
@@ -242,35 +276,7 @@ export default function Home() {
     }
   }
 
-  async function handleSendChatMessage() {
-    if (!chatInput.trim()) return;
-    const text = chatInput;
-    const userMsg: ChatMessage = {
-      id: Date.now(),
-      sender: "user",
-      text,
-      time: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
-    };
 
-    setChatMessages(prev => [...prev, userMsg]);
-    setChatInput("");
-
-    const token = getStoredAuthToken();
-    if (!token) {
-      appendBotMessage("Silakan login terlebih dahulu agar Sakoo bisa mencatat transaksi ke dashboard.");
-      return;
-    }
-
-    try {
-      const result = await apiClient.transactions.parseText(token, { text });
-      appendBotMessage(result.reply_text);
-      if (result.transaction_id !== null) {
-        await refreshTransactions(token);
-      }
-    } catch {
-      appendBotMessage("Maaf, dashboard belum bisa menghubungi backend. Coba lagi sebentar.");
-    }
-  }
 
   async function handleSaveModalTransaction(data: { type: "income" | "expense"; title: string; amount: number }) {
     setIsAddTxModalOpen(false);
@@ -475,12 +481,9 @@ export default function Home() {
         {activeTab === "integrations" && <IntegrationsTab />}
       </div>
 
-      <ChatSimulator 
-        chatMessages={chatMessages}
-        chatInput={chatInput}
-        setChatInput={setChatInput}
-        handleSendChatMessage={handleSendChatMessage}
-      />
+        {activeTab === "chat" && (
+          <ChatTab onTransactionAdded={refreshTransactions} />
+        )}
 
       <TransactionModal 
         isOpen={isAddTxModalOpen} 
@@ -529,6 +532,15 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* Exit Warning Toast */}
+      <div 
+        className={`fixed bottom-24 left-1/2 -translate-x-1/2 bg-[#1a1c1b]/90 text-white px-5 py-2.5 rounded-full text-sm z-[200] shadow-xl border border-white/10 flex items-center gap-2 transition-all duration-300 ease-in-out pointer-events-none
+          ${exitWarningShowing ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-8 scale-95"}`}
+      >
+        <span className="material-symbols-outlined text-[18px]">info</span>
+        Ketuk lagi untuk keluar!
+      </div>
     </>
   );
 }
@@ -624,3 +636,4 @@ function getPayloadDetail(payload: unknown): string | null {
 
   return null;
 }
+// 

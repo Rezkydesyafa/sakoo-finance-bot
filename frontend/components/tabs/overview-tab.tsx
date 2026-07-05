@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { Transaction, ChatMessage } from "@/app/(dashboard)/types";
 import { ConnectedBots } from "@/components/connected-bots";
-import { ChatSimulator } from "@/components/chat-simulator";
+
 import Link from "next/link";
 
 type OverviewTabProps = {
@@ -106,7 +106,7 @@ export function OverviewTab({
               <span className="material-symbols-outlined text-3xl text-[#6F6F6F]">account_balance_wallet</span>
               <span className="text-[13px] font-semibold text-[#191919]">Add Income</span>
             </button>
-            <button className="bg-white card-shadow rounded-[20px] p-4 flex flex-col items-center justify-center gap-2 hover-lift">
+            <button onClick={() => window.dispatchEvent(new Event("open_mobile_scan"))} className="bg-white card-shadow rounded-[20px] p-4 flex flex-col items-center justify-center gap-2 hover-lift border-none cursor-pointer">
               <span className="material-symbols-outlined text-3xl text-[#6F6F6F]">document_scanner</span>
               <span className="text-[13px] font-semibold text-[#191919]">Scan Receipt</span>
             </button>
@@ -231,7 +231,7 @@ export function OverviewTab({
       <div className="col-span-12 lg:col-span-4 flex flex-col gap-8 lg:mt-[72px]">
         
         {/* Connected Bot Channels */}
-        <ConnectedBots />
+        <ConnectedBots displayMode="connectedOnly" />
 
         {/* Recent Transactions */}
         <div className="bg-white rounded-[24px] card-shadow flex-1 overflow-hidden flex flex-col">
@@ -278,7 +278,7 @@ export function OverviewTab({
                   </div>
                   <div className="text-right flex items-center gap-3">
                     <div>
-                      <div className={`font-semibold text-[15px] sm:text-sm ${isIncome ? "text-[#4e6700]" : "text-[#1a1c1b]"}`}>
+                      <div className={`font-semibold text-[15px] sm:text-sm whitespace-nowrap ${isIncome ? "text-[#4e6700]" : "text-[#1a1c1b]"}`}>
                         {isIncome ? "+" : "-"} {formatCurrency(t.amount)}
                       </div>
                     </div>

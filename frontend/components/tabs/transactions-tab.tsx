@@ -107,7 +107,7 @@ export function TransactionsTab({
         </div>
         <div className="text-right flex items-center gap-3">
           <div>
-            <div className={`font-semibold text-[15px] sm:text-sm ${isIncome ? "text-[#4e6700]" : "text-[#1a1c1b]"}`}>
+            <div className={`font-semibold text-[15px] sm:text-sm whitespace-nowrap ${isIncome ? "text-[#4e6700]" : "text-[#1a1c1b]"}`}>
               {isIncome ? "+" : "-"} {formatCurrency(t.amount)}
             </div>
           </div>
