@@ -532,6 +532,38 @@ def test_waha_receipt_image_returns_limit_message_before_second_queue(
         assert db.scalar(select(Job).where(Job.status == "failed")) is None
 
 
+def test_waha_from_me_message_is_logged_without_processing(
+    test_client: tuple[
+        TestClient,
+        sessionmaker[Session],
+        FakeWahaClient,
+        FakeOcrClient,
+        list[dict[str, Any]],
+    ],
+) -> None:
+    client, session_factory, fake_waha, _fake_ocr, queued_jobs = test_client
+    _create_linked_whatsapp_user(session_factory)
+
+    response = client.post(
+        "/webhook/waha",
+        json=_waha_text_update("beli makan 20 ribu", from_me=True),
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["linking_status"] == "from_me"
+    assert payload["transaction_status"] is None
+    assert payload["reply_status"] is None
+    assert fake_waha.sent_messages == []
+    assert queued_jobs == []
+
+    with session_factory() as db:
+        assert db.scalar(select(Transaction)) is None
+        log = db.scalar(select(BotLog))
+        assert log is not None
+        assert log.status == "received"
+
+
 def _run_queued_ocr_job(
     session_factory: sessionmaker[Session],
     fake_ocr: FakeOcrClient,
@@ -595,14 +627,14 @@ def _waha_image_update(caption: str | None = None) -> dict[str, Any]:
     return payload
 
 
-def _waha_text_update(text: str) -> dict[str, Any]:
+def _waha_text_update(text: str, *, from_me: bool = False) -> dict[str, Any]:
     return {
         "event": "message",
         "session": "default",
         "payload": {
             "id": f"msg-{text}",
             "from": "6281234567890@c.us",
-            "fromMe": False,
+            "fromMe": from_me,
             "body": text,
             "type": "text",
         },
