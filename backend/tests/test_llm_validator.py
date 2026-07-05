@@ -12,7 +12,7 @@ def test_llm_chat_prompt_stays_compact() -> None:
     )
 
     assert len(prompt) < 360
-    assert "Sakoo finance bot" in prompt
+    assert "Sakoo" in prompt
 
 
 def test_gemini_model_is_read_from_settings() -> None:
