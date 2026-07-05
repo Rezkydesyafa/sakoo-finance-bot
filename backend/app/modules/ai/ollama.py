@@ -1,6 +1,6 @@
 """Ollama-based AI transaction parser.
 
-Uses a local Ollama instance with a small language model (e.g. qwen2.5:1.5b)
+Uses a local Ollama instance with the model configured in settings.
 to parse natural-language messages into structured transaction data.  This
 module acts as a **fallback** when the rule-based parser produces a low
 confidence score.

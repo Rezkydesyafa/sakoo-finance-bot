@@ -2,7 +2,6 @@ import pytest
 
 from app.config import Settings
 from app.modules.llm.base import LlmProviderError, build_finance_chat_prompt
-from app.modules.llm.gemini_provider import GeminiProvider
 from app.modules.llm.llm_router import answer_finance_question_with_llm, get_llm_providers
 
 
@@ -16,12 +15,19 @@ def test_llm_chat_prompt_stays_compact() -> None:
     assert "Sakoo finance bot" in prompt
 
 
-def test_gemini_default_model_uses_flash_lite() -> None:
-    settings = Settings(database_url="sqlite+pysqlite:///:memory:")
+def test_gemini_model_is_read_from_settings() -> None:
+    settings = Settings(
+        database_url="sqlite+pysqlite:///:memory:",
+        llm_provider="gemini,openrouter,ollama",
+        gemini_model="gemini-3.1-flash-lite",
+        glm_model="glm-4-flash",
+        openrouter_model="deepseek/deepseek-chat",
+        deepseek_model="deepseek-chat",
+        ollama_model="qwen2.5:1.5b",
+    )
 
     assert settings.llm_provider == "gemini,openrouter,ollama"
     assert settings.gemini_model == "gemini-3.1-flash-lite"
-    assert GeminiProvider.model == "gemini-3.1-flash-lite"
 
 
 def test_llm_provider_chain_reads_gemini_then_openrouter_then_ollama() -> None:
@@ -32,7 +38,9 @@ def test_llm_provider_chain_reads_gemini_then_openrouter_then_ollama() -> None:
         gemini_api_key_2="gemini-key-two",
         openrouter_api_key="openrouter-key",
         gemini_model="gemini-test-model",
+        glm_model="glm-test-model",
         openrouter_model="openrouter/test-model",
+        deepseek_model="deepseek-test-model",
         ollama_model="ollama/test-model",
     )
 
@@ -62,6 +70,11 @@ def test_llm_provider_chain_infers_enabled_providers_from_api_keys() -> None:
     settings = Settings(
         database_url="sqlite+pysqlite:///:memory:",
         llm_provider="none",
+        gemini_model="gemini-3.1-flash-lite",
+        glm_model="glm-test-model",
+        openrouter_model="openrouter/test-model",
+        deepseek_model="deepseek-test-model",
+        ollama_model="ollama/test-model",
         gemini_api_key="gemini-key",
         gemini_api_key_1="",
         gemini_api_key_2="",
@@ -95,6 +108,11 @@ def test_llm_chat_falls_back_to_next_provider(monkeypatch: pytest.MonkeyPatch) -
     settings = Settings(
         database_url="sqlite+pysqlite:///:memory:",
         llm_provider="gemini,openrouter",
+        gemini_model="gemini-3.1-flash-lite",
+        glm_model="glm-test-model",
+        openrouter_model="openrouter/test-model",
+        deepseek_model="deepseek-test-model",
+        ollama_model="ollama/test-model",
     )
 
     result = answer_finance_question_with_llm(
