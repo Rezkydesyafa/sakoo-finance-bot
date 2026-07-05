@@ -6,22 +6,23 @@ import type { ReactNode } from "react";
 import { Suspense, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { LogoutButton } from "@/components/logout-button";
-import { apiClient } from "@/lib/api";
-import { getStoredAuthToken } from "@/lib/auth-storage";
+import { apiClient, ApiError } from "@/lib/api";
+import { getStoredAuthToken, clearAuthToken } from "@/lib/auth-storage";
 import { SettingsTab } from "@/components/tabs/settings-tab";
 
 const navigationItems = [
   { label: "Overview", icon: "dashboard", href: "/?tab=overview", id: "overview" },
   { label: "Transactions", icon: "receipt_long", href: "/?tab=transactions", id: "transactions" },
+  { label: "Chat AI", icon: "smart_toy", href: "/?tab=chat", id: "chat", isAi: true },
+  { label: "Scan Receipt", icon: "document_scanner", href: "/?tab=receipt_scan", id: "receipt_scan" },
   { label: "Reports", icon: "bar_chart", href: "/?tab=reports", id: "reports" },
   { label: "Budgets", icon: "account_balance_wallet", href: "/?tab=budgets", id: "budgets" },
-  { label: "Receipt Scan", icon: "document_scanner", href: "/?tab=receipt_scan", id: "receipt_scan" },
 ];
 
 const mobileNavigationItems = [
   { label: "Overview", icon: "dashboard", href: "/?tab=overview", id: "overview" },
   { label: "Transactions", icon: "receipt_long", href: "/?tab=transactions", id: "transactions" },
-  { label: "Scan", icon: "document_scanner", href: "/?tab=receipt_scan", id: "receipt_scan", isScan: true },
+  { label: "Chat AI", icon: "smart_toy", href: "/?tab=chat", id: "chat", isAi: true },
   { label: "Budgets", icon: "account_balance_wallet", href: "/?tab=budgets", id: "budgets" },
   { label: "Reports", icon: "bar_chart", href: "/?tab=reports", id: "reports" },
 ];
@@ -49,10 +50,19 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
   const [profileImage, setProfileImage] = useState<string | null>(null);
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
 
   useEffect(() => {
-    if (currentTab === "settings" && !isSettingsOpen) {
+    if (currentTab === "settings") {
       setIsSettingsOpen(true);
+    } else {
+      setIsSettingsOpen(false);
+    }
+
+    if (currentTab === "scan" || currentTab === "receipt_scan") {
+      setIsMobileScanOpen(true);
+    } else {
+      setIsMobileScanOpen(false);
     }
   }, [currentTab]);
 
@@ -67,8 +77,10 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
       if (user.name) setUserName(user.name);
       if (user.email) setUserEmail(user.email);
       if (user.phone_number) setUserPhone(user.phone_number);
+      setIsAuthChecking(false);
     }).catch(() => {
       // If fetching user fails, might be an expired token
+      clearAuthToken();
       router.replace("/login");
     });
 
@@ -80,10 +92,25 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
     loadProfileImage();
     window.addEventListener("profile_image_updated", loadProfileImage);
 
+    const handleOpenScan = () => router.push("/?tab=scan");
+    window.addEventListener("open_mobile_scan", handleOpenScan);
+
     return () => {
       window.removeEventListener("profile_image_updated", loadProfileImage);
+      window.removeEventListener("open_mobile_scan", handleOpenScan);
     };
   }, []);
+
+  if (isAuthChecking) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-[#f9f9f7]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 rounded-full border-[3px] border-[#c7ff00]/20 border-t-[#c7ff00] animate-spin"></div>
+          <p className="text-xs text-[#6F6F6F] font-semibold">Memuat...</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -139,6 +166,7 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
       amount: 0,
     });
     setIsMobileScanOpen(false);
+    router.push("/?tab=overview");
   };
 
   const handleConfirmReceipt = () => {
@@ -168,6 +196,9 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
       maximumFractionDigits: 0,
     }).format(val);
   }
+
+  const isFullScreen = ["chat", "integrations"].includes(currentTab);
+
   return (
     <div className="text-sm text-[#1a1c1b] antialiased bg-[#f9f9f7] h-[100dvh] overflow-hidden">
       <div className="ambient-glow"></div>
@@ -196,6 +227,8 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
               );
             }
 
+
+
             return (
               <Link
                 key={item.id}
@@ -221,12 +254,27 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
       </nav>
 
       {/* TopNavBar */}
-      <header className="fixed top-0 md:right-0 w-full md:w-[calc(100%_-_240px)] z-40 bg-[#f9f9f7] flex justify-between items-center h-20 px-4 md:px-8 border-b md:border-none border-[#E8E8E8]">
+      <header className={`fixed top-0 md:right-0 w-full md:w-[calc(100%_-_240px)] z-40 bg-[#f9f9f7] justify-between items-center h-20 px-4 md:px-8 border-b md:border-none border-[#E8E8E8] ${currentTab === "chat" || currentTab === "integrations" || currentTab === "receipt_scan" ? "hidden md:flex" : "flex"}`}>
         <div className="flex items-center w-64 md:w-96 relative hidden sm:flex">
           <span className="material-symbols-outlined absolute left-4 text-[#6F6F6F]">search</span>
           <input 
             type="text" 
-            placeholder="Search transactions, assets..." 
+            placeholder="Cari transaksi, kategori..." 
+            defaultValue={searchParams.get("q") || ""}
+            onChange={(e) => {
+              const val = e.target.value;
+              const params = new URLSearchParams(window.location.search);
+              if (val) {
+                params.set("q", val);
+              } else {
+                params.delete("q");
+              }
+              // Jika tidak di overview atau transactions, arahkan ke transactions saat mencari
+              if (val && currentTab !== "overview" && currentTab !== "transactions") {
+                params.set("tab", "transactions");
+              }
+              router.replace(`/?${params.toString()}`, { scroll: false });
+            }}
             className="w-full bg-[#F1F2F0] border-none rounded-full py-2.5 pl-12 pr-4 text-xs focus:ring-1 focus:ring-[#c7ff00] text-[#1a1c1b] font-semibold placeholder-[#6F6F6F]"
           />
         </div>
@@ -282,7 +330,7 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
                   <button 
                     onClick={() => {
                       setIsDropdownOpen(false);
-                      setIsSettingsOpen(true);
+                      router.push("/?tab=settings");
                     }}
                     className="flex items-center gap-3 w-full text-left px-4 py-2 text-sm text-[#5f5e5e] hover:bg-neutral-100 transition-colors bg-transparent border-none cursor-pointer"
                   >
@@ -313,23 +361,18 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
       </header>
       
       {/* Mobile Navigation */}
-      <nav className="flex items-center justify-between border-t border-[#E8E8E8] bg-white fixed bottom-0 left-0 right-0 z-50 py-1 px-2 md:hidden no-scrollbar shadow-[0_-4px_12px_rgba(0,0,0,0.04)] rounded-t-[24px] animate-fade-in">
+      <nav className={`items-center justify-between border-t border-[#E8E8E8] bg-white fixed bottom-0 left-0 right-0 z-50 py-1 px-2 md:hidden no-scrollbar shadow-[0_-4px_12px_rgba(0,0,0,0.04)] rounded-t-[24px] animate-fade-in ${isFullScreen ? "hidden" : "flex"}`}>
         {mobileNavigationItems.map((item) => {
           const isActive = currentTab === item.id;
-          if (item.isScan) {
+          if (item.isAi) {
             return (
               <div key={item.id} className="relative flex justify-center items-center w-[72px] shrink-0">
-                <button
-                  onClick={() => setIsMobileScanOpen(true)}
-                  type="button"
-                  className={`absolute left-1/2 -translate-x-1/2 -top-[28px] flex items-center justify-center w-[52px] h-[52px] rounded-full shadow-[0_2px_8px_rgba(0,0,0,0.12)] border-[2px] border-white active:scale-95 transition-all duration-200 ${
-                    isMobileScanOpen
-                      ? "bg-[#4e6700] text-white"
-                      : "bg-[#c7ff00] text-[#151f00] hover:bg-[#bff500]"
-                  }`}
+                <Link
+                  href={item.href}
+                  className={`absolute left-1/2 -translate-x-1/2 -top-[28px] flex items-center justify-center w-[52px] h-[52px] rounded-full shadow-[0_2px_8px_rgba(0,0,0,0.12)] border-[2px] border-white active:scale-95 transition-all duration-200 ${isActive ? 'bg-[#bff500]' : 'bg-[#c7ff00]'} text-[#151f00] hover:bg-[#bff500]`}
                 >
-                  <span className="material-symbols-outlined text-[26px]" style={isMobileScanOpen ? { fontVariationSettings: '"FILL" 1' } : {}}>{item.icon}</span>
-                </button>
+                  <span className="material-symbols-outlined text-[26px]" style={{ fontVariationSettings: '"FILL" 1' }}>{item.icon}</span>
+                </Link>
               </div>
             );
           }
@@ -355,13 +398,13 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
       </nav>
 
       {/* Main Content Area */}
-      <main className="md:ml-[240px] pt-28 px-4 pb-32 md:pt-28 md:px-8 md:pb-8 max-w-[1440px] h-full overflow-y-auto no-scrollbar">
+      <main className={`md:ml-[240px] max-w-[1440px] h-full overflow-y-auto no-scrollbar ${isFullScreen ? "pt-0 px-0 pb-0" : "pt-28 px-4 pb-32 md:pt-28 md:px-8 md:pb-8"}`}>
         {children}
       </main>
 
       {/* Sliding Mobile Scanner Overlay */}
       <div 
-        className={`fixed inset-0 bg-[#f9f9f7] z-[100] md:hidden transition-transform duration-300 ease-out transform ${
+        className={`fixed inset-0 bg-[#f9f9f7] z-[100] transition-transform duration-300 ease-out transform md:hidden ${
           isMobileScanOpen ? "translate-y-0" : "translate-y-full"
         }`}
       >
@@ -588,7 +631,7 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
               userName={userName} 
               userEmail={userEmail} 
               userPhone={userPhone} 
-              onClose={() => setIsSettingsOpen(false)} 
+              onClose={() => router.push("/?tab=overview")} 
             />
           </div>
         </div>

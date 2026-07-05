@@ -360,6 +360,14 @@ export const apiClient = {
       apiRequest<ReceiptOcrResponse>(`/ocr/receipts/results/${receiptId}`, { token }),
   },
 
+  stt: {
+    transcribe: (token: string, mediaId: number) =>
+      apiRequest<{ job: JobResponse }>(`/stt/transcribe/${mediaId}`, {
+        method: "POST",
+        token,
+      }),
+  },
+
   jobs: {
     get: (token: string, jobId: number) =>
       apiRequest<JobResponse>(`/jobs/${jobId}`, { token }),
