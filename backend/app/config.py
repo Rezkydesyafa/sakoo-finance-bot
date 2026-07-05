@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     stt_language_code: str = "id-ID"
     stt_max_duration_seconds: int = 30
     stt_enable_automatic_punctuation: bool = True
-    llm_provider: str = "none"
+    llm_provider: str = "gemini,openrouter,ollama"
     ollama_base_url: str = "http://host.docker.internal:11434"
     ollama_model: str = "qwen2.5:1.5b"
     ollama_timeout_seconds: float = 30.0
@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     gemini_api_key_1: str = ""
     gemini_api_key_2: str = ""
     gemini_api_keys: str = ""
-    gemini_model: str = "gemini-1.5-flash"
+    gemini_model: str = "gemini-3.1-flash-lite"
     glm_api_key: str = ""
     glm_model: str = "glm-4-flash"
     openrouter_api_key: str = ""

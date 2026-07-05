@@ -14,7 +14,7 @@ from app.modules.llm.base import (
 
 class GeminiProvider(BaseLlmProvider):
     provider_name = "gemini"
-    model = "gemini-1.5-flash"
+    model = "gemini-3.1-flash-lite"
 
     def answer_finance_question(self, message: str, *, context: str) -> str:
         if not self.config.api_key:
