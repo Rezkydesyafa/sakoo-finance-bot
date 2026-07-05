@@ -241,6 +241,7 @@ def test_waha_receipt_total_can_be_edited_after_worker_confirmation(
     assert "Tanggal tidak jelas" in fake_waha.sent_messages[-1]["text"]
     assert "Foto agak blur" in fake_waha.sent_messages[-1]["text"]
     assert "edit total" in fake_waha.sent_messages[-1]["text"].lower()
+    assert "Item: Kopi, Roti" in fake_waha.sent_messages[-1]["text"]
 
     edit_response = client.post("/webhook/waha", json=_waha_text_update("21000"))
     assert edit_response.status_code == 200, edit_response.text
@@ -256,6 +257,7 @@ def test_waha_receipt_total_can_be_edited_after_worker_confirmation(
         receipt = db.scalar(select(Receipt))
         assert transaction is not None
         assert transaction.amount == Decimal("21000.00")
+        assert transaction.description == "Kopi, Roti"
         assert receipt is not None
         assert receipt.status == "confirmed"
         assert receipt.transaction_id == transaction.id
