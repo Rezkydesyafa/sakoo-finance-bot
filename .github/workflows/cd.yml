@@ -2,7 +2,7 @@ name: CD
 
 on:
   workflow_run:
-    workflows: ["CI"]
+    workflows: ['CI']
     types:
       - completed
     branches:
@@ -11,12 +11,16 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: cd-main
+  cancel-in-progress: true
+
 jobs:
   deploy:
     name: Deploy to VPS
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    timeout-minutes: 15
+    timeout-minutes: 45
 
     steps:
       - name: Install cloudflared
@@ -36,7 +40,6 @@ jobs:
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
 
-          # Tulis SSH config dengan variabel yang sudah di-expand
           cat > ~/.ssh/config << EOF
           Host sakoo-server
             HostName ssh.lab-sigma.web.id
@@ -45,50 +48,83 @@ jobs:
             ProxyCommand cloudflared access ssh --hostname %h --id ${CF_CLIENT_ID} --secret ${CF_CLIENT_SECRET}
             StrictHostKeyChecking no
             UserKnownHostsFile /dev/null
+            ServerAliveInterval 30
+            ServerAliveCountMax 10
+            TCPKeepAlive yes
           EOF
 
           chmod 600 ~/.ssh/config
 
+      - name: Test SSH Connection
+        run: |
+          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=10 -T sakoo-server "echo '✅ SSH connected successfully'"
+
       - name: Deploy via SSH
         run: |
-          ssh -T sakoo-server << 'DEPLOY'
-            set -e
+          ssh \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=10 \
+            -o TCPKeepAlive=yes \
+            -T sakoo-server << 'DEPLOY'
+              set -e
 
-            cd ~/sakoo_bot/sakoo-finance-bot
+              export DOCKER_CLIENT_TIMEOUT=600
+              export COMPOSE_HTTP_TIMEOUT=600
 
-            echo "📥 Pulling latest code..."
-            git fetch origin main
-            git reset --hard origin/main
+              echo "📁 Moving to project directory..."
+              cd ~/sakoo_bot/sakoo-finance-bot
 
-            echo "🔨 Building and restarting containers..."
-            cd infra/docker
-            docker compose --env-file ../../.env pull
-            docker compose --env-file ../../.env up -d --build --remove-orphans
-            docker compose --env-file ../../.env restart nginx
+              echo "📥 Pulling latest code..."
+              git fetch origin main
+              git reset --hard origin/main
 
-            echo "🧹 Cleaning up old images..."
-            docker image prune -f
+              echo "🔎 Checking server resources..."
+              df -h
+              free -h
 
-            echo "⏳ Waiting for services to be healthy..."
-            port="$(grep -E '^NGINX_HTTP_PORT=' ../../.env | tail -n 1 | cut -d '=' -f 2- | tr -d '\r')"
-            port="${port:-8080}"
-            health_url="http://127.0.0.1:${port}/health"
+              echo "🔨 Building and restarting containers..."
+              cd infra/docker
 
-            for i in 1 2 3 4 5 6; do
-              echo "  Attempt $i/6..."
-              if curl -sf "$health_url" > /dev/null 2>&1; then
-                echo "  ✅ Health check passed!"
-                break
-              fi
-              if [ "$i" = "6" ]; then
-                echo "  ❌ Health check failed after 6 attempts"
-                docker compose --env-file ../../.env ps
-                docker compose --env-file ../../.env logs --tail=20 backend
-                docker compose --env-file ../../.env logs --tail=20 nginx
-                exit 1
-              fi
-              sleep 10
-            done
+              docker compose --env-file ../../.env pull
+              docker compose --env-file ../../.env up -d --build --remove-orphans
 
-            echo "✅ Deployment successful!"
+              echo "🔁 Restarting nginx..."
+              docker compose --env-file ../../.env restart nginx
+
+              echo "🧹 Cleaning up old images..."
+              docker image prune -f
+
+              echo "📦 Container status..."
+              docker compose --env-file ../../.env ps
+
+              echo "⏳ Waiting for services to be healthy..."
+              port="$(grep -E '^NGINX_HTTP_PORT=' ../../.env | tail -n 1 | cut -d '=' -f 2- | tr -d '\r')"
+              port="${port:-8080}"
+              health_url="http://127.0.0.1:${port}/health"
+
+              for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+                echo "  Attempt $i/12..."
+                if curl -sf "$health_url" > /dev/null 2>&1; then
+                  echo "  ✅ Health check passed!"
+                  echo "✅ Deployment successful!"
+                  exit 0
+                fi
+
+                sleep 10
+              done
+
+              echo "❌ Health check failed after 12 attempts"
+              echo "📦 Container status:"
+              docker compose --env-file ../../.env ps
+
+              echo "📜 Backend logs:"
+              docker compose --env-file ../../.env logs --tail=50 backend || true
+
+              echo "📜 Nginx logs:"
+              docker compose --env-file ../../.env logs --tail=50 nginx || true
+
+              echo "📜 Celery worker logs:"
+              docker compose --env-file ../../.env logs --tail=50 celery_worker || true
+
+              exit 1
           DEPLOY
