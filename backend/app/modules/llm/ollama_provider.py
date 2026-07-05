@@ -21,7 +21,6 @@ class OllamaProvider(BaseLlmProvider):
     """
 
     provider_name = "ollama"
-    model = "qwen2.5:1.5b"
 
     def __init__(self, config: LlmProviderConfig, *, base_url: str = "") -> None:
         super().__init__(config)
@@ -32,11 +31,14 @@ class OllamaProvider(BaseLlmProvider):
         return f"{self.base_url}/v1/chat/completions"
 
     def answer_finance_question(self, message: str, *, context: str) -> str:
+        if not self.config.model:
+            raise LlmProviderError("ollama_model_missing")
+
         return request_openai_chat_completion(
             provider_name=self.provider_name,
             api_url=self.api_url,
             api_key="",
-            model=self.config.model or self.model,
+            model=self.config.model,
             prompt=build_finance_chat_prompt(message, context=context),
             timeout_seconds=self.config.timeout_seconds,
         )
@@ -54,7 +56,10 @@ class OllamaProvider(BaseLlmProvider):
 
     def has_model(self, model_name: str | None = None) -> bool:
         """Check whether a specific model is pulled on the Ollama server."""
-        target = model_name or self.config.model or self.model
+        target = model_name or self.config.model
+        if not target:
+            return False
+
         try:
             response = httpx.get(
                 f"{self.base_url}/api/tags",

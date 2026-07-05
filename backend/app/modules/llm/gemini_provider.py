@@ -14,16 +14,17 @@ from app.modules.llm.base import (
 
 class GeminiProvider(BaseLlmProvider):
     provider_name = "gemini"
-    model = "gemini-1.5-flash"
 
     def answer_finance_question(self, message: str, *, context: str) -> str:
         if not self.config.api_key:
             raise LlmProviderError("gemini_api_key_missing")
 
-        model = self.config.model or self.model
+        if not self.config.model:
+            raise LlmProviderError("gemini_model_missing")
+
         url = (
             "https://generativelanguage.googleapis.com/v1beta/models/"
-            f"{model}:generateContent"
+            f"{self.config.model}:generateContent"
         )
         payload = {
             "contents": [
