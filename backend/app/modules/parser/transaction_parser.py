@@ -9,48 +9,15 @@ from app.modules.parser.intent_router import detect_intent
 from app.modules.parser.normalizer import normalize_text
 from app.modules.parser.schemas import (
     CONFIRMATION_THRESHOLD,
+    EXPENSE_KEYWORDS,
+    INCOME_KEYWORDS,
+    INCOME_PHRASES,
     INTENT_ADD_TRANSACTION,
     SOURCE_WHATSAPP_TEXT,
     AmountMatch,
     DateMatch,
     ParsedTransactionText,
 )
-
-
-INCOME_KEYWORDS = {
-    "bonus",
-    "cashback",
-    "dapat",
-    "dapet",
-    "dibayar",
-    "freelance",
-    "gaji",
-    "income",
-    "masuk",
-    "pemasukan",
-    "pendapatan",
-    "refund",
-    "salary",
-    "terima",
-    "upah",
-}
-INCOME_PHRASES = ("transfer masuk", "uang saku", "uang jajan")
-EXPENSE_KEYWORDS = {
-    "bayar",
-    "beli",
-    "belanja",
-    "biaya",
-    "checkout",
-    "habis",
-    "jajan",
-    "keluar",
-    "langganan",
-    "makan",
-    "minum",
-    "topup",
-    "transfer",
-    "untuk",
-}
 
 CATEGORY_KEYWORDS: tuple[tuple[str, str, set[str]], ...] = (
     (
