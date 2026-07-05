@@ -382,6 +382,24 @@ def test_common_finance_questions_use_local_insights_before_llm(
             text="kenapa saldo cepat habis?",
             source="telegram_text",
         )
+        health = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="keuangan bulan ini aman gak?",
+            source="telegram_text",
+        )
+        cutback = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="apa yang harus dikurangi?",
+            source="telegram_text",
+        )
+        compare = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="bandingkan minggu ini dan minggu lalu",
+            source="telegram_text",
+        )
 
     assert spending.status == "spending_check"
     assert "Pengeluaran bulan ini" in spending.reply_text
@@ -389,6 +407,92 @@ def test_common_finance_questions_use_local_insights_before_llm(
     assert "Saran cepat" in advice.reply_text
     assert reason.status == "cashflow_reason"
     assert "Saldo cepat habis" in reason.reply_text
+    assert health.status == "finance_health"
+    assert "Selisih" in health.reply_text
+    assert cutback.status == "cutback_advice"
+    assert "Makanan" in cutback.reply_text
+    assert compare.status == "week_compare"
+    assert "Minggu ini" in compare.reply_text
+
+
+def test_transaction_search_uses_local_history_without_llm(
+    session_factory: sessionmaker[Session],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_answer(*_args: object, **_kwargs: object) -> str:
+        raise AssertionError("LLM chat should not be called for transaction search")
+
+    monkeypatch.setattr(
+        "app.modules.transactions.service.answer_finance_question_with_llm",
+        fail_answer,
+    )
+
+    with session_factory() as db:
+        user = _create_user(db)
+        food = db.scalar(select(Category).where(Category.name == "Makanan"))
+        db.add(
+            Transaction(
+                user_id=user.id,
+                type="expense",
+                amount=Decimal("18000.00"),
+                category_id=food.id if food else None,
+                description="kopi susu",
+                transaction_date=date.today(),
+                source="telegram_text",
+            )
+        )
+        db.commit()
+
+        result = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="cari kopi",
+            source="telegram_text",
+        )
+
+    assert result.status == "transaction_search"
+    assert "kopi susu" in result.reply_text
+    assert "Rp18.000" in result.reply_text
+
+
+def test_income_source_question_handles_typo_without_llm(
+    session_factory: sessionmaker[Session],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_answer(*_args: object, **_kwargs: object) -> str:
+        raise AssertionError("LLM chat should not be called for income source question")
+
+    monkeypatch.setattr(
+        "app.modules.transactions.service.answer_finance_question_with_llm",
+        fail_answer,
+    )
+
+    with session_factory() as db:
+        user = _create_user(db)
+        gaji = db.scalar(select(Category).where(Category.name == "Gaji"))
+        db.add(
+            Transaction(
+                user_id=user.id,
+                type="income",
+                amount=Decimal("200000.00"),
+                category_id=gaji.id if gaji else None,
+                description="gaji",
+                transaction_date=date.today(),
+                source="telegram_text",
+            )
+        )
+        db.commit()
+
+        result = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="pemsukan saya dari mana",
+            source="telegram_text",
+        )
+
+    assert result.status == "income_source"
+    assert "Pemasukan bulan ini dari" in result.reply_text
+    assert "Gaji" in result.reply_text
 
 
 def test_reply_style_preference_is_saved_and_used(
@@ -442,7 +546,7 @@ def test_unknown_finance_question_uses_llm_chat(
         result = handle_text_transaction(
             db=db,
             user_id=user.id,
-            text="menurutmu keuangan bulan ini aman nggak?",
+            text="menurutmu strategi keuangan terbaik buatku apa?",
             source="telegram_text",
         )
 

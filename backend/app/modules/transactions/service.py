@@ -4,7 +4,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -70,6 +70,18 @@ SPENDING_CHECK_RE = re.compile(r"\b(?:boros|hemat|pengeluaran.*hari ini|hari ini
 TOP_EXPENSE_RE = re.compile(r"\b(?:pengeluaran terbesar|paling gede|terbesar apa|top pengeluaran)\b", re.IGNORECASE)
 SAVING_ADVICE_RE = re.compile(r"\b(?:saran hemat|tips hemat|cara hemat|hemat minggu ini)\b", re.IGNORECASE)
 CASHFLOW_REASON_RE = re.compile(r"\b(?:kenapa.*(?:saldo|uang).*(?:habis|cepat habis)|saldo.*cepat habis)\b", re.IGNORECASE)
+WEEK_COMPARE_RE = re.compile(r"\b(?:bandingkan|dibanding|compare).*(?:minggu ini|minggu lalu)|\bminggu ini.*minggu lalu\b", re.IGNORECASE)
+CUTBACK_RE = re.compile(r"\b(?:apa yang harus dikurangi|kurangi apa|yang perlu dikurangi|pengeluaran.*dikurangi)\b", re.IGNORECASE)
+INCOME_SOURCE_RE = re.compile(
+    r"\b(?:pemasukan|pemsukan|income|uang masuk)\b.*\b(?:dari mana|sumber|apa aja|apa saja)\b",
+    re.IGNORECASE,
+)
+SEARCH_TRANSACTION_RE = re.compile(r"^\s*(?:cari|search|temukan)\s+(?P<keyword>.+?)\s*$", re.IGNORECASE)
+FINANCE_HEALTH_RE = re.compile(
+    r"\b(?:aman|sehat|gimana|bagaimana|kondisi)\b.*\b(?:keuangan|bulan ini|saldo|cashflow)\b|"
+    r"\b(?:keuangan|bulan ini|saldo|cashflow)\b.*\b(?:aman|sehat|gimana|bagaimana|kondisi)\b",
+    re.IGNORECASE,
+)
 REPLY_STYLE_PREFERENCE_RE = re.compile(
     r"\b(?:gaya bahasa|bahasa|respon)\s+(?P<style>santai|formal|detail|rinci|singkat|pendek)\b",
     re.IGNORECASE,
@@ -427,6 +439,36 @@ def _handle_lightweight_message(
                 intent="cashflow_reason",
             ),
         )
+    if WEEK_COMPARE_RE.search(normalized):
+        return TextTransactionResult(
+            status="week_compare",
+            reply_text=_format_week_compare_response(db, user_id),
+            parse_result=_synthetic_parse_result(
+                text=text,
+                source=source,
+                intent="week_compare",
+            ),
+        )
+    if CUTBACK_RE.search(normalized):
+        return TextTransactionResult(
+            status="cutback_advice",
+            reply_text=_format_cutback_advice_response(db, user_id),
+            parse_result=_synthetic_parse_result(
+                text=text,
+                source=source,
+                intent="cutback_advice",
+            ),
+        )
+    if INCOME_SOURCE_RE.search(normalized):
+        return TextTransactionResult(
+            status="income_source",
+            reply_text=_format_income_source_response(db, user_id),
+            parse_result=_synthetic_parse_result(
+                text=text,
+                source=source,
+                intent="income_source",
+            ),
+        )
     if SPENDING_CHECK_RE.search(normalized):
         return TextTransactionResult(
             status="spending_check",
@@ -435,6 +477,32 @@ def _handle_lightweight_message(
                 text=text,
                 source=source,
                 intent="spending_check",
+            ),
+        )
+    if FINANCE_HEALTH_RE.search(normalized):
+        return TextTransactionResult(
+            status="finance_health",
+            reply_text=_format_finance_health_response(db, user_id),
+            parse_result=_synthetic_parse_result(
+                text=text,
+                source=source,
+                intent="finance_health",
+            ),
+        )
+
+    search_match = SEARCH_TRANSACTION_RE.match(normalized)
+    if search_match:
+        return TextTransactionResult(
+            status="transaction_search",
+            reply_text=_format_transaction_search_response(
+                db,
+                user_id,
+                keyword=search_match.group("keyword"),
+            ),
+            parse_result=_synthetic_parse_result(
+                text=text,
+                source=source,
+                intent="transaction_search",
             ),
         )
 
@@ -892,6 +960,148 @@ def _format_saving_advice_response(db: Session, user_id: int) -> str:
     )
 
 
+def _format_income_source_response(db: Session, user_id: int) -> str:
+    today = date.today()
+    start_date = today.replace(day=1)
+    transactions = list_transactions(
+        db,
+        user_id,
+        transaction_type="income",
+        start_date=start_date,
+        end_date=today,
+        limit=5,
+    )
+    if not transactions:
+        return "Belum ada pemasukan bulan ini."
+
+    lines = [
+        f"{index}. {item.category.name if item.category else 'Tanpa kategori'} - "
+        f"{format_rupiah(item.amount)}"
+        f"{f' - {item.description}' if item.description else ''}"
+        for index, item in enumerate(transactions, start=1)
+    ]
+    return "Pemasukan bulan ini dari:\n\n" + "\n".join(lines)
+
+
+def _format_week_compare_response(db: Session, user_id: int) -> str:
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday())
+    last_week_start = week_start - timedelta(days=7)
+    last_week_end = week_start - timedelta(days=1)
+    current = sum_transactions(
+        db,
+        user_id,
+        transaction_type="expense",
+        start_date=week_start,
+        end_date=today,
+    )
+    previous = sum_transactions(
+        db,
+        user_id,
+        transaction_type="expense",
+        start_date=last_week_start,
+        end_date=last_week_end,
+    )
+    diff = current - previous
+    if previous == 0 and current == 0:
+        verdict = "Belum ada pengeluaran di dua minggu ini."
+    elif diff <= 0:
+        verdict = f"Lebih hemat {format_rupiah(abs(diff))} dari minggu lalu."
+    else:
+        verdict = f"Naik {format_rupiah(diff)} dari minggu lalu."
+    return (
+        f"Minggu ini: {format_rupiah(current)}\n"
+        f"Minggu lalu: {format_rupiah(previous)}\n\n"
+        f"{verdict}"
+    )
+
+
+def _format_cutback_advice_response(db: Session, user_id: int) -> str:
+    today = date.today()
+    month_start = today.replace(day=1)
+    top_category = top_expense_category(db, user_id, start_date=month_start, end_date=today)
+    if not top_category:
+        return "Belum ada pengeluaran bulan ini, jadi belum ada yang perlu dikurangi."
+
+    category_name, total = top_category
+    return (
+        f"Yang paling layak dikurangi: {category_name} ({format_rupiah(total)} bulan ini).\n"
+        "Mulai dari transaksi kecil yang berulang di kategori itu."
+    )
+
+
+def _format_finance_health_response(db: Session, user_id: int) -> str:
+    today = date.today()
+    month_start = today.replace(day=1)
+    income_total = sum_transactions(
+        db,
+        user_id,
+        transaction_type="income",
+        start_date=month_start,
+        end_date=today,
+    )
+    expense_total = sum_transactions(
+        db,
+        user_id,
+        transaction_type="expense",
+        start_date=month_start,
+        end_date=today,
+    )
+    net = income_total - expense_total
+    if income_total == 0 and expense_total > 0:
+        verdict = "Belum aman, bulan ini belum ada pemasukan tercatat."
+    elif net >= 0:
+        verdict = "Masih aman, pemasukan bulan ini menutup pengeluaran."
+    else:
+        verdict = "Perlu direm, pengeluaran bulan ini sudah melewati pemasukan."
+    return (
+        f"Pemasukan bulan ini: {format_rupiah(income_total)}\n"
+        f"Pengeluaran bulan ini: {format_rupiah(expense_total)}\n"
+        f"Selisih: {format_rupiah(net)}\n\n"
+        f"{verdict}"
+    )
+
+
+def _format_transaction_search_response(
+    db: Session,
+    user_id: int,
+    *,
+    keyword: str,
+) -> str:
+    normalized = re.sub(r"\s+", " ", keyword).strip(" -,.").lower()
+    if len(normalized) < 2:
+        return "Kata kunci terlalu pendek. Contoh: cari kopi atau cari gojek."
+
+    pattern = f"%{normalized}%"
+    transactions = list(
+        db.scalars(
+            select(Transaction)
+            .join(Category, Transaction.category_id == Category.id, isouter=True)
+            .where(
+                Transaction.user_id == user_id,
+                or_(
+                    func.lower(Transaction.description).like(pattern),
+                    func.lower(Category.name).like(pattern),
+                ),
+            )
+            .order_by(Transaction.transaction_date.desc(), Transaction.id.desc())
+            .limit(5)
+        )
+    )
+    if not transactions:
+        return f"Aku belum menemukan transaksi untuk '{normalized}'."
+
+    lines = [
+        f"{index}. {item.transaction_date.isoformat()} - "
+        f"{'Pemasukan' if item.type == 'income' else 'Pengeluaran'} - "
+        f"{format_rupiah(item.amount)} - "
+        f"{item.category.name if item.category else 'Tanpa kategori'}"
+        f"{f' - {item.description}' if item.description else ''}"
+        for index, item in enumerate(transactions, start=1)
+    ]
+    return f"Hasil pencarian '{normalized}':\n\n" + "\n".join(lines)
+
+
 def _format_cashflow_reason_response(db: Session, user_id: int) -> str:
     today = date.today()
     month_start = today.replace(day=1)
@@ -1005,6 +1215,23 @@ def _build_llm_finance_context(db: Session, user_id: int) -> str:
         end_date=today,
     )
     recent = list_transactions(db, user_id, limit=5)
+    week_start = today - timedelta(days=today.weekday())
+    last_week_start = week_start - timedelta(days=7)
+    last_week_end = week_start - timedelta(days=1)
+    week_expense = sum_transactions(
+        db,
+        user_id,
+        transaction_type="expense",
+        start_date=week_start,
+        end_date=today,
+    )
+    last_week_expense = sum_transactions(
+        db,
+        user_id,
+        transaction_type="expense",
+        start_date=last_week_start,
+        end_date=last_week_end,
+    )
     recent_lines = [
         f"{item.transaction_date.isoformat()} {item.type} {format_rupiah(item.amount)} "
         f"{item.category.name if item.category else 'Tanpa kategori'} "
@@ -1023,6 +1250,8 @@ def _build_llm_finance_context(db: Session, user_id: int) -> str:
             f"Pengeluaran total: {format_rupiah(expense_total)}",
             f"Pemasukan bulan ini: {format_rupiah(month_income)}",
             f"Pengeluaran bulan ini: {format_rupiah(month_expense)}",
+            f"Pengeluaran minggu ini: {format_rupiah(week_expense)}",
+            f"Pengeluaran minggu lalu: {format_rupiah(last_week_expense)}",
             f"Kategori pengeluaran terbesar bulan ini: {top_text}",
             "Transaksi terbaru: " + ("; ".join(recent_lines) if recent_lines else "belum ada"),
         ]
