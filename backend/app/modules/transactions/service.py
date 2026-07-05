@@ -19,12 +19,14 @@ from app.modules.bot.conversation_state import (
     update_pending_transaction,
 )
 from app.modules.llm.base import LlmProviderError
-from app.modules.llm.llm_router import answer_finance_question_with_llm
+from app.modules.llm.llm_router import LlmRateLimitExceeded, answer_finance_question_with_llm
 from app.modules.bot.response_templates import (
     format_cancelled_response,
     format_confirmation_request,
     format_help_response,
+    format_llm_error_response,
     format_no_pending_response,
+    format_rate_limit_response,
     format_rupiah,
     format_saved_transaction as format_saved_transaction_template,
     format_unknown_response,
@@ -66,7 +68,16 @@ CANCEL_RE = re.compile(r"^\s*(?:batal|cancel|ga jadi|gajadi|jangan|hapus)\s*$", 
 EDIT_RE = re.compile(r"^\s*(?:edit|ubah|ganti|koreksi|revisi|bukan)\b", re.IGNORECASE)
 THANKS_RE = re.compile(r"^\s*(?:makasih|terima kasih|thanks|thx|tengkyu)\s*[.!]*\s*$", re.IGNORECASE)
 ACK_RE = re.compile(r"^\s*(?:oke|ok|sip|siap|noted)\s*[.!]*\s*$", re.IGNORECASE)
+BOT_PROFILE_RE = re.compile(
+    r"\b(?:kamu siapa|siapa kamu|bisa bantu apa|bantu saya apa|fitur kamu|kamu bisa apa)\b",
+    re.IGNORECASE,
+)
 SPENDING_CHECK_RE = re.compile(r"\b(?:boros|hemat|pengeluaran.*hari ini|hari ini.*keluar)\b", re.IGNORECASE)
+PURCHASE_LIST_RE = re.compile(
+    r"\b(?:bulan ini|minggu ini|hari ini)\b.*\b(?:beli|belanja|jajan)\b.*\b(?:apa aja|apa saja)\b|"
+    r"\b(?:apa aja|apa saja)\b.*\b(?:dibeli|aku beli|saya beli|belanja)\b",
+    re.IGNORECASE,
+)
 TOP_EXPENSE_RE = re.compile(r"\b(?:pengeluaran terbesar|paling gede|terbesar apa|top pengeluaran)\b", re.IGNORECASE)
 SAVING_ADVICE_RE = re.compile(r"\b(?:saran hemat|tips hemat|cara hemat|hemat minggu ini)\b", re.IGNORECASE)
 CASHFLOW_REASON_RE = re.compile(r"\b(?:kenapa.*(?:saldo|uang).*(?:habis|cepat habis)|saldo.*cepat habis)\b", re.IGNORECASE)
@@ -343,9 +354,6 @@ def _handle_llm_finance_chat(
     source: str,
     parse_result: ParsedMessage,
 ) -> TextTransactionResult | None:
-    if not FINANCE_CHAT_RE.search(normalize_text(text)):
-        return None
-
     try:
         answer = answer_finance_question_with_llm(
             text,
@@ -353,10 +361,17 @@ def _handle_llm_finance_chat(
             user_id=user_id,
             db=db,
         )
+    except LlmRateLimitExceeded as exc:
+        return TextTransactionResult(
+            status="llm_rate_limited",
+            reply_text=format_rate_limit_response(),
+            parse_result=parse_result,
+            error_message=exc.detail,
+        )
     except LlmProviderError as exc:
         return TextTransactionResult(
             status=INTENT_UNKNOWN,
-            reply_text=_format_command_response(db, user_id, parse_result),
+            reply_text=format_llm_error_response(),
             parse_result=parse_result,
             error_message=exc.detail,
         )
@@ -407,6 +422,26 @@ def _handle_lightweight_message(
                 text=text,
                 source=source,
                 intent="acknowledged",
+            ),
+        )
+    if BOT_PROFILE_RE.search(normalized):
+        return TextTransactionResult(
+            status="bot_profile",
+            reply_text=_format_bot_profile_response(),
+            parse_result=_synthetic_parse_result(
+                text=text,
+                source=source,
+                intent="bot_profile",
+            ),
+        )
+    if PURCHASE_LIST_RE.search(normalized):
+        return TextTransactionResult(
+            status="purchase_list",
+            reply_text=_format_purchase_list_response(db, user_id, normalized),
+            parse_result=_synthetic_parse_result(
+                text=text,
+                source=source,
+                intent="purchase_list",
             ),
         )
     if TOP_EXPENSE_RE.search(normalized):
@@ -813,6 +848,29 @@ def _format_recent_transactions_response(db: Session, user_id: int) -> str:
         for index, item in enumerate(transactions, start=1)
     ]
     return "Riwayat transaksi terbaru:\n\n" + "\n".join(lines)
+
+
+def _format_bot_profile_response() -> str:
+    return (
+        "Aku Sakoo, asisten keuangan pribadi kamu.\n"
+        "Aku bisa catat transaksi, baca struk, cek saldo, laporan, dan cari riwayat.\n"
+        "Coba tanya: bulan ini aku beli apa saja, makanan berapa, atau saldo aman gak?"
+    )
+
+
+def _format_purchase_list_response(db: Session, user_id: int, text: str) -> str:
+    if "hari ini" in text:
+        period = "day"
+    elif "minggu ini" in text:
+        period = "week"
+    else:
+        period = "month"
+    return _format_transaction_list_response(
+        db,
+        user_id,
+        transaction_type="expense",
+        period=period,
+    )
 
 
 def _format_report_summary_response(

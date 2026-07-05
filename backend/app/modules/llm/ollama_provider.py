@@ -6,7 +6,7 @@ from app.modules.llm.base import (
     BaseLlmProvider,
     LlmProviderConfig,
     LlmProviderError,
-    build_finance_chat_prompt,
+    build_finance_chat_messages,
     compact_error_detail,
     request_openai_chat_completion,
 )
@@ -34,12 +34,16 @@ class OllamaProvider(BaseLlmProvider):
         if not self.config.model:
             raise LlmProviderError("ollama_model_missing")
 
+        system_prompt, user_prompt = build_finance_chat_messages(
+            message, context=context,
+        )
         return request_openai_chat_completion(
             provider_name=self.provider_name,
             api_url=self.api_url,
             api_key="",
             model=self.config.model,
-            prompt=build_finance_chat_prompt(message, context=context),
+            prompt=user_prompt,
+            system_prompt=system_prompt,
             timeout_seconds=self.config.timeout_seconds,
         )
 

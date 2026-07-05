@@ -561,7 +561,7 @@ def test_missing_amount_asks_telegram_user_to_clarify(
     assert payload["transaction_status"] == "needs_confirmation"
     assert payload["transaction_id"] is None
     assert payload["reply_status"] == "sent"
-    assert "nominal belum terbaca" in fake_telegram.sent_messages[0]["text"]
+    assert "belum menemukan nominalnya" in fake_telegram.sent_messages[0]["text"]
 
     with session_factory() as db:
         assert db.scalar(select(Transaction)) is None

@@ -7,7 +7,7 @@ import httpx
 from app.modules.llm.base import (
     BaseLlmProvider,
     LlmProviderError,
-    build_finance_chat_prompt,
+    build_finance_chat_messages,
     compact_error_detail,
 )
 
@@ -22,19 +22,24 @@ class GeminiProvider(BaseLlmProvider):
         if not self.config.model:
             raise LlmProviderError("gemini_model_missing")
 
+        system_prompt, user_prompt = build_finance_chat_messages(
+            message, context=context,
+        )
+
         url = (
             "https://generativelanguage.googleapis.com/v1beta/models/"
             f"{self.config.model}:generateContent"
         )
         payload = {
+            "systemInstruction": {
+                "parts": [{"text": system_prompt}],
+            },
             "contents": [
                 {
-                    "parts": [
-                        {"text": build_finance_chat_prompt(message, context=context)}
-                    ]
+                    "parts": [{"text": user_prompt}]
                 }
             ],
-            "generationConfig": {"temperature": 0.4, "maxOutputTokens": 160},
+            "generationConfig": {"temperature": 0.4, "maxOutputTokens": 300},
         }
         try:
             response = httpx.post(

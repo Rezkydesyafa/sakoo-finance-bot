@@ -7,10 +7,26 @@ from typing import Any
 import httpx
 
 
+# ── System prompt (persona, rules, capabilities) ──────────────────────
+FINANCE_CHAT_SYSTEM_PROMPT = (
+    "Kamu adalah Sakoo, asisten keuangan pribadi via chat. "
+    "Fitur: catat transaksi, cek saldo, laporan keuangan, export PDF, OCR struk, voice note. "
+    "Jawab dalam Bahasa Indonesia, maksimal 4 baris pendek. "
+    "Gunakan angka dari konteks saja, jangan mengarang angka. "
+    "Boleh jawab: sapaan, tanya fitur bot, dan pertanyaan keuangan. "
+    "Jika topik di luar keuangan, arahkan kembali ke keuangan dengan sopan."
+)
+
+# ── User prompt template (context + question) ─────────────────────────
+FINANCE_CHAT_USER_TEMPLATE = 'Konteks:\n{context}\n\nPertanyaan: "{message}"'
+
+# Legacy single-string template kept for backward compatibility with
+# ``build_finance_chat_prompt``.
 FINANCE_CHAT_PROMPT_TEMPLATE = (
-    "Role:Sakoo finance bot. Reply ID, max 4 short lines. "
+    "Role:Sakoo, asisten keuangan chat. Reply ID, max 4 short lines. "
     "Use ctx numbers only; do not invent. "
-    "If outside finance/Sakoo, say you only help finance/Sakoo. "
+    "Answer greetings, bot features, and finance questions. "
+    "If off-topic, politely redirect to finance. "
     'Ctx:{context} Q:"{message}"'
 )
 
@@ -38,7 +54,22 @@ class BaseLlmProvider:
         raise LlmProviderError(f"{self.provider_name}_finance_chat_not_supported")
 
 
+def build_finance_chat_messages(
+    message: str,
+    *,
+    context: str,
+) -> tuple[str, str]:
+    """Return ``(system_prompt, user_prompt)`` for multi-message LLM calls."""
+    compact_message = re.sub(r"\s+", " ", message.strip())[:300]
+    compact_context = re.sub(r"\s+", " ", context.strip())[:900]
+    user_prompt = FINANCE_CHAT_USER_TEMPLATE.replace(
+        "{message}", compact_message,
+    ).replace("{context}", compact_context)
+    return FINANCE_CHAT_SYSTEM_PROMPT, user_prompt
+
+
 def build_finance_chat_prompt(message: str, *, context: str) -> str:
+    """Legacy single-string prompt for backward compatibility."""
     compact_message = re.sub(r"\s+", " ", message.strip())
     escaped_message = compact_message[:300].replace("\\", "\\\\").replace('"', '\\"')
     compact_context = re.sub(r"\s+", " ", context.strip())[:900]
@@ -64,7 +95,8 @@ def request_openai_chat_completion(
     prompt: str,
     timeout_seconds: float,
     temperature: float = 0.4,
-    max_tokens: int = 160,
+    max_tokens: int = 300,
+    system_prompt: str | None = None,
 ) -> str:
     if not api_key and provider_name != "ollama":
         raise LlmProviderError(f"{provider_name}_api_key_missing")
@@ -73,9 +105,14 @@ def request_openai_chat_completion(
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
 
+    messages: list[dict[str, str]] = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+    messages.append({"role": "user", "content": prompt})
+
     payload = {
         "model": model,
-        "messages": [{"role": "user", "content": prompt}],
+        "messages": messages,
         "temperature": temperature,
         "max_tokens": max_tokens,
     }
