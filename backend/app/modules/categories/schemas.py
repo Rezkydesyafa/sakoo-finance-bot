@@ -12,8 +12,6 @@ class CategoryResponse(BaseModel):
     icon: str | None = None
     color: str | None = None
     keywords: list[str] | None = None
-    budget_limit: float | None = None
-    spent_this_month: float = 0.0
     is_default: bool = False
     is_active: bool = True
     created_at: datetime
@@ -28,7 +26,6 @@ class CategoryCreateRequest(BaseModel):
     icon: str | None = Field(None, max_length=32)
     color: str | None = Field(None, max_length=32)
     keywords: list[str] | None = None
-    budget_limit: float | None = Field(None, ge=0)
 
 
 class CategoryUpdateRequest(BaseModel):
@@ -37,7 +34,6 @@ class CategoryUpdateRequest(BaseModel):
     icon: str | None = Field(None, max_length=32)
     color: str | None = Field(None, max_length=32)
     keywords: list[str] | None = None
-    budget_limit: float | None = Field(None, ge=0)
     is_active: bool | None = None
 
 

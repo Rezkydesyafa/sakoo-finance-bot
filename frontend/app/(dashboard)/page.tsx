@@ -14,6 +14,7 @@ import { SettingsTab } from "@/components/tabs/settings-tab";
 import { IntegrationsTab } from "@/components/tabs/integrations-tab";
 import { TransactionModal } from "@/components/add-transaction-modal";
 import { ChatTab } from "@/components/tabs/chat-tab";
+import { CategoriesTab } from "@/components/tabs/categories-tab";
 import type { Transaction } from "./types";
 
 export default function Home() {
@@ -485,6 +486,8 @@ export default function Home() {
         )}
 
         {activeTab === "budgets" && <BudgetsTab />}
+
+        {activeTab === "categories" && <CategoriesTab />}
 
         {activeTab === "integrations" && <IntegrationsTab />}
       </div>
