@@ -179,7 +179,6 @@ class Category(TimestampMixin, Base):
     icon: Mapped[str | None] = mapped_column(String(32), nullable=True)
     color: Mapped[str | None] = mapped_column(String(32), nullable=True)
     keywords: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
-    budget_limit: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
     is_default: Mapped[bool] = mapped_column(
         Boolean,
         default=False,

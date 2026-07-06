@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from datetime import date
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from app.models import Category, Transaction
+from app.models import Category
 
 
 def list_categories(
@@ -25,33 +24,13 @@ def list_categories(
     if active_only:
         conditions.append(Category.is_active == True)  # noqa: E712
 
-    categories = list(
+    return list(
         db.scalars(
             select(Category)
             .where(*conditions)
             .order_by(Category.is_default.desc(), Category.name.asc())
         )
     )
-
-    today = date.today()
-    start_of_month = today.replace(day=1)
-
-    sums = dict(
-        db.execute(
-            select(Transaction.category_id, func.sum(Transaction.amount))
-            .where(
-                Transaction.user_id == user_id,
-                Transaction.transaction_date >= start_of_month,
-                Transaction.type == "expense"
-            )
-            .group_by(Transaction.category_id)
-        ).all()
-    )
-
-    for cat in categories:
-        cat.spent_this_month = float(sums.get(cat.id) or 0.0)
-
-    return categories
 
 
 def get_category(db: Session, category_id: int) -> Category | None:
@@ -67,7 +46,6 @@ def create_category(
     icon: str | None = None,
     color: str | None = None,
     keywords: list[str] | None = None,
-    budget_limit: float | None = None,
 ) -> Category:
     category = Category(
         user_id=user_id,
@@ -76,13 +54,11 @@ def create_category(
         icon=icon,
         color=color,
         keywords=keywords,
-        budget_limit=budget_limit,
         is_default=False,
         is_active=True,
     )
     db.add(category)
     db.flush()
-    category.spent_this_month = 0.0
     return category
 
 
@@ -95,7 +71,6 @@ def update_category(
     icon: str | None = ...,  # type: ignore[assignment]
     color: str | None = ...,  # type: ignore[assignment]
     keywords: list[str] | None = ...,  # type: ignore[assignment]
-    budget_limit: float | None = ...,  # type: ignore[assignment]
     is_active: bool | None = None,
 ) -> Category:
     if name is not None:
@@ -108,14 +83,9 @@ def update_category(
         category.color = color  # type: ignore[assignment]
     if keywords is not ...:
         category.keywords = keywords  # type: ignore[assignment]
-    if budget_limit is not ...:
-        category.budget_limit = budget_limit  # type: ignore[assignment]
     if is_active is not None:
         category.is_active = is_active
     db.flush()
-    # maintain attribute for response
-    if not hasattr(category, "spent_this_month"):
-        category.spent_this_month = 0.0
     return category
 
 
