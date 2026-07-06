@@ -22,6 +22,10 @@ EDIT_DATE_RE = re.compile(r"^\s*edit\s+tanggal\s+(?P<date>.+?)\s*$", re.IGNORECA
 EDIT_MERCHANT_RE = re.compile(r"^\s*edit\s+merchant\s+(?P<merchant>.+?)\s*$", re.IGNORECASE)
 EDIT_CATEGORY_RE = re.compile(r"^\s*edit\s+kategori\s+(?P<category>.+?)\s*$", re.IGNORECASE)
 EDIT_NOTE_RE = re.compile(r"^\s*edit\s+(?:catatan|note)\s+(?P<note>.+?)\s*$", re.IGNORECASE)
+EDIT_FREE_NOTE_RE = re.compile(
+    r"^\s*edit\s+(?!(?:total|tanggal|merchant|kategori|catatan|note)\b)(?P<note>.+?)\s*$",
+    re.IGNORECASE,
+)
 EDIT_PREFIX_RE = re.compile(r"^\s*edit\b", re.IGNORECASE)
 AMOUNT_ONLY_RE = re.compile(r"^\s*(?P<amount>(?:rp\s*)?\d[\d.,\s]*(?:ribu|rb|k)?)\s*$", re.IGNORECASE)
 CATEGORY_MARKER_RE = re.compile(r"\s*\[kategori:(?P<category>[^\]]+)\]\s*", re.IGNORECASE)
@@ -111,6 +115,7 @@ def receipt_caption_note(receipt: Receipt) -> str | None:
 
 
 def apply_receipt_correction(receipt: Receipt, text: str) -> ReceiptCorrectionResult | None:
+    text = _normalize_receipt_edit_text(text)
     amount = parse_total_correction(text)
     if amount is not None:
         receipt.total_amount = amount
@@ -141,12 +146,21 @@ def apply_receipt_correction(receipt: Receipt, text: str) -> ReceiptCorrectionRe
         receipt.status = "needs_confirmation"
         return ReceiptCorrectionResult()
 
+    if match := EDIT_FREE_NOTE_RE.match(text):
+        _set_receipt_note(receipt, _clean_edit_value(match.group("note")))
+        receipt.status = "needs_confirmation"
+        return ReceiptCorrectionResult()
+
     if EDIT_PREFIX_RE.match(text):
         return ReceiptCorrectionResult(
             "Format edit belum terbaca. Contoh: edit total 20000, edit tanggal kemarin, "
             "edit kategori makan, edit catatan sarapan."
         )
     return None
+
+
+def _normalize_receipt_edit_text(text: str) -> str:
+    return re.sub(r"^\s*/(?=edit\b)", "", text.strip(), flags=re.IGNORECASE)
 
 
 def find_duplicate_receipt_transaction(
@@ -212,10 +226,11 @@ def format_receipt_confirmation(receipt: Receipt) -> str:
     category = receipt_category_name(receipt)
     note = receipt_caption_note(receipt)
     item_names = extract_receipt_item_names(receipt.ocr_text or "", limit=3)
-    item_note = f" Item: {', '.join(item_names)}." if item_names and not note else ""
+    item_note = f"\nItem: {', '.join(item_names)}" if item_names and not note else ""
+    note_text = f"\nCatatan: {note}" if note else ""
     extra_note = (
-        f" Kategori: {category or 'belum dipilih'}."
-        f"{f' Catatan: {note}.' if note else ''}"
+        f"\nKategori: {category or 'belum dipilih'}"
+        f"{note_text}"
         f"{item_note}"
     )
     date_note = (
@@ -232,9 +247,10 @@ def format_receipt_confirmation(receipt: Receipt) -> str:
             else " Caption yang kamu kirim belum punya nominal yang jelas."
         )
         return (
-            "Total belum terbaca dari struk. "
-            f"Merchant: {merchant}. Tanggal: {receipt_date}. "
-            "Kirim nominalnya, contoh: 20000 atau edit total 20000."
+            "Total belum terbaca. Aku sudah coba baca struknya, tapi nominalnya belum jelas.\n\n"
+            f"Merchant: {merchant}\n"
+            f"Tanggal: {receipt_date}\n\n"
+            "Kirim nominalnya ya, contoh: 20000 atau edit total 20000."
             f"{extra_note}"
             f"{date_note}"
             f"{fallback_text}"
@@ -247,14 +263,15 @@ def format_receipt_confirmation(receipt: Receipt) -> str:
     )
     fallback_note = " Total ini aku ambil dari caption karena OCR belum cukup jelas. " if used_caption_fallback else ""
     return (
-        "Foto struk sudah diproses OCR. "
-        f"Merchant: {merchant}. Tanggal: {receipt_date}. "
-        f"Total: {format_rupiah(receipt.total_amount)}. "
-        f"Confidence: {confidence}. "
+        "Aku sudah baca struknya. Ini yang aku tangkap:\n\n"
+        f"Merchant: {merchant}\n"
+        f"Tanggal: {receipt_date}\n"
+        f"Total: {format_rupiah(receipt.total_amount)}\n"
+        f"Keyakinan baca: {confidence}\n"
         f"{extra_note}"
         f"{fallback_note}"
         f"{date_note}"
-        "Balas YA untuk simpan, atau koreksi: edit total 20000 / edit tanggal kemarin / "
+        "\nBalas YA kalau sudah benar, atau koreksi: edit total 20000 / edit tanggal kemarin / "
         "edit kategori makan / edit catatan sarapan."
     )
 

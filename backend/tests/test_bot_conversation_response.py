@@ -455,6 +455,172 @@ def test_transaction_search_uses_local_history_without_llm(
     assert "Rp18.000" in result.reply_text
 
 
+def test_latest_expense_list_uses_created_order_for_new_receipt(
+    session_factory: sessionmaker[Session],
+) -> None:
+    with session_factory() as db:
+        user = _create_user(db)
+        food = db.scalar(select(Category).where(Category.name == "Makanan"))
+        tagihan = db.scalar(select(Category).where(Category.name == "Tagihan"))
+        db.add(
+            Transaction(
+                user_id=user.id,
+                type="expense",
+                amount=Decimal("5000.00"),
+                category_id=food.id if food else None,
+                description="jajan hari ini",
+                transaction_date=date.today(),
+                source="telegram_text",
+            )
+        )
+        db.flush()
+        db.add(
+            Transaction(
+                user_id=user.id,
+                type="expense",
+                amount=Decimal("140070.00"),
+                category_id=tagihan.id if tagihan else None,
+                description="Bayar wifi",
+                transaction_date=date.today() - timedelta(days=4),
+                source="receipt_ocr",
+            )
+        )
+        db.commit()
+
+        result = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="/pengeluaran",
+            source="whatsapp_text",
+        )
+
+    assert result.status == "list_expense"
+    assert result.reply_text.splitlines()[2].endswith("Bayar wifi")
+
+
+def test_reset_expense_requires_confirmation(
+    session_factory: sessionmaker[Session],
+) -> None:
+    with session_factory() as db:
+        user = _create_user(db)
+        food = db.scalar(select(Category).where(Category.name == "Makanan"))
+        income = db.scalar(select(Category).where(Category.name == "Gaji"))
+        db.add_all(
+            [
+                Transaction(
+                    user_id=user.id,
+                    type="expense",
+                    amount=Decimal("18000.00"),
+                    category_id=food.id if food else None,
+                    description="kopi",
+                    transaction_date=date.today(),
+                    source="telegram_text",
+                ),
+                Transaction(
+                    user_id=user.id,
+                    type="income",
+                    amount=Decimal("100000.00"),
+                    category_id=income.id if income else None,
+                    description="gaji",
+                    transaction_date=date.today(),
+                    source="telegram_text",
+                ),
+            ]
+        )
+        db.commit()
+
+        requested = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="kosongkan pengeluaran",
+            source="telegram_text",
+        )
+        db.commit()
+        assert requested.status == "reset_needs_confirmation"
+        assert "YA RESET" in requested.reply_text
+        assert len(db.scalars(select(Transaction)).all()) == 2
+
+        confirmed = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="YA RESET",
+            source="telegram_text",
+        )
+        db.commit()
+
+        remaining = db.scalars(select(Transaction)).all()
+        assert confirmed.status == "reset_done"
+        assert "1 transaksi pengeluaran" in confirmed.reply_text
+        assert len(remaining) == 1
+        assert remaining[0].type == "income"
+
+
+def test_reset_income_and_expense_can_be_cancelled_or_confirmed(
+    session_factory: sessionmaker[Session],
+) -> None:
+    with session_factory() as db:
+        user = _create_user(db)
+        food = db.scalar(select(Category).where(Category.name == "Makanan"))
+        income = db.scalar(select(Category).where(Category.name == "Gaji"))
+        db.add_all(
+            [
+                Transaction(
+                    user_id=user.id,
+                    type="expense",
+                    amount=Decimal("18000.00"),
+                    category_id=food.id if food else None,
+                    description="kopi",
+                    transaction_date=date.today(),
+                    source="telegram_text",
+                ),
+                Transaction(
+                    user_id=user.id,
+                    type="income",
+                    amount=Decimal("100000.00"),
+                    category_id=income.id if income else None,
+                    description="gaji",
+                    transaction_date=date.today(),
+                    source="telegram_text",
+                ),
+            ]
+        )
+        db.commit()
+
+        requested = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="reset pengeluaran dan pemasukan",
+            source="whatsapp_text",
+        )
+        cancelled = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="batal",
+            source="whatsapp_text",
+        )
+        db.commit()
+        assert requested.status == "reset_needs_confirmation"
+        assert cancelled.status == "reset_cancelled"
+        assert len(db.scalars(select(Transaction)).all()) == 2
+
+        handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="hapus semua transaksi",
+            source="whatsapp_text",
+        )
+        confirmed = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="YA RESET",
+            source="whatsapp_text",
+        )
+        db.commit()
+
+        assert confirmed.status == "reset_done"
+        assert db.scalars(select(Transaction)).all() == []
+
+
 def test_profile_and_purchase_questions_get_direct_replies(
     session_factory: sessionmaker[Session],
     monkeypatch: pytest.MonkeyPatch,

@@ -96,8 +96,9 @@ def handle_report_pdf_command(
     return ReportPdfFlowResult(
         status="queued",
         reply_text=(
+            f"Siap, aku buatin export PDF laporan {_format_period_label(parse_result.period)}. "
             f"Permintaan export PDF laporan {_format_period_label(parse_result.period)} "
-            "sudah masuk antrean. Bot akan mengirim file PDF setelah selesai dibuat."
+            "sudah masuk antrean, nanti aku kirim file PDF-nya setelah selesai."
         ),
         parse_result=parse_result,
         period=period,

@@ -1,6 +1,6 @@
 import re
 from dataclasses import asdict, dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
 
@@ -8,10 +8,11 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.models import Category, Transaction, UserPreference
+from app.models import BotLog, Category, Receipt, Transaction, User, UserPreference
 from app.modules.bot.conversation_state import (
     CANCELLED_TRANSACTION_STATUS,
     CONFIRMED_TRANSACTION_STATUS,
+    PENDING_TRANSACTION_TTL,
     clone_parsed_message,
     get_pending_transaction,
     mark_pending_status,
@@ -68,6 +69,11 @@ CANCEL_RE = re.compile(r"^\s*(?:batal|cancel|ga jadi|gajadi|jangan|hapus)\s*$", 
 EDIT_RE = re.compile(r"^\s*(?:edit|ubah|ganti|koreksi|revisi|bukan)\b", re.IGNORECASE)
 THANKS_RE = re.compile(r"^\s*(?:makasih|terima kasih|thanks|thx|tengkyu)\s*[.!]*\s*$", re.IGNORECASE)
 ACK_RE = re.compile(r"^\s*(?:oke|ok|sip|siap|noted)\s*[.!]*\s*$", re.IGNORECASE)
+RESET_CONFIRM_RE = re.compile(r"^\s*(?:ya\s+)?reset\s*$", re.IGNORECASE)
+RESET_REQUEST_RE = re.compile(
+    r"\b(?:kosongkan|reset|bersihkan|hapus semua)\b.*\b(?:pengeluaran|pemasukan|transaksi|semua)\b",
+    re.IGNORECASE,
+)
 BOT_PROFILE_RE = re.compile(
     r"\b(?:kamu siapa|siapa kamu|bisa bantu apa|bantu saya apa|fitur kamu|kamu bisa apa)\b",
     re.IGNORECASE,
@@ -107,6 +113,11 @@ FINANCE_CHAT_RE = re.compile(
     r"dashboard|sakoo|utang|hutang|piutang|cashflow|pdf)\b",
     re.IGNORECASE,
 )
+RESET_MESSAGE_TYPE = "transaction_reset"
+PENDING_RESET_STATUS = "pending_reset"
+CONFIRMED_RESET_STATUS = "confirmed_reset"
+CANCELLED_RESET_STATUS = "cancelled_reset"
+EXPIRED_RESET_STATUS = "expired_reset"
 
 
 @dataclass(frozen=True)
@@ -161,6 +172,15 @@ def handle_text_transaction(
     source: str,
     forced_transaction_type: str | None = None,
 ) -> TextTransactionResult:
+    reset_result = _handle_transaction_reset_reply(
+        db=db,
+        user_id=user_id,
+        text=text,
+        source=source,
+    )
+    if reset_result is not None:
+        return reset_result
+
     pending_result = _handle_pending_transaction_reply(
         db=db,
         user_id=user_id,
@@ -274,6 +294,187 @@ def _save_transaction_from_parse_result(
         parse_result=parse_result,
         transaction_id=transaction.id,
     )
+
+
+def _handle_transaction_reset_reply(
+    *,
+    db: Session,
+    user_id: int,
+    text: str,
+    source: str,
+) -> TextTransactionResult | None:
+    normalized = normalize_text(text)
+    pending = _get_pending_transaction_reset(db, user_id=user_id)
+    if pending is not None:
+        reset_type = str((pending.parsed_result or {}).get("transaction_type") or "all")
+        label = _reset_type_label(reset_type)
+        if CANCEL_RE.match(normalized):
+            pending.status = CANCELLED_RESET_STATUS
+            db.flush()
+            return TextTransactionResult(
+                status="reset_cancelled",
+                reply_text=f"Oke, reset {label} aku batalkan. Data kamu tetap aman.",
+                parse_result=_synthetic_parse_result(
+                    text=text,
+                    source=source,
+                    intent="reset_cancelled",
+                ),
+            )
+        if RESET_CONFIRM_RE.match(normalized):
+            deleted = _execute_transaction_reset(db, user_id=user_id, reset_type=reset_type)
+            pending.status = CONFIRMED_RESET_STATUS
+            db.flush()
+            return TextTransactionResult(
+                status="reset_done",
+                reply_text=(
+                    f"Selesai, {deleted} transaksi {label} sudah aku kosongkan.\n"
+                    "Saldo dan laporan sekarang dihitung ulang dari data yang masih tersisa."
+                ),
+                parse_result=_synthetic_parse_result(
+                    text=text,
+                    source=source,
+                    intent="reset_done",
+                ),
+            )
+        return TextTransactionResult(
+            status="reset_confirmation_pending",
+            reply_text=(
+                f"Masih ada permintaan reset {label} yang menunggu konfirmasi.\n"
+                "Balas YA RESET untuk lanjut, atau batal."
+            ),
+            parse_result=_synthetic_parse_result(
+                text=text,
+                source=source,
+                intent="reset_confirmation_pending",
+            ),
+        )
+
+    reset_type = _detect_reset_type(normalized)
+    if reset_type is None:
+        return None
+
+    count = _count_reset_transactions(db, user_id=user_id, reset_type=reset_type)
+    label = _reset_type_label(reset_type)
+    if count == 0:
+        return TextTransactionResult(
+            status="reset_empty",
+            reply_text=f"Belum ada transaksi {label} yang bisa dikosongkan.",
+            parse_result=_synthetic_parse_result(
+                text=text,
+                source=source,
+                intent="reset_empty",
+            ),
+        )
+
+    _store_pending_transaction_reset(
+        db,
+        user_id=user_id,
+        platform=_platform_from_source(source),
+        raw_message=text,
+        reset_type=reset_type,
+    )
+    return TextTransactionResult(
+        status="reset_needs_confirmation",
+        reply_text=(
+            f"Aku bisa kosongkan {label}, tapi ini akan menghapus {count} transaksi.\n"
+            "Kalau sudah yakin, balas YA RESET.\n"
+            "Kalau berubah pikiran, balas batal."
+        ),
+        parse_result=_synthetic_parse_result(
+            text=text,
+            source=source,
+            intent="reset_needs_confirmation",
+        ),
+    )
+
+
+def _get_pending_transaction_reset(db: Session, *, user_id: int) -> BotLog | None:
+    pending = db.scalar(
+        select(BotLog)
+        .where(
+            BotLog.user_id == user_id,
+            BotLog.message_type == RESET_MESSAGE_TYPE,
+            BotLog.status == PENDING_RESET_STATUS,
+        )
+        .order_by(BotLog.created_at.desc(), BotLog.id.desc())
+    )
+    if pending is None:
+        return None
+    created_at = pending.created_at if pending.created_at.tzinfo else pending.created_at.replace(tzinfo=timezone.utc)
+    if datetime.now(timezone.utc) - created_at > PENDING_TRANSACTION_TTL:
+        pending.status = EXPIRED_RESET_STATUS
+        db.flush()
+        return None
+    return pending
+
+
+def _store_pending_transaction_reset(
+    db: Session,
+    *,
+    user_id: int,
+    platform: str,
+    raw_message: str,
+    reset_type: str,
+) -> None:
+    db.add(
+        BotLog(
+            user_id=user_id,
+            platform=platform,
+            message_type=RESET_MESSAGE_TYPE,
+            raw_message=raw_message,
+            parsed_result={
+                "kind": "transaction_reset",
+                "transaction_type": reset_type,
+            },
+            status=PENDING_RESET_STATUS,
+        )
+    )
+    db.flush()
+
+
+def _detect_reset_type(text: str) -> str | None:
+    if not RESET_REQUEST_RE.search(text):
+        return None
+    has_expense = "pengeluaran" in text
+    has_income = "pemasukan" in text
+    if has_expense and has_income:
+        return "all"
+    if "transaksi" in text or "semua" in text:
+        return "all"
+    if has_expense:
+        return "expense"
+    if has_income:
+        return "income"
+    return None
+
+
+def _count_reset_transactions(db: Session, *, user_id: int, reset_type: str) -> int:
+    query = select(func.count(Transaction.id)).where(Transaction.user_id == user_id)
+    if reset_type in {"expense", "income"}:
+        query = query.where(Transaction.type == reset_type)
+    return int(db.scalar(query) or 0)
+
+
+def _execute_transaction_reset(db: Session, *, user_id: int, reset_type: str) -> int:
+    query = select(Transaction).where(Transaction.user_id == user_id)
+    if reset_type in {"expense", "income"}:
+        query = query.where(Transaction.type == reset_type)
+    transactions = list(db.scalars(query))
+    transaction_ids = [item.id for item in transactions]
+    if transaction_ids:
+        for receipt in db.scalars(select(Receipt).where(Receipt.transaction_id.in_(transaction_ids))):
+            receipt.transaction_id = None
+        for transaction in transactions:
+            db.delete(transaction)
+    return len(transactions)
+
+
+def _reset_type_label(reset_type: str) -> str:
+    if reset_type == "expense":
+        return "pengeluaran"
+    if reset_type == "income":
+        return "pemasukan"
+    return "pengeluaran dan pemasukan"
 
 
 def _handle_pending_transaction_reply(
@@ -427,7 +628,7 @@ def _handle_lightweight_message(
     if BOT_PROFILE_RE.search(normalized):
         return TextTransactionResult(
             status="bot_profile",
-            reply_text=_format_bot_profile_response(),
+            reply_text=_format_bot_profile_response(db, user_id),
             parse_result=_synthetic_parse_result(
                 text=text,
                 source=source,
@@ -702,7 +903,10 @@ def _format_command_response(
     if parse_result.intent == INTENT_GET_REPORT:
         return _format_report_summary_response(db, user_id, parse_result.period)
     if parse_result.intent == INTENT_EXPORT_PDF:
-        return f"Perintah export PDF laporan {period} terdeteksi. PDF service akan memproses permintaan ini."
+        return (
+            f"Siap, aku siapkan export PDF laporan {period}. "
+            "Nanti file PDF akan aku kirim setelah selesai dibuat."
+        )
     if parse_result.intent == INTENT_RECENT_TRANSACTIONS:
         return _format_recent_transactions_response(db, user_id)
     if parse_result.intent == INTENT_DELETE_LAST_TRANSACTION:
@@ -797,8 +1001,9 @@ def _format_balance_response(db: Session, user_id: int) -> str:
     income_total = sum_transactions(db, user_id, transaction_type="income")
     expense_total = sum_transactions(db, user_id, transaction_type="expense")
     balance = income_total - expense_total
+    name = _user_first_name(db, user_id)
     return (
-        "Saldo kamu saat ini:\n\n"
+        f"Aku cek ya, {name}. Ini posisi saldomu saat ini:\n\n"
         f"Pemasukan: {format_rupiah(income_total)}\n"
         f"Pengeluaran: {format_rupiah(expense_total)}\n"
         f"Sisa saldo: {format_rupiah(balance)}"
@@ -820,10 +1025,12 @@ def _format_transaction_list_response(
         start_date=start_date,
         end_date=end_date,
         limit=5,
+        newest_by_created=period is None,
     )
     label = "pengeluaran" if transaction_type == "expense" else "pemasukan"
+    name = _user_first_name(db, user_id)
     if not transactions:
-        return f"Belum ada {label} {_format_period(period)}."
+        return f"Belum ada {label} {_format_period(period)}, {name}. Kalau ada, kirim aja lewat chat."
 
     lines = [
         f"{index}. {item.transaction_date.isoformat()} - "
@@ -832,13 +1039,14 @@ def _format_transaction_list_response(
         f"{f' - {item.description}' if item.description else ''}"
         for index, item in enumerate(transactions, start=1)
     ]
-    return f"List {label} {_format_period(period)}:\n\n" + "\n".join(lines)
+    return f"Aku cek, {name}. List {label} {_format_period(period)} kamu:\n\n" + "\n".join(lines)
 
 
 def _format_recent_transactions_response(db: Session, user_id: int) -> str:
-    transactions = list_transactions(db, user_id, limit=5)
+    transactions = list_transactions(db, user_id, limit=5, newest_by_created=True)
+    name = _user_first_name(db, user_id)
     if not transactions:
-        return "Belum ada riwayat transaksi."
+        return f"Belum ada riwayat transaksi, {name}."
 
     lines = [
         f"{index}. {item.transaction_date.isoformat()} - "
@@ -847,13 +1055,14 @@ def _format_recent_transactions_response(db: Session, user_id: int) -> str:
         f"{item.category.name if item.category else 'Tanpa kategori'}"
         for index, item in enumerate(transactions, start=1)
     ]
-    return "Riwayat transaksi terbaru:\n\n" + "\n".join(lines)
+    return f"Aku ambil Riwayat transaksi terbaru kamu, {name}:\n\n" + "\n".join(lines)
 
 
-def _format_bot_profile_response() -> str:
+def _format_bot_profile_response(db: Session, user_id: int) -> str:
+    name = _user_first_name(db, user_id)
     return (
-        "Aku Sakoo, asisten keuangan pribadi kamu.\n"
-        "Aku bisa catat transaksi, baca struk, cek saldo, laporan, dan cari riwayat.\n"
+        f"Halo {name}. Aku Sakoo, asisten keuangan pribadi kamu.\n"
+        "Aku bisa bantu catat transaksi, baca struk, cek saldo, bikin laporan, dan cari riwayat.\n"
         "Coba tanya: bulan ini aku beli apa saja, makanan berapa, atau saldo aman gak?"
     )
 
@@ -1249,6 +1458,7 @@ def _format_category_summary_response(
 
 def _build_llm_finance_context(db: Session, user_id: int) -> str:
     today = date.today()
+    name = _user_first_name(db, user_id)
     month_start = today.replace(day=1)
     income_total = sum_transactions(db, user_id, transaction_type="income")
     expense_total = sum_transactions(db, user_id, transaction_type="expense")
@@ -1272,7 +1482,7 @@ def _build_llm_finance_context(db: Session, user_id: int) -> str:
         start_date=month_start,
         end_date=today,
     )
-    recent = list_transactions(db, user_id, limit=5)
+    recent = list_transactions(db, user_id, limit=5, newest_by_created=True)
     week_start = today - timedelta(days=today.weekday())
     last_week_start = week_start - timedelta(days=7)
     last_week_end = week_start - timedelta(days=1)
@@ -1303,6 +1513,7 @@ def _build_llm_finance_context(db: Session, user_id: int) -> str:
     )
     return "\n".join(
         [
+            f"Nama user: {name}",
             f"Saldo total: {format_rupiah(income_total - expense_total)}",
             f"Pemasukan total: {format_rupiah(income_total)}",
             f"Pengeluaran total: {format_rupiah(expense_total)}",
@@ -1456,3 +1667,9 @@ def _reply_style(db: Session | None = None, user_id: int | None = None) -> str:
     if style in {"short", "friendly", "detailed"}:
         return style
     return "friendly"
+
+
+def _user_first_name(db: Session, user_id: int) -> str:
+    name = db.scalar(select(User.name).where(User.id == user_id)) or ""
+    first = str(name).strip().split(" ", 1)[0]
+    return first or "kamu"

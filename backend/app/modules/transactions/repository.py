@@ -67,6 +67,7 @@ def list_transactions(
     start_date: date | None = None,
     end_date: date | None = None,
     limit: int = 5,
+    newest_by_created: bool = False,
 ) -> list[Transaction]:
     query = select(Transaction).where(Transaction.user_id == user_id)
     if transaction_type is not None:
@@ -75,11 +76,12 @@ def list_transactions(
         query = query.where(Transaction.transaction_date >= start_date)
     if end_date is not None:
         query = query.where(Transaction.transaction_date <= end_date)
-    return list(
-        db.scalars(
-            query.order_by(Transaction.transaction_date.desc(), Transaction.id.desc()).limit(limit)
-        )
+    order_by = (
+        (Transaction.created_at.desc(), Transaction.id.desc())
+        if newest_by_created
+        else (Transaction.transaction_date.desc(), Transaction.id.desc())
     )
+    return list(db.scalars(query.order_by(*order_by).limit(limit)))
 
 
 def count_user_category_transactions(
@@ -140,4 +142,3 @@ def sum_category_expense(
         )
     )
     return Decimal(str(value or 0))
-

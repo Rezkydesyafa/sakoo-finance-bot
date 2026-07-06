@@ -379,10 +379,10 @@ def _confirm_receipt_transaction(
         receipt_id=receipt.id,
         transaction_id=transaction.id,
         reply_text=(
-            "Transaksi struk tersimpan: "
-            f"Pengeluaran {format_rupiah(transaction.amount)}"
+            "Siap, Transaksi struk tersimpan.\n"
+            f"Aku catat pengeluaran {format_rupiah(transaction.amount)}"
             + f" untuk {receipt.merchant_name or receipt.caption_text or 'Struk'} "
-            f"pada {transaction.transaction_date.isoformat()}."
+            f"tanggal {transaction.transaction_date.isoformat()}."
         ),
     )
 
