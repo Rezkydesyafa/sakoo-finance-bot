@@ -251,42 +251,6 @@ export type PlatformAccountResponse = {
   is_active: boolean;
 };
 
-export type CategoryResponse = {
-  id: number;
-  user_id: number | null;
-  name: string;
-  type: "income" | "expense" | "both";
-  icon: string | null;
-  color: string | null;
-  keywords: string[] | null;
-  is_default: boolean;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-};
-
-export type CategoryListResponse = {
-  items: CategoryResponse[];
-  total: number;
-};
-
-export type CategoryCreateRequest = {
-  name: string;
-  type: "income" | "expense" | "both";
-  icon?: string | null;
-  color?: string | null;
-  keywords?: string[] | null;
-};
-
-export type CategoryUpdateRequest = {
-  name?: string;
-  type?: "income" | "expense" | "both";
-  icon?: string | null;
-  color?: string | null;
-  keywords?: string[] | null;
-  is_active?: boolean;
-};
-
 type ApiRequestOptions = RequestInit & {
   token?: string;
   query?: Record<string, string | number | boolean | undefined | null>;
@@ -422,36 +386,6 @@ export const apiClient = {
       });
     },
     downloadUrl: (id: number) => `${API_BASE_URL}/media/${id}/download`,
-  },
-
-  categories: {
-    list: (token: string) =>
-      apiRequest<CategoryListResponse>("/categories", { token }),
-    create: (token: string, payload: CategoryCreateRequest) =>
-      apiRequest<CategoryResponse>("/categories", {
-        method: "POST",
-        token,
-        body: JSON.stringify(payload),
-      }),
-    get: (token: string, id: number) =>
-      apiRequest<CategoryResponse>(`/categories/${id}`, { token }),
-    update: (token: string, id: number, payload: CategoryUpdateRequest) =>
-      apiRequest<CategoryResponse>(`/categories/${id}`, {
-        method: "PUT",
-        token,
-        body: JSON.stringify(payload),
-      }),
-    delete: (token: string, id: number) =>
-      apiRequest<void>(`/categories/${id}`, {
-        method: "DELETE",
-        token,
-      }),
-    updateKeywords: (token: string, id: number, keywords: string[]) =>
-      apiRequest<CategoryResponse>(`/categories/${id}/keywords`, {
-        method: "PATCH",
-        token,
-        body: JSON.stringify({ keywords }),
-      }),
   },
 };
 
