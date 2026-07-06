@@ -1,12 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { apiClient } from "@/lib/api";
+import type { CategoryResponse } from "@/lib/api";
+import { getStoredAuthToken } from "@/lib/auth-storage";
 
 type TransactionModalProps = {
   isOpen: boolean;
   mode: "add" | "edit";
   onClose: () => void;
-  onSave: (data: { type: "income" | "expense"; title: string; amount: number }) => void;
+  onSave: (data: { type: "income" | "expense"; title: string; amount: number; category_id?: number }) => void;
   initialType: "income" | "expense";
   initialTitle?: string;
   initialAmount?: number;
@@ -24,16 +27,33 @@ export function TransactionModal({
   const [type, setType] = useState<"income" | "expense">(initialType);
   const [title, setTitle] = useState(initialTitle);
   const [amount, setAmount] = useState(initialAmount ? initialAmount.toString() : "");
+  const [categoryId, setCategoryId] = useState<number | undefined>(undefined);
+  const [categories, setCategories] = useState<CategoryResponse[]>([]);
 
   useEffect(() => {
     if (isOpen) {
       setType(initialType);
       setTitle(initialTitle);
       setAmount(initialAmount ? initialAmount.toString() : "");
+      setCategoryId(undefined);
+
+      // Load categories from API
+      const token = getStoredAuthToken();
+      if (token) {
+        apiClient.categories.list(token).then((res) => {
+          setCategories(res.items);
+        }).catch(() => {
+          // Silently fail, category dropdown will be empty
+        });
+      }
     }
   }, [isOpen, initialType, initialTitle, initialAmount]);
 
   if (!isOpen) return null;
+
+  const filteredCategories = categories.filter(
+    (c) => c.type === type || c.type === "both"
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,7 +62,7 @@ export function TransactionModal({
       alert("Nominal tidak valid!");
       return;
     }
-    onSave({ type, title, amount: numericAmount });
+    onSave({ type, title, amount: numericAmount, category_id: categoryId });
   };
 
   return (
@@ -68,7 +88,6 @@ export function TransactionModal({
 
         <form onSubmit={handleSubmit} className="space-y-5">
 
-
           <div>
             <label className="block text-xs font-semibold text-[#6F6F6F] mb-1.5">Judul Transaksi</label>
             <input 
@@ -93,6 +112,24 @@ export function TransactionModal({
               className="w-full bg-[#F1F2F0] border-none rounded-xl py-3 px-4 text-sm font-medium text-[#1a1c1b] focus:ring-1 focus:ring-[#c7ff00]" 
             />
           </div>
+
+          {filteredCategories.length > 0 && (
+            <div>
+              <label className="block text-xs font-semibold text-[#6F6F6F] mb-1.5">Kategori</label>
+              <select
+                value={categoryId ?? ""}
+                onChange={(e) => setCategoryId(e.target.value ? Number(e.target.value) : undefined)}
+                className="w-full bg-[#F1F2F0] border-none rounded-xl py-3 px-4 text-sm font-medium text-[#1a1c1b] focus:ring-1 focus:ring-[#c7ff00] appearance-none cursor-pointer"
+              >
+                <option value="">Pilih kategori...</option>
+                {filteredCategories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}{cat.is_default ? "" : " ✦"}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <button type="submit" className="w-full bg-[#1a1c1b] hover:bg-black text-white py-3.5 rounded-full text-sm font-bold transition-colors border-none cursor-pointer mt-2 shadow-md">
             {mode === "edit" ? "Simpan Perubahan" : "Simpan Transaksi"}
