@@ -17,6 +17,7 @@ INTENT_GET_REPORT = "get_report"
 INTENT_EXPORT_PDF = "export_pdf"
 INTENT_HELP = "help"
 INTENT_LINK_ACCOUNT = "link_account"
+INTENT_FINANCE_CHAT = "finance_chat"
 INTENT_UNKNOWN = "unknown"
 
 # Existing public intent kept for backward compatibility with earlier tests/flows.
@@ -32,6 +33,7 @@ VALID_INTENTS = {
     INTENT_EXPORT_PDF,
     INTENT_HELP,
     INTENT_LINK_ACCOUNT,
+    INTENT_FINANCE_CHAT,
     INTENT_UNKNOWN,
     INTENT_RECENT_TRANSACTIONS,
     INTENT_DELETE_LAST_TRANSACTION,

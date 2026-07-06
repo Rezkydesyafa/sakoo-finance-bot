@@ -226,7 +226,7 @@ def _parse_provider_names(value: str) -> list[str]:
 
 def _clean_answer(value: str) -> str:
     text = re.sub(r"\s+\n", "\n", str(value or "")).strip()
-    return text[:1200]
+    return text[:1800]
 
 
 def _gemini_api_keys(settings: Settings) -> list[str]:
