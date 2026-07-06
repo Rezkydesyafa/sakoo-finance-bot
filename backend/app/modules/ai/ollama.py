@@ -39,17 +39,21 @@ VALID_CATEGORIES = [
 TRANSACTION_PARSE_PROMPT_TEMPLATE = """Kamu adalah parser transaksi keuangan. Ubah pesan pengguna menjadi JSON transaksi.
 
 ATURAN:
-1. Tentukan "intent": salah satu dari "add_transaction", "get_report", "export_pdf", "get_balance", "recent_transactions", "delete_last_transaction", "help", "unknown"
+1. Tentukan "intent": salah satu dari "add_transaction", "get_report", "export_pdf", "get_balance", "recent_transactions", "delete_last_transaction", "list_expense", "list_income", "sorted_expense", "category_detail", "create_category", "help", "unknown"
 2. Jika intent adalah "add_transaction":
    - "type": "expense" untuk pengeluaran, "income" untuk pemasukan
    - "amount": angka bulat dalam Rupiah (contoh: "20 ribu" = 20000, "2 juta" = 2000000, "30rb" = 30000)
    - "category": salah satu dari {categories}
    - "description": deskripsi singkat transaksi
    - "transaction_date": tanggal dalam format YYYY-MM-DD. Hari ini: {today}. Jika "kemarin" kurangi 1 hari. Jika tidak disebutkan, gunakan hari ini.
-3. Jika intent bukan "add_transaction", isi field lain dengan null
+3. Jika intent "list_expense" atau "list_income": isi "period" (day/week/month/yesterday) dan "limit" (angka jika disebutkan)
+4. Jika intent "sorted_expense": isi "period" dan "sort_order" (desc/asc)
+5. Jika intent "category_detail": isi "category" dengan nama kategori yang ditanya
+6. Jika intent "create_category": isi "category" dengan nama kategori baru
+7. Jika intent lainnya, isi field lain dengan null
 
 FORMAT OUTPUT (HANYA JSON, TANPA PENJELASAN):
-{{"intent":"...","type":"...","amount":angka,"category":"...","description":"...","transaction_date":"YYYY-MM-DD"}}
+{{"intent":"...","type":"...","amount":angka,"category":"...","description":"...","transaction_date":"YYYY-MM-DD","period":"...","limit":angka,"sort_order":"..."}}
 
 PESAN: "{message}"
 """
@@ -155,6 +159,11 @@ def _parse_ollama_response(
         "get_balance",
         "recent_transactions",
         "delete_last_transaction",
+        "list_expense",
+        "list_income",
+        "sorted_expense",
+        "category_detail",
+        "create_category",
         "help",
         "unknown",
     }:

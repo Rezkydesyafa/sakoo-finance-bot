@@ -109,6 +109,9 @@ def parsed_message_from_payload(payload: dict[str, Any]) -> ParsedMessage:
         period=payload.get("period"),
         category_confidence=metadata.get("category_confidence"),
         category_source=metadata.get("category_source"),
+        limit=payload.get("limit"),
+        sort_order=payload.get("sort_order"),
+        category_filter=payload.get("category_filter"),
     )
 
 
@@ -130,6 +133,9 @@ def clone_parsed_message(
         "period": parse_result.period,
         "category_confidence": parse_result.category_confidence,
         "category_source": parse_result.category_source,
+        "limit": parse_result.limit,
+        "sort_order": parse_result.sort_order,
+        "category_filter": parse_result.category_filter,
     }
     values.update(updates)
     return ParsedMessage(**values)
