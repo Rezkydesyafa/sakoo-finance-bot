@@ -245,12 +245,7 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
           })}
         </div>
         
-        <div className="px-6 mb-4 mt-auto">
-          <Link href="/?tab=transactions" className="w-full py-3 px-4 bg-[#4e6700] text-white text-[13px] font-semibold rounded-full hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
-            <span className="material-symbols-outlined">add</span>
-            + New Transaction
-          </Link>
-        </div>
+
       </nav>
 
       {/* TopNavBar */}
