@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session
 
 from app.models import Transaction
 
+CONFIRMED_TRANSACTION_STATUS = "confirmed"
+
 
 @dataclass(frozen=True)
 class TransactionQueryFilters:
@@ -38,7 +40,7 @@ def query_transactions(db: Session, filters: TransactionQueryFilters) -> Transac
     items = list(
         db.scalars(
             base_statement
-            .order_by(Transaction.transaction_date.desc(), Transaction.id.desc())
+            .order_by(Transaction.created_at.desc(), Transaction.id.desc())
             .limit(filters.limit)
             .offset(filters.offset)
         )
@@ -53,7 +55,10 @@ def query_transactions(db: Session, filters: TransactionQueryFilters) -> Transac
 
 
 def build_transactions_query(filters: TransactionQueryFilters) -> Select[tuple[Transaction]]:
-    statement = select(Transaction).where(Transaction.user_id == filters.user_id)
+    statement = select(Transaction).where(
+        Transaction.user_id == filters.user_id,
+        Transaction.status == CONFIRMED_TRANSACTION_STATUS,
+    )
 
     if filters.start_date is not None:
         statement = statement.where(Transaction.transaction_date >= filters.start_date)

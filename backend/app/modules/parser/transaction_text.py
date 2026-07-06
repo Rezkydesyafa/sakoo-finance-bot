@@ -2,6 +2,7 @@ from app.modules.parser.intent_router import detect_intent
 from app.modules.parser.schemas import (
     CONFIRMATION_THRESHOLD,
     INTENT_ADD_TRANSACTION,
+    INTENT_CREATE_CATEGORY,
     INTENT_DELETE_LAST_TRANSACTION,
     INTENT_EXPORT_PDF,
     INTENT_FINANCE_CHAT,
@@ -25,6 +26,7 @@ from app.modules.parser.transaction_parser import parse_transaction_text
 __all__ = [
     "CONFIRMATION_THRESHOLD",
     "INTENT_ADD_TRANSACTION",
+    "INTENT_CREATE_CATEGORY",
     "INTENT_DELETE_LAST_TRANSACTION",
     "INTENT_EXPORT_PDF",
     "INTENT_FINANCE_CHAT",

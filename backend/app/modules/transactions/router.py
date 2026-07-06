@@ -46,6 +46,7 @@ def create_transaction(
         description=payload.description,
         transaction_date=payload.transaction_date,
         source="dashboard_manual",
+        status="confirmed",
     )
     db.add(transaction)
     db.commit()

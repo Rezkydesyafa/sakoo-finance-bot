@@ -56,6 +56,7 @@ class TransactionResponse(BaseModel):
     description: str | None
     transaction_date: date
     source: str
+    status: str
     created_at: datetime
     updated_at: datetime
 

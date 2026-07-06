@@ -81,6 +81,7 @@ def test_user_can_crud_income_and_expense_transactions(
     expense = expense_response.json()
     assert expense["source"] == "dashboard_manual"
     assert expense["type"] == "expense"
+    assert expense["status"] == "confirmed"
     assert Decimal(str(expense["amount"])) == Decimal("18000.00")
 
     income_response = client.post(
@@ -186,7 +187,7 @@ def test_transaction_parse_endpoint_uses_backend_parser(
     payload = response.json()
     assert payload["status"] == "saved"
     assert payload["transaction_id"] is not None
-    assert "Saldo sekarang" in payload["reply_text"]
+    assert "Tercatat" in payload["reply_text"]
 
     with session_factory() as db:
         transaction = db.get(Transaction, payload["transaction_id"])
@@ -261,8 +262,8 @@ def test_transaction_list_supports_filters_pagination_and_newest_sort(
     assert first_page_payload["offset"] == 0
     assert first_page_payload["has_next"] is True
     assert [item["transaction_date"] for item in first_page_payload["items"]] == [
-        "2026-06-27",
         "2026-06-26",
+        "2026-06-27",
     ]
 
     second_page = client.get(

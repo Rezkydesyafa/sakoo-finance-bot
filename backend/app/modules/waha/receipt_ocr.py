@@ -252,6 +252,7 @@ def _confirm_receipt_transaction(
         description=receipt_description(receipt, fallback="Struk WhatsApp"),
         transaction_date=receipt.receipt_date or date.today(),
         source="receipt_ocr",
+        status="confirmed",
     )
     db.add(transaction)
     db.flush()

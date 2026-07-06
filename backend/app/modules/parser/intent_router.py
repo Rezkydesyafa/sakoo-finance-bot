@@ -11,6 +11,7 @@ from app.modules.parser.schemas import (
     INCOME_KEYWORDS,
     INCOME_PHRASES,
     INTENT_ADD_TRANSACTION,
+    INTENT_CREATE_CATEGORY,
     INTENT_DELETE_LAST_TRANSACTION,
     INTENT_EXPORT_PDF,
     INTENT_FINANCE_CHAT,
@@ -63,6 +64,11 @@ DELETE_LAST_PHRASES = (
     "batalkan transaksi terakhir",
 )
 LINK_ACCOUNT_PHRASES = ("hubungkan", "link akun", "sambungkan")
+CREATE_CATEGORY_RE = re.compile(
+    r"\b(?:buat(?:kan)?|bikin|tambah(?:kan)?|create)\b.*\bkategori\b"
+    r"|\bkategori\b.*\b(?:baru|buat(?:kan)?|bikin|tambah(?:kan)?)\b",
+    re.IGNORECASE,
+)
 FINANCE_EDUCATION_RE = re.compile(
     r"\b(?:"
     r"tips?\s+(?:menabung|hemat|keuangan|investasi|nabung|budgeting|finansial)"
@@ -106,6 +112,8 @@ def detect_intent(text: str) -> IntentMatch:
 
     if tokens & HELP_KEYWORDS and len(tokens) <= 4:
         return IntentMatch(intent=INTENT_HELP, confidence=1.0)
+    if CREATE_CATEGORY_RE.search(normalized):
+        return IntentMatch(intent=INTENT_CREATE_CATEGORY, confidence=0.95)
     if _contains_phrase(normalized, LINK_ACCOUNT_PHRASES):
         return IntentMatch(intent=INTENT_LINK_ACCOUNT, confidence=0.95)
     if _contains_phrase(normalized, DELETE_LAST_PHRASES):

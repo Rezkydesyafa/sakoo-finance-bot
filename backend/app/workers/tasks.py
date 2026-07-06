@@ -203,17 +203,6 @@ def run_receipt_ocr_job(
     db.commit()
 
     try:
-        _send_receipt_processing_notification_if_needed(
-            waha_client=waha_client,
-            telegram_client=telegram_client,
-            notify_chat_id=notify_chat_id,
-            notify_session=notify_session,
-            notify_platform=notify_platform,
-        )
-    except Exception:
-        pass
-
-    try:
         receipt = process_receipt_ocr(
             db,
             user_id=user_id,
@@ -442,35 +431,6 @@ def _send_receipt_notification_if_needed(
     text = format_receipt_confirmation(receipt)
     if notify_platform == "telegram":
         client = telegram_client or next(get_telegram_client())
-        client.send_message(chat_id=notify_chat_id, text=text)
-        return
-
-    client = waha_client or get_waha_client()
-    client.send_text(
-        chat_id=notify_chat_id,
-        text=text,
-        session=notify_session,
-    )
-
-
-def _send_receipt_processing_notification_if_needed(
-    *,
-    waha_client: WahaClient | None,
-    telegram_client: TelegramClient | None,
-    notify_chat_id: str | None,
-    notify_session: str | None,
-    notify_platform: str | None,
-) -> None:
-    if not notify_chat_id:
-        return
-    text = (
-        "Sedang membaca struk...\n"
-        "[==>     ] OCR berjalan\n"
-        "Tunggu sebentar, aku cek total dan tanggalnya."
-    )
-    if notify_platform == "telegram":
-        client = telegram_client or next(get_telegram_client())
-        client.send_chat_action(chat_id=notify_chat_id, action="typing")
         client.send_message(chat_id=notify_chat_id, text=text)
         return
 

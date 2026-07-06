@@ -6,6 +6,7 @@ from typing import Protocol
 
 
 class TransactionLike(Protocol):
+    id: int
     type: str
     amount: Decimal | None
     description: str | None
@@ -53,40 +54,26 @@ def format_saved_transaction(
     context_note: str | None = None,
 ) -> str:
     is_income = transaction.type == "income"
-    emoji = "💰" if is_income else "💸"
     direction = "Pemasukan" if is_income else "Pengeluaran"
-    title = f"{emoji} Pemasukan tercatat!" if is_income else f"{emoji} Transaksi Tercatat!"
     category_name = category.name if category else "Tanpa kategori"
     description = transaction.description or "-"
-    balance_line = f"\n💳 Saldo sekarang: *{format_rupiah(balance_after)}*" if balance_after is not None else ""
-    note_line = f"\n\n📌 {context_note}" if context_note else ""
+    balance_line = f"\nSaldo: {format_rupiah(balance_after)}" if balance_after is not None else ""
+    transaction_id = getattr(transaction, "id", None)
+    id_line = f" #{transaction_id}" if transaction_id else ""
 
     if style == "short":
         return (
-            "✅ Tercatat.\n"
-            f"{direction} *{format_rupiah(transaction.amount)}* — {category_name}"
+            f"Tercatat{id_line}.\n"
+            f"{direction} {format_rupiah(transaction.amount)} - {category_name}"
             f"{balance_line}"
         )
 
-    if style == "detailed":
-        return (
-            f"{title}\n\n"
-            f"Jenis: {direction}\n"
-            f"Nominal: *{format_rupiah(transaction.amount)}*\n"
-            f"Kategori: {category_name}\n"
-            f"Catatan: {description}\n"
-            f"Tanggal: {format_date_label(transaction.transaction_date)}"
-            f"{balance_line}{note_line}"
-        )
-
     return (
-        f"{title}\n\n"
-        f"Jenis: {direction}\n"
-        f"Nominal: *{format_rupiah(transaction.amount)}*\n"
+        f"Tercatat{id_line}.\n"
+        f"{direction}: {format_rupiah(transaction.amount)}\n"
         f"Kategori: {category_name}\n"
-        f"Catatan: {description}\n"
-        f"Tanggal: {format_date_label(transaction.transaction_date)}"
-        f"{balance_line}{note_line}"
+        f"Catatan: {description}"
+        f"{balance_line}"
     )
 
 

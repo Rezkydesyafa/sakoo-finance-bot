@@ -182,6 +182,7 @@ def find_duplicate_receipt_transaction(
             Transaction.user_id == receipt.user_id,
             Transaction.source == "receipt_ocr",
             Transaction.type == "expense",
+            Transaction.status == "confirmed",
             Transaction.amount == receipt.total_amount,
             Transaction.transaction_date == transaction_date,
             Transaction.description == description,
@@ -202,6 +203,7 @@ def find_latest_saved_receipt_transaction(
             Receipt.user_id == user_id,
             Receipt.transaction_id.is_not(None),
             Receipt.status.in_(("confirmed", "duplicate")),
+            Transaction.status == "confirmed",
         )
         .order_by(Receipt.created_at.desc(), Receipt.id.desc())
     )
@@ -226,34 +228,25 @@ def format_receipt_confirmation(receipt: Receipt) -> str:
     category = receipt_category_name(receipt)
     note = receipt_caption_note(receipt)
     item_names = extract_receipt_item_names(receipt.ocr_text or "", limit=3)
-    item_note = f"\nItem: {', '.join(item_names)}" if item_names and not note else ""
-    note_text = f"\nCatatan: {note}" if note else ""
-    extra_note = (
-        f"\nKategori: {category or 'belum dipilih'}"
-        f"{note_text}"
-        f"{item_note}"
-    )
-    date_note = (
-        " Tanggal tidak jelas, aku pakai tanggal hari ini kalau kamu simpan."
-        if receipt.receipt_date is None
-        else ""
-    )
+    detail_lines = [
+        f"Tanggal: {receipt_date}",
+        f"Kategori: {category or 'belum dipilih'}",
+    ]
+    if receipt.merchant_name:
+        detail_lines.insert(0, f"Merchant: {merchant}")
+    if note:
+        detail_lines.append(f"Catatan: {note}")
+    elif item_names:
+        detail_lines.append(f"Item: {', '.join(item_names)}")
+    if receipt.receipt_date is None:
+        detail_lines.append("Tanggal belum jelas, aku pakai hari ini kalau kamu simpan.")
 
     if receipt.total_amount is None:
-        fallback_text = (
-            " Foto agak blur atau nominal tidak terlihat. Coba foto ulang dari atas, "
-            "atau kirim caption: beli makan 20 ribu."
-            if not receipt.caption_text
-            else " Caption yang kamu kirim belum punya nominal yang jelas."
-        )
         return (
-            "Total belum terbaca. Aku sudah coba baca struknya, tapi nominalnya belum jelas.\n\n"
-            f"Merchant: {merchant}\n"
-            f"Tanggal: {receipt_date}\n\n"
-            "Kirim nominalnya ya, contoh: 20000 atau edit total 20000."
-            f"{extra_note}"
-            f"{date_note}"
-            f"{fallback_text}"
+            "Hasil OCR belum lengkap.\n\n"
+            + "\n".join(detail_lines)
+            + "\nNominal: belum terbaca\n\n"
+            "Kirim nominalnya, contoh: edit total 50000."
         )
 
     used_caption_fallback = (
@@ -261,17 +254,14 @@ def format_receipt_confirmation(receipt: Receipt) -> str:
         and receipt.status == "needs_confirmation"
         and (receipt.confidence or Decimal("0")) == Decimal("0.7000")
     )
-    fallback_note = " Total ini aku ambil dari caption karena OCR belum cukup jelas. " if used_caption_fallback else ""
+    if used_caption_fallback:
+        detail_lines.append("Nominal diambil dari caption karena OCR belum cukup jelas.")
     return (
-        "Aku sudah baca struknya. Ini yang aku tangkap:\n\n"
-        f"Merchant: {merchant}\n"
-        f"Tanggal: {receipt_date}\n"
-        f"Total: {format_rupiah(receipt.total_amount)}\n"
-        f"Keyakinan baca: {confidence}\n"
-        f"{extra_note}"
-        f"{fallback_note}"
-        f"{date_note}"
-        "\nBalas YA kalau sudah benar, atau koreksi: edit total 20000 / edit tanggal kemarin / "
+        "Hasil OCR:\n\n"
+        + "\n".join(detail_lines)
+        + f"\nTotal: {format_rupiah(receipt.total_amount)}"
+        + f"\nConfidence: {confidence}\n\n"
+        "Balas YA untuk simpan, atau koreksi: edit total 20000 / edit tanggal kemarin / "
         "edit kategori makan / edit catatan sarapan."
     )
 

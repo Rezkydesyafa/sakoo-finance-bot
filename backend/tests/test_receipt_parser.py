@@ -88,3 +88,22 @@ def test_receipt_parser_marks_different_total_candidates_for_confirmation() -> N
     assert result.status == "needs_confirmation"
     assert result.need_confirmation is True
     assert "multiple_total_candidates" in result.reasons
+
+
+def test_transfer_receipt_reads_nominal_label_without_success_as_merchant() -> None:
+    result = parse_receipt_text(
+        """
+        Transfer Berhasil!
+        2026-07-02
+        Nominal
+        Rp 50.000
+        dari MOHAMAD DWI REZKY
+        Tujuan Transaksi
+        Lainnya
+        """,
+    )
+
+    assert result.total_amount == Decimal("50000.00")
+    assert result.merchant_name is None
+    assert result.receipt_date == date(2026, 7, 2)
+    assert "digital_transfer" in result.reasons
