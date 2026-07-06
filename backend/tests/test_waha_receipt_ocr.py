@@ -237,9 +237,8 @@ def test_waha_receipt_total_can_be_edited_after_worker_confirmation(
 
     _run_queued_ocr_job(session_factory, fake_ocr, fake_waha, queued_jobs[0])
 
-    assert "Total belum terbaca" in fake_waha.sent_messages[-1]["text"]
-    assert "Tanggal tidak jelas" in fake_waha.sent_messages[-1]["text"]
-    assert "Foto agak blur" in fake_waha.sent_messages[-1]["text"]
+    assert "Hasil OCR belum lengkap" in fake_waha.sent_messages[-1]["text"]
+    assert "Tanggal belum jelas" in fake_waha.sent_messages[-1]["text"]
     assert "edit total" in fake_waha.sent_messages[-1]["text"].lower()
     assert "Item: Kopi, Roti" in fake_waha.sent_messages[-1]["text"]
 

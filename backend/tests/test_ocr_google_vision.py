@@ -235,8 +235,8 @@ def test_receipt_ocr_worker_sends_telegram_loading_action(
             notify_platform="telegram",
         )
 
-    assert fake_telegram.chat_actions == [{"chat_id": "456", "action": "typing"}]
-    assert "Sedang membaca struk" in fake_telegram.sent_messages[0]["text"]
+    assert fake_telegram.chat_actions == []
+    assert "Hasil OCR" in fake_telegram.sent_messages[0]["text"]
 
 
 def test_receipt_ocr_is_isolated_by_current_user(

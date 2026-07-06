@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 import pytest
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -14,7 +15,7 @@ os.environ["LLM_PROVIDER"] = "none"
 
 from app.config import get_settings
 from app.database import Base
-from app.models import BotLog, Category, Transaction, User, UserPreference
+from app.models import BotLog, Category, MediaFile, Receipt, Transaction, User, UserPreference
 from app.modules.transactions.service import handle_text_transaction
 
 
@@ -42,6 +43,7 @@ def session_factory(monkeypatch: pytest.MonkeyPatch) -> Iterator[sessionmaker[Se
                 Category(name="Transportasi", type="expense"),
                 Category(name="Tagihan", type="expense"),
                 Category(name="Belanja", type="expense"),
+                Category(name="Pendidikan", type="expense"),
                 Category(name="Gaji", type="income"),
                 Category(name="Uang Saku", type="income"),
                 Category(name="Lainnya", type="expense"),
@@ -85,9 +87,10 @@ def test_pending_transaction_can_be_confirmed(session_factory: sessionmaker[Sess
         assert transaction is not None
         assert transaction.amount == Decimal("20000.00")
         assert transaction.type == "expense"
-        assert "Saldo sekarang" in confirm.reply_text
-        assert "Pengeluaran bulan ini" in confirm.reply_text
-        assert "Kategori terbesar" in confirm.reply_text
+        assert transaction.status == "confirmed"
+        assert confirm.transaction_id == transaction.id
+        assert "Tercatat" in confirm.reply_text
+        assert "Pengeluaran bulan ini" not in confirm.reply_text
 
 
 def test_pending_transaction_expires_before_confirmation(
@@ -498,6 +501,171 @@ def test_latest_expense_list_uses_created_order_for_new_receipt(
     assert result.reply_text.splitlines()[2].endswith("Bayar wifi")
 
 
+def test_print_journal_is_saved_and_listed_as_education_expense(
+    session_factory: sessionmaker[Session],
+) -> None:
+    with session_factory() as db:
+        user = _create_user(db)
+        saved = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="Saya print jurnal 15 k",
+            source="whatsapp_text",
+        )
+
+        transaction = db.get(Transaction, saved.transaction_id)
+        assert saved.status == "saved"
+        assert transaction is not None
+        assert transaction.amount == Decimal("15000.00")
+        assert transaction.status == "confirmed"
+        assert transaction.category is not None
+        assert transaction.category.name == "Pendidikan"
+
+        listed = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="list pengeluaran saya",
+            source="whatsapp_text",
+        )
+
+    assert listed.status == "list_expense"
+    assert "print jurnal" in listed.reply_text
+    assert "Pendidikan" in listed.reply_text
+
+
+def test_pending_ocr_receipt_is_not_listed_before_confirmation(
+    session_factory: sessionmaker[Session],
+) -> None:
+    with session_factory() as db:
+        user = _create_user(db)
+        media = MediaFile(
+            user_id=user.id,
+            file_type="receipt",
+            original_filename="transfer.jpg",
+            stored_path="receipts/transfer.jpg",
+            mime_type="image/jpeg",
+            source="whatsapp_receipt",
+        )
+        db.add(media)
+        db.flush()
+        db.add(
+            Receipt(
+                user_id=user.id,
+                media_file_id=media.id,
+                merchant_name=None,
+                total_amount=Decimal("50000.00"),
+                status="needs_confirmation",
+            )
+        )
+        db.commit()
+
+        result = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="list pengeluaran",
+            source="whatsapp_text",
+        )
+
+    assert result.status == "list_expense"
+    assert "Rp50.000" not in result.reply_text
+
+
+def test_expense_list_uses_current_user_id(
+    session_factory: sessionmaker[Session],
+) -> None:
+    with session_factory() as db:
+        user_a = _create_user(db, email="a@example.com")
+        user_b = _create_user(db, email="b@example.com")
+        food = db.scalar(select(Category).where(Category.name == "Makanan"))
+        db.add_all(
+            [
+                Transaction(
+                    user_id=user_a.id,
+                    type="expense",
+                    amount=Decimal("10000.00"),
+                    category_id=food.id if food else None,
+                    description="kopi user a",
+                    transaction_date=date.today(),
+                    source="whatsapp_text",
+                    status="confirmed",
+                ),
+                Transaction(
+                    user_id=user_b.id,
+                    type="expense",
+                    amount=Decimal("99000.00"),
+                    category_id=food.id if food else None,
+                    description="kopi user b",
+                    transaction_date=date.today(),
+                    source="whatsapp_text",
+                    status="confirmed",
+                ),
+            ]
+        )
+        db.commit()
+
+        result = handle_text_transaction(
+            db=db,
+            user_id=user_a.id,
+            text="/pengeluaran",
+            source="whatsapp_text",
+        )
+
+    assert "kopi user a" in result.reply_text
+    assert "kopi user b" not in result.reply_text
+
+
+def test_success_reply_only_after_database_commit(
+    session_factory: sessionmaker[Session],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with session_factory() as db:
+        user = _create_user(db)
+
+        def fail_commit() -> None:
+            raise SQLAlchemyError("commit failed")
+
+        monkeypatch.setattr(db, "commit", fail_commit)
+        result = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="Beli makan 5k",
+            source="whatsapp_text",
+        )
+
+        assert result.status == "save_failed"
+        assert result.transaction_id is None
+        assert "Tercatat" not in result.reply_text
+
+
+def test_create_category_requires_confirmation_and_saves(
+    session_factory: sessionmaker[Session],
+) -> None:
+    with session_factory() as db:
+        user = _create_user(db)
+        requested = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="buatkan saya kategori untuk tugas kuliah",
+            source="whatsapp_text",
+        )
+        confirmed = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="YA",
+            source="whatsapp_text",
+        )
+        category = db.scalar(
+            select(Category).where(
+                Category.name == "Tugas Kuliah",
+                Category.type == "expense",
+            )
+        )
+
+    assert requested.status == "category_create_needs_confirmation"
+    assert confirmed.status == "category_created"
+    assert category is not None
+
+
 def test_reset_expense_requires_confirmation(
     session_factory: sessionmaker[Session],
 ) -> None:
@@ -827,10 +995,10 @@ def test_cancel_pending_transaction(session_factory: sessionmaker[Session]) -> N
         assert pending_log is not None
 
 
-def _create_user(db: Session) -> User:
+def _create_user(db: Session, *, email: str = "conversation@example.com") -> User:
     user = User(
         name="Conversation User",
-        email="conversation@example.com",
+        email=email,
         password_hash="hashed-password",
     )
     db.add(user)

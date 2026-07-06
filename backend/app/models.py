@@ -224,6 +224,12 @@ class Transaction(TimestampMixin, Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     transaction_date: Mapped[date] = mapped_column(Date, nullable=False)
     source: Mapped[str] = mapped_column(String(40), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="confirmed",
+        server_default="confirmed",
+    )
 
     user: Mapped["User"] = relationship(back_populates="transactions")
     category: Mapped["Category | None"] = relationship(back_populates="transactions")
@@ -241,9 +247,14 @@ class Transaction(TimestampMixin, Base):
             "'receipt_ocr', 'voice_note')",
             name="ck_transactions_source",
         ),
+        CheckConstraint(
+            "status IN ('pending_confirmation', 'confirmed', 'cancelled')",
+            name="ck_transactions_status",
+        ),
         Index("ix_transactions_user_date", "user_id", "transaction_date"),
         Index("ix_transactions_user_category", "user_id", "category_id"),
         Index("ix_transactions_user_type_date", "user_id", "type", "transaction_date"),
+        Index("ix_transactions_user_status_created", "user_id", "status", "created_at"),
         Index(
             "ix_transactions_user_category_date",
             "user_id",

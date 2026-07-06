@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session
 
 from app.models import Category, Transaction
 
+CONFIRMED_TRANSACTION_STATUS = "confirmed"
+
 
 def find_category(
     *,
@@ -44,6 +46,7 @@ def sum_transactions(
     query = select(func.coalesce(func.sum(Transaction.amount), 0)).where(
         Transaction.user_id == user_id,
         Transaction.type == transaction_type,
+        Transaction.status == CONFIRMED_TRANSACTION_STATUS,
     )
     if start_date is not None:
         query = query.where(Transaction.transaction_date >= start_date)
@@ -69,7 +72,10 @@ def list_transactions(
     limit: int = 5,
     newest_by_created: bool = False,
 ) -> list[Transaction]:
-    query = select(Transaction).where(Transaction.user_id == user_id)
+    query = select(Transaction).where(
+        Transaction.user_id == user_id,
+        Transaction.status == CONFIRMED_TRANSACTION_STATUS,
+    )
     if transaction_type is not None:
         query = query.where(Transaction.type == transaction_type)
     if start_date is not None:
@@ -93,6 +99,7 @@ def count_user_category_transactions(
         select(func.count(Transaction.id)).where(
             Transaction.user_id == user_id,
             Transaction.category_id == category_id,
+            Transaction.status == CONFIRMED_TRANSACTION_STATUS,
         )
     )
     return int(value or 0)
@@ -108,7 +115,11 @@ def top_expense_category(
     query = (
         select(Category.name, func.coalesce(func.sum(Transaction.amount), 0).label("total"))
         .join(Category, Transaction.category_id == Category.id, isouter=True)
-        .where(Transaction.user_id == user_id, Transaction.type == "expense")
+        .where(
+            Transaction.user_id == user_id,
+            Transaction.type == "expense",
+            Transaction.status == CONFIRMED_TRANSACTION_STATUS,
+        )
         .group_by(Category.name)
         .order_by(func.coalesce(func.sum(Transaction.amount), 0).desc())
     )
@@ -136,6 +147,7 @@ def sum_category_expense(
         .where(
             Transaction.user_id == user_id,
             Transaction.type == "expense",
+            Transaction.status == CONFIRMED_TRANSACTION_STATUS,
             func.lower(Category.name) == category_name.lower(),
             Transaction.transaction_date >= start_date,
             Transaction.transaction_date <= end_date,

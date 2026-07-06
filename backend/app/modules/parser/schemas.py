@@ -18,6 +18,7 @@ INTENT_EXPORT_PDF = "export_pdf"
 INTENT_HELP = "help"
 INTENT_LINK_ACCOUNT = "link_account"
 INTENT_FINANCE_CHAT = "finance_chat"
+INTENT_CREATE_CATEGORY = "create_category"
 INTENT_UNKNOWN = "unknown"
 
 # Existing public intent kept for backward compatibility with earlier tests/flows.
@@ -34,6 +35,7 @@ VALID_INTENTS = {
     INTENT_HELP,
     INTENT_LINK_ACCOUNT,
     INTENT_FINANCE_CHAT,
+    INTENT_CREATE_CATEGORY,
     INTENT_UNKNOWN,
     INTENT_RECENT_TRANSACTIONS,
     INTENT_DELETE_LAST_TRANSACTION,
@@ -65,7 +67,8 @@ CATEGORY_HINTS: frozenset[str] = frozenset({
     "kelas", "klinik", "kopi", "kos", "kursus", "listrik", "nasi",
     "netflix", "obat", "parkir", "pulsa", "seblak", "shopee",
     "spotify", "tokopedia", "tol", "ukt", "wifi", "tugas", "dana",
-    "gopay", "ovo",
+    "gopay", "ovo", "print", "jurnal", "kuliah", "kampus", "fotokopi",
+    "skripsi", "makalah", "praktikum",
 })
 
 

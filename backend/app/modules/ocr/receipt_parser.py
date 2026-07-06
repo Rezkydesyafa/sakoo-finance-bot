@@ -20,6 +20,13 @@ TOTAL_KEYWORDS: tuple[tuple[str, re.Pattern[str], int], ...] = (
     ),
     ("total", re.compile(r"\btotal\b", re.IGNORECASE), 4),
 )
+TRANSFER_AMOUNT_LABELS: tuple[tuple[str, re.Pattern[str], int], ...] = (
+    ("jumlah_bayar", re.compile(r"\bjumlah\s+bayar\b", re.IGNORECASE), 6),
+    ("nominal", re.compile(r"\bnominal\b", re.IGNORECASE), 6),
+    ("amount", re.compile(r"\bamount\b", re.IGNORECASE), 6),
+    ("total", re.compile(r"\btotal\b", re.IGNORECASE), 5),
+    ("jumlah", re.compile(r"\bjumlah\b", re.IGNORECASE), 4),
+)
 IGNORED_TOTAL_LINE_RE = re.compile(
     r"\b(?:sub\s*total|subtotal|total\s+item|item\s+total|qty|quantity|jumlah\s+item)\b",
     re.IGNORECASE,
@@ -49,7 +56,12 @@ DATE_MONTH_NAME_RE = re.compile(
 )
 MERCHANT_NOISE_RE = re.compile(
     r"\b(?:alamat|cashier|date|faktur|jalan|jl\.?|kasir|npwp|nota|no\.?|"
-    r"receipt|struk|telp|tanggal|tax|time|waktu)\b",
+    r"receipt|struk|telp|tanggal|tax|time|transfer\s+berhasil|waktu)\b",
+    re.IGNORECASE,
+)
+TRANSFER_RECEIPT_RE = re.compile(
+    r"\b(?:transfer\s+berhasil|pembayaran\s+berhasil|bayar\s+berhasil|"
+    r"transaksi\s+berhasil|berhasil\s+transfer)\b",
     re.IGNORECASE,
 )
 ITEM_NOISE_RE = re.compile(
@@ -121,6 +133,9 @@ class TotalCandidate:
 
 def parse_receipt_text(text: str, current_year: int | None = None) -> ReceiptParseResult:
     lines = _normalize_lines(text)
+    if _looks_like_transfer_receipt(lines):
+        return _parse_transfer_receipt(lines, current_year=current_year)
+
     merchant_name = _extract_merchant(lines)
     receipt_date = _extract_date(lines, current_year=current_year)
     item_names = _extract_item_names(lines)
@@ -170,6 +185,61 @@ def parse_receipt_text(text: str, current_year: int | None = None) -> ReceiptPar
     )
 
 
+def _looks_like_transfer_receipt(lines: list[str]) -> bool:
+    return any(TRANSFER_RECEIPT_RE.search(line) for line in lines)
+
+
+def _parse_transfer_receipt(
+    lines: list[str],
+    *,
+    current_year: int | None,
+) -> ReceiptParseResult:
+    total_candidate, ambiguous_total = _extract_labeled_amount(
+        lines,
+        TRANSFER_AMOUNT_LABELS,
+    )
+    receipt_date = _extract_date(lines, current_year=current_year)
+    reasons: list[str] = ["digital_transfer"]
+
+    if total_candidate is None:
+        reasons.append("missing_transfer_amount_label")
+        return ReceiptParseResult(
+            total_amount=None,
+            merchant_name=None,
+            receipt_date=receipt_date,
+            item_names=[],
+            confidence=_calculate_confidence(
+                has_total=False,
+                has_merchant=False,
+                has_date=receipt_date is not None,
+                ambiguous=False,
+            ),
+            status="manual_input_required",
+            need_confirmation=True,
+            reasons=reasons,
+        )
+
+    if ambiguous_total:
+        reasons.append("multiple_transfer_amount_candidates")
+    confidence = _calculate_confidence(
+        has_total=True,
+        has_merchant=False,
+        has_date=receipt_date is not None,
+        ambiguous=ambiguous_total,
+    )
+    need_confirmation = ambiguous_total or confidence < Decimal(str(TOTAL_CONFIDENCE_THRESHOLD))
+    return ReceiptParseResult(
+        total_amount=total_candidate.amount,
+        merchant_name=None,
+        receipt_date=receipt_date,
+        item_names=[],
+        confidence=confidence,
+        status="needs_confirmation" if need_confirmation else "processed",
+        need_confirmation=need_confirmation,
+        reasons=reasons,
+    )
+
+
 def _normalize_lines(text: str) -> list[str]:
     return [
         re.sub(r"\s+", " ", line).strip()
@@ -179,12 +249,21 @@ def _normalize_lines(text: str) -> list[str]:
 
 
 def _extract_total(lines: list[str]) -> tuple[TotalCandidate | None, bool]:
+    return _extract_labeled_amount(lines, TOTAL_KEYWORDS, skip_ignored=True)
+
+
+def _extract_labeled_amount(
+    lines: list[str],
+    labels: tuple[tuple[str, re.Pattern[str], int], ...],
+    *,
+    skip_ignored: bool = False,
+) -> tuple[TotalCandidate | None, bool]:
     candidates: list[TotalCandidate] = []
     for line_index, line in enumerate(lines):
-        if IGNORED_TOTAL_LINE_RE.search(line):
+        if skip_ignored and IGNORED_TOTAL_LINE_RE.search(line):
             continue
 
-        for keyword, pattern, priority in TOTAL_KEYWORDS:
+        for keyword, pattern, priority in labels:
             keyword_match = pattern.search(line)
             if not keyword_match:
                 continue

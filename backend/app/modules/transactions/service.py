@@ -5,6 +5,7 @@ from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import func, or_, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -39,6 +40,7 @@ from app.modules.parser.normalizer import normalize_text
 from app.modules.parser.service import ParsedMessage
 from app.modules.parser.transaction_text import (
     INTENT_ADD_TRANSACTION,
+    INTENT_CREATE_CATEGORY,
     INTENT_DELETE_LAST_TRANSACTION,
     INTENT_EXPORT_PDF,
     INTENT_FINANCE_CHAT,
@@ -53,7 +55,6 @@ from app.modules.parser.transaction_text import (
 )
 from app.modules.transactions.repository import (
     calculate_balance,
-    count_user_category_transactions,
     find_category,
     list_transactions,
     sum_category_expense,
@@ -104,6 +105,11 @@ REPLY_STYLE_PREFERENCE_RE = re.compile(
     r"\b(?:gaya bahasa|bahasa|respon)\s+(?P<style>santai|formal|detail|rinci|singkat|pendek)\b",
     re.IGNORECASE,
 )
+CREATE_CATEGORY_RE = re.compile(
+    r"\b(?:buat(?:kan)?|bikin|tambah(?:kan)?|create)\b.*\bkategori\b"
+    r"|\bkategori\b.*\b(?:baru|buat(?:kan)?|bikin|tambah(?:kan)?)\b",
+    re.IGNORECASE,
+)
 CATEGORY_SUMMARY_RE = re.compile(
     r"\b(?P<category>makan(?:an)?|kopi|transport|bensin|tagihan|belanja|hiburan|kesehatan|pendidikan|kos)\b.*\b(?:berapa|total|bulan ini|minggu ini|hari ini)\b",
     re.IGNORECASE,
@@ -119,6 +125,11 @@ PENDING_RESET_STATUS = "pending_reset"
 CONFIRMED_RESET_STATUS = "confirmed_reset"
 CANCELLED_RESET_STATUS = "cancelled_reset"
 EXPIRED_RESET_STATUS = "expired_reset"
+CATEGORY_CREATE_MESSAGE_TYPE = "category_create"
+PENDING_CATEGORY_CREATE_STATUS = "pending_category_create"
+CONFIRMED_CATEGORY_CREATE_STATUS = "confirmed_category_create"
+CANCELLED_CATEGORY_CREATE_STATUS = "cancelled_category_create"
+TRANSACTION_STATUS_CONFIRMED = "confirmed"
 
 
 @dataclass(frozen=True)
@@ -181,6 +192,15 @@ def handle_text_transaction(
     )
     if reset_result is not None:
         return reset_result
+
+    category_create_result = _handle_category_create_reply(
+        db=db,
+        user_id=user_id,
+        text=text,
+        source=source,
+    )
+    if category_create_result is not None:
+        return category_create_result
 
     pending_result = _handle_pending_transaction_reply(
         db=db,
@@ -279,14 +299,26 @@ def _save_transaction_from_parse_result(
         description=parse_result.description,
         transaction_date=parse_result.transaction_date or date.today(),
         source=parse_result.source,
+        status=TRANSACTION_STATUS_CONFIRMED,
     )
-    db.add(transaction)
-    db.flush()
-    if pending_log is not None:
-        mark_pending_status(
-            db,
-            pending_log=pending_log,
-            status=CONFIRMED_TRANSACTION_STATUS,
+    try:
+        db.add(transaction)
+        db.flush()
+        if pending_log is not None:
+            mark_pending_status(
+                db,
+                pending_log=pending_log,
+                status=CONFIRMED_TRANSACTION_STATUS,
+            )
+        db.commit()
+        db.refresh(transaction)
+    except SQLAlchemyError as exc:
+        db.rollback()
+        return TextTransactionResult(
+            status="save_failed",
+            reply_text="Maaf, transaksi belum berhasil kusimpan. Coba kirim ulang sebentar lagi.",
+            parse_result=parse_result,
+            error_message=str(exc),
         )
 
     return TextTransactionResult(
@@ -389,6 +421,156 @@ def _handle_transaction_reset_reply(
     )
 
 
+def _handle_category_create_reply(
+    *,
+    db: Session,
+    user_id: int,
+    text: str,
+    source: str,
+) -> TextTransactionResult | None:
+    normalized = normalize_text(text)
+    pending = _get_pending_category_create(db, user_id=user_id)
+    if pending is not None:
+        payload = pending.parsed_result or {}
+        name = str(payload.get("name") or "").strip()
+        transaction_type = str(payload.get("type") or "expense")
+
+        if CANCEL_RE.match(normalized):
+            pending.status = CANCELLED_CATEGORY_CREATE_STATUS
+            db.commit()
+            return TextTransactionResult(
+                status="category_create_cancelled",
+                reply_text=f"Oke, kategori {name} batal dibuat.",
+                parse_result=_synthetic_parse_result(
+                    text=text,
+                    source=source,
+                    intent=INTENT_CREATE_CATEGORY,
+                ),
+            )
+
+        if YES_CONFIRMATION_RE.match(normalized):
+            category = find_category(
+                db=db,
+                category_name=name,
+                transaction_type=transaction_type,
+            )
+            if category is None or category.name.lower() != name.lower():
+                category = Category(name=name, type=transaction_type)
+                db.add(category)
+            pending.status = CONFIRMED_CATEGORY_CREATE_STATUS
+            db.commit()
+            return TextTransactionResult(
+                status="category_created",
+                reply_text=f"Siap, kategori {name} sudah tersimpan.",
+                parse_result=_synthetic_parse_result(
+                    text=text,
+                    source=source,
+                    intent=INTENT_CREATE_CATEGORY,
+                ),
+            )
+
+        return TextTransactionResult(
+            status="category_create_confirmation_pending",
+            reply_text=f"Masih menunggu konfirmasi buat kategori {name}. Balas YA atau batal.",
+            parse_result=_synthetic_parse_result(
+                text=text,
+                source=source,
+                intent=INTENT_CREATE_CATEGORY,
+            ),
+        )
+
+    request = _parse_category_create_request(text)
+    if request is None:
+        return None
+
+    name, transaction_type = request
+    existing = find_category(
+        db=db,
+        category_name=name,
+        transaction_type=transaction_type,
+    )
+    if existing is not None and existing.name.lower() == name.lower():
+        return TextTransactionResult(
+            status="category_exists",
+            reply_text=f"Kategori {existing.name} sudah ada.",
+            parse_result=_synthetic_parse_result(
+                text=text,
+                source=source,
+                intent=INTENT_CREATE_CATEGORY,
+            ),
+        )
+
+    db.add(
+        BotLog(
+            user_id=user_id,
+            platform=_platform_from_source(source),
+            message_type=CATEGORY_CREATE_MESSAGE_TYPE,
+            raw_message=text,
+            parsed_result={
+                "kind": "category_create",
+                "name": name,
+                "type": transaction_type,
+            },
+            status=PENDING_CATEGORY_CREATE_STATUS,
+        )
+    )
+    db.commit()
+    label = "pengeluaran" if transaction_type == "expense" else "pemasukan"
+    return TextTransactionResult(
+        status="category_create_needs_confirmation",
+        reply_text=f"Aku akan buat kategori {label}: {name}. Balas YA untuk simpan atau batal.",
+        parse_result=_synthetic_parse_result(
+            text=text,
+            source=source,
+            intent=INTENT_CREATE_CATEGORY,
+        ),
+    )
+
+
+def _get_pending_category_create(db: Session, *, user_id: int) -> BotLog | None:
+    return db.scalar(
+        select(BotLog)
+        .where(
+            BotLog.user_id == user_id,
+            BotLog.message_type == CATEGORY_CREATE_MESSAGE_TYPE,
+            BotLog.status == PENDING_CATEGORY_CREATE_STATUS,
+        )
+        .order_by(BotLog.created_at.desc(), BotLog.id.desc())
+    )
+
+
+def _parse_category_create_request(text: str) -> tuple[str, str] | None:
+    if not CREATE_CATEGORY_RE.search(text):
+        return None
+    normalized = normalize_text(text)
+    match = re.search(
+        r"\bkategori(?:\s+baru)?(?:\s+untuk)?\s+(?P<name>.+)$",
+        normalized,
+        re.IGNORECASE,
+    )
+    if not match:
+        match = re.search(
+            r"\b(?:buatkan|buat|bikin|tambahkan|tambah|create)\s+(?:saya\s+)?"
+            r"kategori(?:\s+baru)?(?:\s+untuk)?\s+(?P<name>.+)$",
+            normalized,
+            re.IGNORECASE,
+        )
+    if not match:
+        return None
+
+    raw_name = re.sub(
+        r"\b(?:pengeluaran|pemasukan|income|expense|untuk|saya|dong|ya)\b",
+        " ",
+        match.group("name"),
+        flags=re.IGNORECASE,
+    )
+    name = re.sub(r"\s+", " ", raw_name).strip(" -,.")
+    if len(name) < 3:
+        return None
+    transaction_type = "income" if re.search(r"\b(?:pemasukan|income)\b", normalized) else "expense"
+    return name.title(), transaction_type
+
+
 def _get_pending_transaction_reset(db: Session, *, user_id: int) -> BotLog | None:
     pending = db.scalar(
         select(BotLog)
@@ -450,14 +632,20 @@ def _detect_reset_type(text: str) -> str | None:
 
 
 def _count_reset_transactions(db: Session, *, user_id: int, reset_type: str) -> int:
-    query = select(func.count(Transaction.id)).where(Transaction.user_id == user_id)
+    query = select(func.count(Transaction.id)).where(
+        Transaction.user_id == user_id,
+        Transaction.status == TRANSACTION_STATUS_CONFIRMED,
+    )
     if reset_type in {"expense", "income"}:
         query = query.where(Transaction.type == reset_type)
     return int(db.scalar(query) or 0)
 
 
 def _execute_transaction_reset(db: Session, *, user_id: int, reset_type: str) -> int:
-    query = select(Transaction).where(Transaction.user_id == user_id)
+    query = select(Transaction).where(
+        Transaction.user_id == user_id,
+        Transaction.status == TRANSACTION_STATUS_CONFIRMED,
+    )
     if reset_type in {"expense", "income"}:
         query = query.where(Transaction.type == reset_type)
     transactions = list(db.scalars(query))
@@ -919,6 +1107,8 @@ def _format_command_response(
             "Silakan daftar atau login di dashboard Sakoo, buka Connected Bots, "
             "buat kode linking, lalu kirim: hubungkan KODE."
         )
+    if parse_result.intent == INTENT_CREATE_CATEGORY:
+        return "Sebutkan nama kategorinya. Contoh: buat kategori Tugas Kuliah."
     if parse_result.intent == INTENT_UNKNOWN:
         return format_unknown_response()
     if parse_result.intent == INTENT_FINANCE_CHAT:
@@ -988,18 +1178,11 @@ def _format_saved_transaction(
     category: Category | None,
 ) -> str:
     balance_after = calculate_balance(db, user_id)
-    context_note = _build_saved_transaction_context_note(
-        db,
-        user_id,
-        transaction=transaction,
-        category=category,
-    )
     return format_saved_transaction_template(
         transaction,
         category,
         style=_reply_style(db, user_id),
         balance_after=balance_after,
-        context_note=context_note,
     )
 
 
@@ -1031,7 +1214,7 @@ def _format_transaction_list_response(
         start_date=start_date,
         end_date=end_date,
         limit=5,
-        newest_by_created=period is None,
+        newest_by_created=True,
     )
     label = "pengeluaran" if transaction_type == "expense" else "pemasukan"
     name = _user_first_name(db, user_id)
@@ -1352,6 +1535,7 @@ def _format_transaction_search_response(
             .join(Category, Transaction.category_id == Category.id, isouter=True)
             .where(
                 Transaction.user_id == user_id,
+                Transaction.status == TRANSACTION_STATUS_CONFIRMED,
                 or_(
                     func.lower(Transaction.description).like(pattern),
                     func.lower(Category.name).like(pattern),
@@ -1545,57 +1729,6 @@ def _period_bounds(period: str | None) -> tuple[date | None, date | None]:
     if period == "month":
         return today.replace(day=1), today
     return None, None
-
-
-def _build_saved_transaction_context_note(
-    db: Session,
-    user_id: int,
-    *,
-    transaction: Transaction,
-    category: Category | None,
-) -> str | None:
-    notes: list[str] = []
-    month_start = transaction.transaction_date.replace(day=1)
-    month_expense = sum_transactions(
-        db,
-        user_id,
-        transaction_type="expense",
-        start_date=month_start,
-        end_date=transaction.transaction_date,
-    )
-    top_category = top_expense_category(
-        db,
-        user_id,
-        start_date=month_start,
-        end_date=transaction.transaction_date,
-    )
-    notes.append(f"Pengeluaran bulan ini: {format_rupiah(month_expense)}.")
-    if top_category:
-        notes.append(
-            f"Kategori terbesar: {top_category[0]} {format_rupiah(top_category[1])}."
-        )
-
-    if transaction.type == "expense":
-        day_total = sum_transactions(
-            db,
-            user_id,
-            transaction_type="expense",
-            start_date=transaction.transaction_date,
-            end_date=transaction.transaction_date,
-        )
-        if day_total >= Decimal("100000"):
-            notes.append(f"Hari ini pengeluaranmu sudah {format_rupiah(day_total)}.")
-
-    if category is not None:
-        category_count = count_user_category_transactions(
-            db,
-            user_id,
-            category.id,
-        )
-        if category_count >= 3:
-            notes.append(f"Masuk ke {category.name}, kategori yang cukup sering kamu pakai.")
-
-    return " ".join(notes) if notes else None
 
 
 def _build_report_insight(
