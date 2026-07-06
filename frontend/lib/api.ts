@@ -251,41 +251,45 @@ export type PlatformAccountResponse = {
   is_active: boolean;
 };
 
-export type CategoryResponse = {
+export interface CategoryResponse {
   id: number;
-  user_id: number | null;
+  user_id?: number | null;
   name: string;
-  type: "income" | "expense" | "both";
-  icon: string | null;
-  color: string | null;
-  keywords: string[] | null;
+  type: string;
+  icon?: string | null;
+  color?: string | null;
+  keywords?: string[] | null;
+  budget_limit?: number | null;
+  spent_this_month: number;
   is_default: boolean;
   is_active: boolean;
   created_at: string;
   updated_at: string;
-};
+}
 
 export type CategoryListResponse = {
   items: CategoryResponse[];
   total: number;
 };
 
-export type CategoryCreateRequest = {
+export interface CategoryCreateRequest {
   name: string;
-  type: "income" | "expense" | "both";
+  type: string;
   icon?: string | null;
   color?: string | null;
   keywords?: string[] | null;
-};
+  budget_limit?: number | null;
+}
 
-export type CategoryUpdateRequest = {
+export interface CategoryUpdateRequest {
   name?: string;
-  type?: "income" | "expense" | "both";
+  type?: string;
   icon?: string | null;
   color?: string | null;
   keywords?: string[] | null;
+  budget_limit?: number | null;
   is_active?: boolean;
-};
+}
 
 type ApiRequestOptions = RequestInit & {
   token?: string;
