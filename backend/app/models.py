@@ -4,6 +4,7 @@ from typing import Any
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -85,6 +86,10 @@ class User(TimestampMixin, Base):
         cascade="all, delete-orphan",
         uselist=False,
     )
+    categories: Mapped[list["Category"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
     bot_logs: Mapped[list["BotLog"]] = relationship(back_populates="user")
 
     __table_args__ = (
@@ -161,23 +166,42 @@ class AccountLinkingCode(Base):
     )
 
 
-class Category(Base):
+class Category(TimestampMixin, Base):
     __tablename__ = "categories"
 
     id: Mapped[int] = mapped_column(BigIntPk, primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=True,
+    )
     name: Mapped[str] = mapped_column(String(80), nullable=False)
     type: Mapped[str] = mapped_column(String(16), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
+    icon: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    color: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    keywords: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    is_default: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        server_default="false",
+        nullable=False,
+    )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
+        server_default="true",
         nullable=False,
     )
 
+    user: Mapped["User | None"] = relationship(back_populates="categories")
     transactions: Mapped[list["Transaction"]] = relationship(back_populates="category")
 
     __table_args__ = (
-        CheckConstraint("type IN ('income', 'expense')", name="ck_categories_type"),
-        UniqueConstraint("name", "type", name="uq_categories_name_type"),
+        CheckConstraint(
+            "type IN ('income', 'expense', 'both')",
+            name="ck_categories_type",
+        ),
+        UniqueConstraint("user_id", "name", "type", name="uq_categories_user_name_type"),
+        Index("ix_categories_user_id", "user_id"),
     )
 
 

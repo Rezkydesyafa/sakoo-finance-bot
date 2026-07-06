@@ -160,6 +160,9 @@ def parse_transaction_text(text: str, today: date | None = None) -> ParsedTransa
             need_confirmation=False,
             reasons=[],
             period=intent_match.period,
+            limit=intent_match.limit,
+            sort_order=intent_match.sort_order,
+            category_filter=intent_match.category_filter,
         )
 
     amount_match = extract_amount(normalized)

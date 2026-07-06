@@ -11,6 +11,7 @@ from app.modules.parser.schemas import (
     INCOME_KEYWORDS,
     INCOME_PHRASES,
     INTENT_ADD_TRANSACTION,
+    INTENT_CATEGORY_DETAIL,
     INTENT_CREATE_CATEGORY,
     INTENT_DELETE_LAST_TRANSACTION,
     INTENT_EXPORT_PDF,
@@ -22,6 +23,7 @@ from app.modules.parser.schemas import (
     INTENT_LIST_EXPENSE,
     INTENT_LIST_INCOME,
     INTENT_RECENT_TRANSACTIONS,
+    INTENT_SORTED_EXPENSE,
     INTENT_UNKNOWN,
     IntentMatch,
 )
@@ -43,6 +45,9 @@ LIST_EXPENSE_PHRASES = (
     "pengeluaran bulan ini",
     "pengeluaran minggu ini",
     "pengeluaran hari ini",
+    "pengeluaran kemarin",
+    "apa saja pengeluaran",
+    "apa aja pengeluaran",
 )
 LIST_INCOME_PHRASES = (
     "list pemasukan",
@@ -50,6 +55,9 @@ LIST_INCOME_PHRASES = (
     "pemasukan bulan ini",
     "pemasukan minggu ini",
     "pemasukan hari ini",
+    "pemasukan kemarin",
+    "apa saja pemasukan",
+    "apa aja pemasukan",
 )
 RECENT_TRANSACTION_PHRASES = (
     "riwayat",
@@ -85,6 +93,37 @@ FINANCE_EDUCATION_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Match patterns like "tampilkan 10 pengeluaran", "liat 5 pemasukan", "lihat 20 pengeluaran"
+LIST_WITH_LIMIT_RE = re.compile(
+    r"\b(?:tampilkan|liat|lihat|tunjukkan|show|kasih liat|kasih lihat)\b"
+    r".*?\b(?P<limit>\d+)\s*"
+    r"(?P<type>pengeluaran|pemasukan|expense|income)\b",
+    re.IGNORECASE,
+)
+
+# Also match "10 pengeluaran terakhir", "5 transaksi pengeluaran"
+LIST_LIMIT_SUFFIX_RE = re.compile(
+    r"\b(?P<limit>\d+)\s*(?P<type>pengeluaran|pemasukan|expense|income)"
+    r"\s*(?:terakhir|terbaru|terkini)?\b",
+    re.IGNORECASE,
+)
+
+# Match "urutkan pengeluaran terbesar bulan ini", "sortir pengeluaran terbesar"
+SORTED_EXPENSE_RE = re.compile(
+    r"\b(?:urutkan|sortir|sort|ranking|peringkat|susun)\b"
+    r".*\b(?:pengeluaran|pemasukan|expense|income)\b"
+    r".*\b(?:terbesar|terkecil|tertinggi|terendah)\b",
+    re.IGNORECASE,
+)
+
+# Match category detail queries like "tagihan apa itu", "makanan berapa bulan ini"
+CATEGORY_DETAIL_RE = re.compile(
+    r"\b(?P<category>makan(?:an)?|kopi|transport(?:asi)?|bensin|tagihan|belanja|"
+    r"hiburan|kesehatan|pendidikan|kos|gaji|tabungan)\b"
+    r"\s+(?:apa\s+(?:itu|saja|aja)|berapa|rincian|detail|rinci)",
+    re.IGNORECASE,
+)
+
 COMMAND_INTENTS = {
     "/start": INTENT_HELP,
     "/help": INTENT_HELP,
@@ -102,9 +141,6 @@ def detect_intent(text: str) -> IntentMatch:
     tokens = _tokenize(normalized)
     period = detect_period(normalized)
 
-    if _looks_like_transaction_input(normalized):
-        return IntentMatch(intent=INTENT_ADD_TRANSACTION, confidence=0.95)
-
     command = _extract_command(normalized)
     if command:
         intent = COMMAND_INTENTS.get(command, INTENT_UNKNOWN)
@@ -112,12 +148,58 @@ def detect_intent(text: str) -> IntentMatch:
 
     if tokens & HELP_KEYWORDS and len(tokens) <= 4:
         return IntentMatch(intent=INTENT_HELP, confidence=1.0)
+
+    # Category create must come BEFORE transaction language check
+    # because "buat kategori tugas" contains "tugas" which is a CATEGORY_HINT
     if CREATE_CATEGORY_RE.search(normalized):
         return IntentMatch(intent=INTENT_CREATE_CATEGORY, confidence=0.95)
+
     if _contains_phrase(normalized, LINK_ACCOUNT_PHRASES):
         return IntentMatch(intent=INTENT_LINK_ACCOUNT, confidence=0.95)
     if _contains_phrase(normalized, DELETE_LAST_PHRASES):
         return IntentMatch(intent=INTENT_DELETE_LAST_TRANSACTION, confidence=1.0)
+
+    # Sorted expense: "urutkan pengeluaran terbesar bulan ini"
+    sorted_match = SORTED_EXPENSE_RE.search(normalized)
+    if sorted_match:
+        sort_order = "desc"
+        if re.search(r"\bterkecil|terendah\b", normalized):
+            sort_order = "asc"
+        return IntentMatch(
+            intent=INTENT_SORTED_EXPENSE,
+            period=period or "month",
+            confidence=1.0,
+            sort_order=sort_order,
+        )
+
+    # List with explicit limit: "tampilkan 10 pengeluaran", "liat 5 pemasukan"
+    limit_match = LIST_WITH_LIMIT_RE.search(normalized)
+    if limit_match:
+        limit = int(limit_match.group("limit"))
+        txn_type_word = limit_match.group("type").lower()
+        intent = INTENT_LIST_INCOME if txn_type_word in {"pemasukan", "income"} else INTENT_LIST_EXPENSE
+        return IntentMatch(intent=intent, period=period, confidence=1.0, limit=limit)
+
+    # Also check "10 pengeluaran terakhir" pattern (without leading verb)
+    limit_suffix_match = LIST_LIMIT_SUFFIX_RE.search(normalized)
+    if limit_suffix_match and not _looks_like_transaction_input(normalized):
+        limit = int(limit_suffix_match.group("limit"))
+        txn_type_word = limit_suffix_match.group("type").lower()
+        intent = INTENT_LIST_INCOME if txn_type_word in {"pemasukan", "income"} else INTENT_LIST_EXPENSE
+        return IntentMatch(intent=intent, period=period, confidence=1.0, limit=limit)
+
+    # Category detail: "tagihan apa itu?", "makanan berapa bulan ini"
+    category_detail_match = CATEGORY_DETAIL_RE.search(normalized)
+    if category_detail_match:
+        category_name = _category_name_from_alias(category_detail_match.group("category"))
+        return IntentMatch(
+            intent=INTENT_CATEGORY_DETAIL,
+            period=period or "month",
+            confidence=1.0,
+            category_filter=category_name,
+        )
+
+    # List expense/income phrases
     if _contains_phrase(normalized, LIST_EXPENSE_PHRASES):
         return IntentMatch(intent=INTENT_LIST_EXPENSE, period=period, confidence=1.0)
     if _contains_phrase(normalized, LIST_INCOME_PHRASES):
@@ -126,6 +208,12 @@ def detect_intent(text: str) -> IntentMatch:
         return IntentMatch(intent=INTENT_RECENT_TRANSACTIONS, period=period, confidence=1.0)
     if _contains_phrase(normalized, BALANCE_PHRASES):
         return IntentMatch(intent=INTENT_GET_BALANCE, confidence=1.0)
+
+    # Transaction detection BEFORE report/export keywords
+    # to prevent "beli buku laporan 20rb" from matching as get_report
+    if _looks_like_transaction_input(normalized):
+        return IntentMatch(intent=INTENT_ADD_TRANSACTION, confidence=0.95)
+
     if (tokens & EXPORT_KEYWORDS) and (tokens & REPORT_KEYWORDS):
         return IntentMatch(intent=INTENT_EXPORT_PDF, period=period, confidence=1.0)
     if tokens & REPORT_KEYWORDS:
@@ -168,3 +256,26 @@ def _contains_phrase(text: str, phrases: tuple[str, ...]) -> bool:
 
 def _tokenize(text: str) -> set[str]:
     return set(re.findall(r"[a-zA-Z\u00c0-\u024f]+", text.lower()))
+
+
+def _category_name_from_alias(alias: str) -> str:
+    normalized = alias.lower()
+    if normalized in {"makan", "makanan", "kopi"}:
+        return "Makanan"
+    if normalized in {"transport", "transportasi", "bensin"}:
+        return "Transportasi"
+    if normalized in {"kos", "tagihan"}:
+        return "Tagihan"
+    if normalized == "belanja":
+        return "Belanja"
+    if normalized == "hiburan":
+        return "Hiburan"
+    if normalized == "kesehatan":
+        return "Kesehatan"
+    if normalized == "pendidikan":
+        return "Pendidikan"
+    if normalized == "gaji":
+        return "Gaji"
+    if normalized == "tabungan":
+        return "Tabungan"
+    return normalized.title()

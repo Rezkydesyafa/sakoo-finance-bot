@@ -32,6 +32,9 @@ class ParsedMessage:
     period: str | None = None
     category_confidence: float | None = None
     category_source: str | None = None
+    limit: int | None = None
+    sort_order: str | None = None
+    category_filter: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
@@ -51,6 +54,12 @@ class ParsedMessage:
             payload["reasons"] = self.reasons
         if self.period:
             payload["period"] = self.period
+        if self.limit is not None:
+            payload["limit"] = self.limit
+        if self.sort_order:
+            payload["sort_order"] = self.sort_order
+        if self.category_filter:
+            payload["category_filter"] = self.category_filter
         if self.category_confidence is not None or self.category_source:
             payload["metadata"] = {
                 "category_confidence": round(self.category_confidence or 0.0, 4),
@@ -82,6 +91,9 @@ def parse_message(
             need_confirmation=False,
             reasons=base_result.reasons,
             period=base_result.period,
+            limit=getattr(base_result, "limit", None),
+            sort_order=getattr(base_result, "sort_order", None),
+            category_filter=getattr(base_result, "category_filter", None),
         )
 
     category, category_confidence, category_source, reasons = _resolve_category(
