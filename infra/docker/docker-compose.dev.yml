@@ -1,0 +1,18 @@
+# Docker Compose override for LOCAL DEVELOPMENT
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+
+services:
+  backend:
+    build:
+      context: ../../backend
+    image: sakoo-backend:dev
+
+  frontend:
+    build:
+      context: ../../frontend
+    image: sakoo-frontend:dev
+
+  celery_worker:
+    build:
+      context: ../../backend
+    image: sakoo-backend:dev

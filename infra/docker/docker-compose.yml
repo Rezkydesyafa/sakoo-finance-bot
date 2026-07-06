@@ -1,7 +1,6 @@
 services:
   backend:
-    build:
-      context: ../../backend
+    image: ghcr.io/rezkydesyafa/sakoo-backend:latest
     command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
     restart: unless-stopped
     extra_hosts:
@@ -34,8 +33,7 @@ services:
       - "8000:8000"
 
   frontend:
-    build:
-      context: ../../frontend
+    image: ghcr.io/rezkydesyafa/sakoo-frontend:latest
     restart: unless-stopped
     environment:
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost/api}
@@ -77,8 +75,7 @@ services:
       retries: 10
 
   celery_worker:
-    build:
-      context: ../../backend
+    image: ghcr.io/rezkydesyafa/sakoo-backend:latest
     restart: unless-stopped
     command: celery -A app.workers.celery_app.celery_app worker --loglevel=info --concurrency=${CELERY_CONCURRENCY:-1}
     extra_hosts:
