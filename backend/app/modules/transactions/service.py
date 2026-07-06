@@ -40,6 +40,7 @@ from app.modules.parser.normalizer import normalize_text
 from app.modules.parser.service import ParsedMessage
 from app.modules.parser.transaction_text import (
     INTENT_ADD_TRANSACTION,
+    INTENT_CATEGORY_DETAIL,
     INTENT_CREATE_CATEGORY,
     INTENT_DELETE_LAST_TRANSACTION,
     INTENT_EXPORT_PDF,
@@ -51,10 +52,12 @@ from app.modules.parser.transaction_text import (
     INTENT_LIST_EXPENSE,
     INTENT_LIST_INCOME,
     INTENT_RECENT_TRANSACTIONS,
+    INTENT_SORTED_EXPENSE,
     INTENT_UNKNOWN,
 )
 from app.modules.transactions.repository import (
     calculate_balance,
+    detect_category_by_keywords,
     find_category,
     list_transactions,
     sum_category_expense,
@@ -286,10 +289,26 @@ def _save_transaction_from_parse_result(
             error_message="incomplete_pending_transaction",
         )
 
+    # Try keyword-based auto-categorization if category is fallback
+    category_name = parse_result.category
+    if (
+        parse_result.description
+        and category_name in {"Lainnya", None}
+    ):
+        keyword_cat = detect_category_by_keywords(
+            db,
+            user_id,
+            parse_result.description,
+            transaction_type=parse_result.type,
+        )
+        if keyword_cat is not None:
+            category_name = keyword_cat.name
+
     category = find_category(
         db=db,
-        category_name=parse_result.category,
+        category_name=category_name,
         transaction_type=parse_result.type,
+        user_id=user_id,
     )
     transaction = Transaction(
         user_id=user_id,
@@ -453,9 +472,10 @@ def _handle_category_create_reply(
                 db=db,
                 category_name=name,
                 transaction_type=transaction_type,
+                user_id=user_id,
             )
             if category is None or category.name.lower() != name.lower():
-                category = Category(name=name, type=transaction_type)
+                category = Category(name=name, type=transaction_type, user_id=user_id)
                 db.add(category)
             pending.status = CONFIRMED_CATEGORY_CREATE_STATUS
             db.commit()
@@ -488,6 +508,7 @@ def _handle_category_create_reply(
         db=db,
         category_name=name,
         transaction_type=transaction_type,
+        user_id=user_id,
     )
     if existing is not None and existing.name.lower() == name.lower():
         return TextTransactionResult(
@@ -1081,12 +1102,28 @@ def _format_command_response(
             user_id,
             transaction_type="expense",
             period=parse_result.period,
+            limit=parse_result.limit,
         )
     if parse_result.intent == INTENT_LIST_INCOME:
         return _format_transaction_list_response(
             db,
             user_id,
             transaction_type="income",
+            period=parse_result.period,
+            limit=parse_result.limit,
+        )
+    if parse_result.intent == INTENT_SORTED_EXPENSE:
+        return _format_sorted_expense_response(
+            db,
+            user_id,
+            period=parse_result.period,
+            sort_order=parse_result.sort_order or "desc",
+        )
+    if parse_result.intent == INTENT_CATEGORY_DETAIL:
+        return _format_category_detail_response(
+            db,
+            user_id,
+            category_name=parse_result.category_filter or "Lainnya",
             period=parse_result.period,
         )
     if parse_result.intent == INTENT_GET_REPORT:
@@ -1205,7 +1242,9 @@ def _format_transaction_list_response(
     *,
     transaction_type: str,
     period: str | None,
+    limit: int | None = None,
 ) -> str:
+    effective_limit = limit or 10
     start_date, end_date = _period_bounds(period)
     transactions = list_transactions(
         db,
@@ -1213,7 +1252,7 @@ def _format_transaction_list_response(
         transaction_type=transaction_type,
         start_date=start_date,
         end_date=end_date,
-        limit=5,
+        limit=effective_limit,
         newest_by_created=True,
     )
     label = "pengeluaran" if transaction_type == "expense" else "pemasukan"
@@ -1228,7 +1267,87 @@ def _format_transaction_list_response(
         f"{f' - {item.description}' if item.description else ''}"
         for index, item in enumerate(transactions, start=1)
     ]
-    return f"Aku cek, {name}. List {label} {_format_period(period)} kamu:\n\n" + "\n".join(lines)
+    total = sum(item.amount for item in transactions)
+    total_line = f"\n\nTotal: {format_rupiah(total)}"
+    return (
+        f"Aku cek, {name}. List {label} {_format_period(period)} kamu:\n\n"
+        + "\n".join(lines)
+        + total_line
+    )
+
+
+def _format_sorted_expense_response(
+    db: Session,
+    user_id: int,
+    *,
+    period: str | None,
+    sort_order: str = "desc",
+) -> str:
+    start_date, end_date = _period_bounds(period or "month")
+    transactions = list_transactions(
+        db,
+        user_id,
+        transaction_type="expense",
+        start_date=start_date,
+        end_date=end_date,
+        limit=10,
+        sort_by_amount=True,
+        sort_order=sort_order,
+    )
+    name = _user_first_name(db, user_id)
+    if not transactions:
+        return f"Belum ada pengeluaran {_format_period(period or 'month')}, {name}."
+
+    order_label = "terbesar ke terkecil" if sort_order == "desc" else "terkecil ke terbesar"
+    lines = [
+        f"{index}. {format_rupiah(item.amount)} - "
+        f"{item.category.name if item.category else 'Tanpa kategori'}"
+        f"{f' - {item.description}' if item.description else ''}"
+        f" ({item.transaction_date.isoformat()})"
+        for index, item in enumerate(transactions, start=1)
+    ]
+    total = sum(item.amount for item in transactions)
+    return (
+        f"Pengeluaran {_format_period(period or 'month')} ({order_label}), {name}:\n\n"
+        + "\n".join(lines)
+        + f"\n\nTotal: {format_rupiah(total)}"
+    )
+
+
+def _format_category_detail_response(
+    db: Session,
+    user_id: int,
+    *,
+    category_name: str,
+    period: str | None,
+) -> str:
+    start_date, end_date = _period_bounds(period or "month")
+    transactions = list_transactions(
+        db,
+        user_id,
+        transaction_type="expense",
+        start_date=start_date,
+        end_date=end_date,
+        limit=10,
+        newest_by_created=True,
+        category_name=category_name,
+    )
+    name = _user_first_name(db, user_id)
+    if not transactions:
+        return f"Belum ada transaksi {category_name} {_format_period(period or 'month')}, {name}."
+
+    lines = [
+        f"{index}. {item.transaction_date.isoformat()} - "
+        f"{format_rupiah(item.amount)}"
+        f"{f' - {item.description}' if item.description else ''}"
+        for index, item in enumerate(transactions, start=1)
+    ]
+    total = sum(item.amount for item in transactions)
+    return (
+        f"Rincian {category_name} {_format_period(period or 'month')}, {name}:\n\n"
+        + "\n".join(lines)
+        + f"\n\nTotal {category_name}: {format_rupiah(total)}"
+    )
 
 
 def _format_recent_transactions_response(db: Session, user_id: int) -> str:
