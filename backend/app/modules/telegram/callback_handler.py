@@ -436,8 +436,9 @@ def _handle_export_callback(
         parsed=parsed,
         telegram_client=telegram_client,
         text=(
-            f"Permintaan export PDF laporan {label} sudah masuk antrean. "
-            "Bot akan mengirim file PDF setelah selesai dibuat."
+            f"Siap, aku buatin export PDF laporan {label}. "
+            f"Permintaan export PDF laporan {label} sudah masuk antrean, "
+            "nanti aku kirim file PDF-nya setelah selesai."
         ),
         reply_markup=build_export_menu(),
         status="export_queued",

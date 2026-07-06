@@ -399,6 +399,7 @@ def test_waha_receipt_can_edit_category_date_merchant_and_note(
         ("edit tanggal kemarin", yesterday.isoformat()),
         ("edit merchant Indomaret", "Indomaret"),
         ("edit catatan parkir kantor", "parkir kantor"),
+        ("/edit beli kopi", "beli kopi"),
     ]:
         response = client.post("/webhook/waha", json=_waha_text_update(text))
         assert response.status_code == 200, response.text
@@ -416,7 +417,7 @@ def test_waha_receipt_can_edit_category_date_merchant_and_note(
         assert transaction.category is not None
         assert transaction.category.name == "Transportasi"
         assert transaction.transaction_date == yesterday
-        assert transaction.description == "parkir kantor"
+        assert transaction.description == "beli kopi"
         assert receipt is not None
         assert receipt.merchant_name == "Indomaret"
 

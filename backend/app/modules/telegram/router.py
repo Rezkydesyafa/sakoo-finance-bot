@@ -790,8 +790,9 @@ def _handle_export_command(
         status="export_queued",
         transaction_status="queued",
         reply_text=(
-            "Permintaan export PDF laporan bulan ini sudah masuk antrean. "
-            "Bot akan mengirim file PDF setelah selesai dibuat."
+            "Siap, aku buatin export PDF laporan bulan ini. "
+            "Permintaan export PDF laporan bulan ini sudah masuk antrean, "
+            "nanti aku kirim file PDF-nya setelah selesai."
         ),
         reply_markup=build_main_menu(),
         job_id=job.id,

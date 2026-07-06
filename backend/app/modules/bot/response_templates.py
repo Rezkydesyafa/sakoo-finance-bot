@@ -124,8 +124,8 @@ def format_confirmation_request(
 
 def format_unknown_response() -> str:
     return (
-        "🤷 Aku belum paham maksudnya.\n\n"
-        "Coba kirim seperti:\n"
+        "Aku belum nangkep maksudnya.\n\n"
+        "Kalau ini soal keuangan, coba tulis seperti:\n"
         "• beli kopi 18 ribu\n"
         "• saldo\n"
         "• laporan bulan ini\n"
