@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiClient, ApiError } from "@/lib/api";
-import type { CategoryResponse, CategoryCreateRequest } from "@/lib/api";
+import type { CategoryResponse } from "@/lib/api";
 import { getStoredAuthToken } from "@/lib/auth-storage";
 
 const ICON_MAP: Record<string, string> = {
@@ -53,6 +53,15 @@ function getCategoryColor(cat: CategoryResponse): string {
   return cat.color || COLOR_MAP[cat.name] || "#6F6F6F";
 }
 
+function formatRupiah(amount: number): string {
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
 export function BudgetsTab() {
   const [categories, setCategories] = useState<CategoryResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,6 +74,7 @@ export function BudgetsTab() {
   const [formType, setFormType] = useState<"expense" | "income" | "both">("expense");
   const [formColor, setFormColor] = useState(PALETTE_COLORS[0]);
   const [formKeywords, setFormKeywords] = useState("");
+  const [formBudgetLimit, setFormBudgetLimit] = useState("");
   const [formSaving, setFormSaving] = useState(false);
 
   useEffect(() => {
@@ -91,6 +101,7 @@ export function BudgetsTab() {
     setFormType("expense");
     setFormColor(PALETTE_COLORS[Math.floor(Math.random() * PALETTE_COLORS.length)]);
     setFormKeywords("");
+    setFormBudgetLimit("");
     setIsModalOpen(true);
   }
 
@@ -101,6 +112,7 @@ export function BudgetsTab() {
     setFormType(cat.type as "expense" | "income" | "both");
     setFormColor(getCategoryColor(cat));
     setFormKeywords((cat.keywords || []).join(", "));
+    setFormBudgetLimit(cat.budget_limit ? String(cat.budget_limit) : "");
     setIsModalOpen(true);
   }
 
@@ -109,6 +121,7 @@ export function BudgetsTab() {
     if (!token || !formName.trim()) return;
     setFormSaving(true);
     const keywords = formKeywords.split(",").map((k) => k.trim().toLowerCase()).filter(Boolean);
+    const budgetLimitNum = formBudgetLimit ? parseFloat(formBudgetLimit) : null;
 
     try {
       if (editingCategory) {
@@ -117,6 +130,7 @@ export function BudgetsTab() {
           type: formType,
           color: formColor,
           keywords: keywords.length > 0 ? keywords : null,
+          budget_limit: budgetLimitNum,
         });
       } else {
         await apiClient.categories.create(token, {
@@ -124,6 +138,7 @@ export function BudgetsTab() {
           type: formType,
           color: formColor,
           keywords: keywords.length > 0 ? keywords : null,
+          budget_limit: budgetLimitNum,
         });
       }
       setIsModalOpen(false);
@@ -151,23 +166,28 @@ export function BudgetsTab() {
     }
   }
 
-  const expenseCategories = categories.filter((c) => c.type === "expense" || c.type === "both");
-  const incomeCategories = categories.filter((c) => c.type === "income" || c.type === "both");
-  const customCategories = categories.filter((c) => !c.is_default);
+  // Calculate totals
+  const totalBudgeted = categories.reduce((sum, cat) => sum + (cat.budget_limit || 0), 0);
+  const totalSpent = categories.reduce((sum, cat) => sum + (cat.spent_this_month || 0), 0);
+  const totalRemaining = totalBudgeted - totalSpent;
+  const isHealthy = totalRemaining >= 0;
 
   return (
     <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* ======= DESKTOP ======= */}
-      <div className="hidden md:block max-w-container-max mx-auto">
-        {/* Header */}
+      <div className="max-w-[1200px] mx-auto">
+        {/* Header Section */}
         <div className="flex justify-between items-end mb-8">
           <div>
-            <h2 className="font-headline-hero text-headline-hero text-text-primary mb-2 dark:text-white">Manage Your Budgets</h2>
-            <p className="font-body-main text-body-main text-text-muted">Stay on track with your monthly spending limits.</p>
+            <h2 className="font-headline-hero text-[26px] md:text-[32px] font-bold text-[#191919] dark:text-white mb-2 tracking-[-0.02em]">
+              Manage Your Budgets
+            </h2>
+            <p className="font-body-main text-[14px] text-[#5f5e5e] dark:text-[#9A9A9A]">
+              Stay on track with your monthly spending limits.
+            </p>
           </div>
           <button
             onClick={openCreateModal}
-            className="bg-primary-container text-on-primary-container font-label-button text-label-button px-6 py-3 rounded-full hover:opacity-90 transition-all active:scale-95 flex items-center gap-2"
+            className="hidden md:flex bg-[#c7ff00] text-[#191919] font-bold text-[13px] px-6 py-3 rounded-full hover:bg-opacity-90 transition-all active:scale-95 items-center gap-2"
           >
             <span className="material-symbols-outlined text-[18px]">add</span>
             Set New Budget
@@ -176,265 +196,197 @@ export function BudgetsTab() {
 
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-          <div className="bg-white rounded-[24px] p-6 card-shadow flex flex-col justify-between hover:-translate-y-1 transition-transform duration-300">
+          <div className="bg-white dark:bg-[#1a1c1b] rounded-[24px] p-6 shadow-sm hover:-translate-y-1 hover:shadow-md transition-all duration-300">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-[#F1F2F0] flex items-center justify-center text-[#5f5e5e]">
-                <span className="material-symbols-outlined text-[20px]">category</span>
+              <div className="w-10 h-10 rounded-full bg-[#F1F2F0] dark:bg-[#2A2A2A] flex items-center justify-center text-[#5f5e5e] dark:text-[#c7ff00]">
+                <span className="material-symbols-outlined">account_balance_wallet</span>
               </div>
-              <span className="text-sm font-semibold text-[#6F6F6F]">Total Categories</span>
+              <span className="font-semibold text-[14px] text-[#5f5e5e] dark:text-[#9A9A9A]">Total Budgeted</span>
             </div>
-            <div className="text-2xl font-bold text-[#1a1c1b]">{loading ? "..." : categories.length}</div>
+            <div className="text-[32px] md:text-[42px] font-extrabold tracking-[-0.04em] text-[#191919] dark:text-white">
+              {loading ? "..." : formatRupiah(totalBudgeted)}
+            </div>
           </div>
 
-          <div className="bg-[#2A2A2A] rounded-[24px] p-6 card-shadow flex flex-col justify-between hover:-translate-y-1 transition-transform duration-300 relative overflow-hidden">
+          <div className="bg-[#191919] rounded-[28px] p-6 shadow-lg hover:-translate-y-1 hover:shadow-xl transition-all duration-300 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-[#c7ff00] opacity-10 rounded-full blur-2xl transform translate-x-1/2 -translate-y-1/2"></div>
-            <div className="flex items-center gap-3 mb-4 relative z-10">
-              <div className="w-10 h-10 rounded-full bg-[#1a1c1b] flex items-center justify-center text-white">
-                <span className="material-symbols-outlined text-[20px]">trending_down</span>
+            <div className="flex items-center justify-between mb-4 relative z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-[#2A2A2A] flex items-center justify-center text-white">
+                  <span className="material-symbols-outlined">savings</span>
+                </div>
+                <span className="font-semibold text-[14px] text-white opacity-80">Remaining</span>
               </div>
-              <span className="text-sm font-semibold text-white opacity-80">Expense Categories</span>
+              <div className={`text-[12px] font-bold px-3 py-1 rounded-full ${isHealthy ? 'bg-[#c7ff00] text-[#587300]' : 'bg-[#EF6B6B] text-white'}`}>
+                {isHealthy ? "Healthy" : "Overbudget"}
+              </div>
             </div>
-            <div className="text-2xl font-bold text-white relative z-10">{loading ? "..." : expenseCategories.length}</div>
+            <div className="text-[32px] md:text-[42px] font-extrabold tracking-[-0.04em] text-white relative z-10">
+              {loading ? "..." : formatRupiah(totalRemaining)}
+            </div>
           </div>
 
-          <div className="bg-white rounded-[24px] p-6 card-shadow flex flex-col justify-between hover:-translate-y-1 transition-transform duration-300">
+          <div className="bg-white dark:bg-[#1a1c1b] rounded-[24px] p-6 shadow-sm hover:-translate-y-1 hover:shadow-md transition-all duration-300">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-[#F1F2F0] flex items-center justify-center text-[#5f5e5e]">
-                <span className="material-symbols-outlined text-[20px]">trending_up</span>
+              <div className="w-10 h-10 rounded-full bg-[#F1F2F0] dark:bg-[#2A2A2A] flex items-center justify-center text-[#5f5e5e] dark:text-[#EF6B6B]">
+                <span className="material-symbols-outlined">payments</span>
               </div>
-              <span className="text-sm font-semibold text-[#6F6F6F]">Income Categories</span>
+              <span className="font-semibold text-[14px] text-[#5f5e5e] dark:text-[#9A9A9A]">Total Spent</span>
             </div>
-            <div className="text-2xl font-bold text-[#1a1c1b]">{loading ? "..." : incomeCategories.length}</div>
+            <div className="text-[32px] md:text-[42px] font-extrabold tracking-[-0.04em] text-[#191919] dark:text-white">
+              {loading ? "..." : formatRupiah(totalSpent)}
+            </div>
           </div>
         </div>
 
+        {/* Mobile action button */}
+        <div className="md:hidden mb-8">
+            <button
+              onClick={openCreateModal}
+              className="w-full bg-[#c7ff00] text-[#191919] font-bold text-[14px] px-6 py-4 rounded-full flex items-center justify-center gap-2 shadow-md active:scale-95 transition-transform"
+            >
+              <span className="material-symbols-outlined text-[20px]">add</span>
+              Set New Budget
+            </button>
+        </div>
+
         {/* Two Column Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-gutter">
-          {/* Category List (Col 1-2) */}
-          <div className="lg:col-span-2 space-y-stack-md">
-            <h3 className="font-headline-section text-headline-section text-text-primary dark:text-white mb-4">Categories</h3>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Budget List (Col 1-2) */}
+          <div className="lg:col-span-2 space-y-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-[20px] text-[#191919] dark:text-white">Categories</h3>
+            </div>
 
-            {/* Budget Allocation Table */}
-            <div className="bg-white rounded-[24px] card-shadow flex flex-col overflow-hidden">
-              <div className="px-6 py-5 bg-white border-b border-[#E8E8E8] flex items-center justify-between">
-                <h3 className="text-[15px] font-semibold text-[#1a1c1b]">Budget Allocation</h3>
-                {customCategories.length > 0 && (
-                  <span className="text-xs text-[#9E9E9E]">{customCategories.length} custom</span>
-                )}
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="w-8 h-8 border-2 border-[#c7ff00] border-t-transparent rounded-full animate-spin" />
               </div>
+            ) : categories.length === 0 ? (
+               <div className="bg-white dark:bg-[#1a1c1b] rounded-[24px] p-12 text-center text-[#9E9E9E] text-sm shadow-sm">
+                  Belum ada kategori. Klik &quot;Set New Budget&quot; untuk menambahkan.
+               </div>
+            ) : (
+              <div className="space-y-4">
+                {categories.map((cat) => {
+                  const limit = cat.budget_limit || 0;
+                  const spent = cat.spent_this_month || 0;
+                  
+                  let percent = limit > 0 ? Math.round((spent / limit) * 100) : 0;
+                  if (percent > 100) percent = 100;
 
-              {loading ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="w-7 h-7 border-2 border-[#c7ff00] border-t-transparent rounded-full animate-spin" />
-                </div>
-              ) : (
-                <div className="divide-y divide-[#E8E8E8]/50">
-                  {categories.map((cat) => (
+                  // Determine colors based on percent
+                  let progressColorText = "text-[#6F6F6F] dark:text-[#9A9A9A]";
+                  let progressBg = "bg-[#c7ff00]";
+                  
+                  if (percent >= 90) {
+                      progressColorText = "text-[#EF6B6B]";
+                      progressBg = "bg-[#EF6B6B]";
+                  } else if (percent >= 75) {
+                      progressColorText = "text-[#F6C85F]";
+                      progressBg = "bg-[#F6C85F]";
+                  }
+
+                  // If no budget limit is set
+                  const hasLimit = limit > 0;
+                  const displaySpent = formatRupiah(spent);
+                  const displayLimit = hasLimit ? `/ ${formatRupiah(limit)}` : "";
+                  const displayPercent = hasLimit ? `${percent}% Used` : "No limit set";
+
+                  return (
                     <div
                       key={cat.id}
-                      className="px-6 py-4 hover:bg-[#F1F2F0]/30 transition-colors group cursor-pointer"
                       onClick={() => !cat.is_default && openEditModal(cat)}
+                      className={`bg-white dark:bg-[#1a1c1b] rounded-[24px] p-6 shadow-sm transition-all duration-300 ${!cat.is_default ? 'hover:-translate-y-1 hover:shadow-md cursor-pointer group' : ''}`}
                     >
-                      <div className="flex justify-between items-center">
+                      <div className="flex justify-between items-center mb-4">
                         <div className="flex items-center gap-4">
                           <div
-                            className="w-12 h-12 rounded-full flex items-center justify-center transition-all group-hover:shadow-sm"
+                            className="w-12 h-12 rounded-full flex items-center justify-center transition-transform group-hover:scale-105"
                             style={{ backgroundColor: `${getCategoryColor(cat)}20`, color: getCategoryColor(cat) }}
                           >
                             <span className="material-symbols-outlined icon-fill">{getCategoryIcon(cat)}</span>
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="text-sm font-semibold text-[#1a1c1b] block">{cat.name}</span>
-                              {cat.is_default && (
-                                <span className="px-1.5 py-0.5 text-[9px] font-bold bg-[#F1F2F0] text-[#9E9E9E] rounded-full uppercase tracking-wider">Default</span>
-                              )}
-                              {!cat.is_default && (
-                                <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-full uppercase tracking-wider" style={{ backgroundColor: `${getCategoryColor(cat)}20`, color: getCategoryColor(cat) }}>Custom</span>
-                              )}
+                                <h4 className="font-semibold text-[15px] text-[#191919] dark:text-white">{cat.name}</h4>
+                                {cat.is_default && (
+                                    <span className="px-1.5 py-0.5 text-[9px] font-bold bg-[#F1F2F0] dark:bg-[#2A2A2A] text-[#9E9E9E] rounded-full uppercase tracking-wider">Default</span>
+                                )}
                             </div>
-                            <span className="text-xs text-[#6F6F6F] mt-0.5 block">{TYPE_LABELS[cat.type] || cat.type}</span>
+                            <p className="text-[12px] font-normal text-[#5f5e5e] dark:text-[#9A9A9A]">{TYPE_LABELS[cat.type]}</p>
                           </div>
                         </div>
-
-                        <div className="flex items-center gap-2">
-                          {/* Keywords preview */}
-                          {(cat.keywords || []).length > 0 && (
-                            <div className="hidden lg:flex gap-1 mr-2">
-                              {(cat.keywords || []).slice(0, 3).map((kw) => (
-                                <span key={kw} className="px-2 py-0.5 text-[10px] bg-[#F5F5F5] text-[#757575] rounded-full">{kw}</span>
-                              ))}
-                              {(cat.keywords || []).length > 3 && (
-                                <span className="text-[10px] text-[#9E9E9E]">+{(cat.keywords || []).length - 3}</span>
+                        <div className="text-right flex flex-col items-end">
+                          <div className="font-semibold text-[14px] text-[#191919] dark:text-white">
+                            {displaySpent} <span className="text-[#5f5e5e] font-normal text-[14px]">{displayLimit}</span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                              {!cat.is_default && (
+                                  <button
+                                      onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(cat.id); }}
+                                      className="opacity-0 group-hover:opacity-100 p-0.5 text-[#D5D8DC] hover:text-[#EF6B6B] transition-all"
+                                  >
+                                      <span className="material-symbols-outlined text-[16px]">delete</span>
+                                  </button>
                               )}
-                            </div>
-                          )}
-
-                          {/* Action buttons for custom categories */}
-                          {!cat.is_default && (
-                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button
-                                onClick={(e) => { e.stopPropagation(); openEditModal(cat); }}
-                                className="p-1.5 rounded-lg hover:bg-[#F5F5F5] text-[#9E9E9E] hover:text-[#1a1c1b] transition-all"
-                                title="Edit"
-                              >
-                                <span className="material-symbols-outlined text-[18px]">edit</span>
-                              </button>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(cat.id); }}
-                                className="p-1.5 rounded-lg hover:bg-red-50 text-[#9E9E9E] hover:text-red-500 transition-all"
-                                title="Hapus"
-                              >
-                                <span className="material-symbols-outlined text-[18px]">delete</span>
-                              </button>
-                            </div>
-                          )}
+                              <p className={`text-[12px] font-medium ${progressColorText}`}>
+                                {displayPercent}
+                              </p>
+                          </div>
                         </div>
                       </div>
+                      
+                      {/* Progress Bar */}
+                      {hasLimit && (
+                        <div className="w-full h-3 bg-[#F1F2F0] dark:bg-[#2A2A2A] rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full ${progressBg} transition-all duration-1000 ease-out`} style={{ width: `${percent}%` }}></div>
+                        </div>
+                      )}
+                      
                     </div>
-                  ))}
-
-                  {categories.length === 0 && (
-                    <div className="px-6 py-12 text-center text-[#9E9E9E] text-sm">
-                      Belum ada kategori. Klik &quot;Set New Budget&quot; untuk menambahkan.
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
-          {/* Right Column: Tips */}
-          <div className="space-y-stack-md">
-            <h3 className="font-headline-section text-headline-section text-text-primary dark:text-white mb-4 opacity-0 hidden lg:block">Insights</h3>
-
+          {/* Insights & Right Col */}
+          <div className="space-y-6">
+            <h3 className="font-bold text-[20px] text-[#191919] mb-4 opacity-0 hidden lg:block">Insights</h3>
+            
             {/* Insight Card */}
-            <div className="bg-surface-muted dark:bg-inverse-surface rounded-[24px] p-6">
+            <div className="bg-[#F1F2F0] dark:bg-[#2f3130] rounded-[24px] p-6 shadow-sm">
               <div className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-full bg-surface-white dark:bg-black flex flex-shrink-0 items-center justify-center text-primary-container shadow-sm">
+                <div className="w-10 h-10 rounded-full bg-white dark:bg-black flex flex-shrink-0 items-center justify-center text-[#587300] dark:text-[#c7ff00] shadow-sm">
                   <span className="material-symbols-outlined">lightbulb</span>
                 </div>
                 <div>
-                  <h4 className="font-title-card text-title-card text-text-primary dark:text-white mb-2">Budget Insights</h4>
-                  <p className="font-body-main text-body-main text-text-muted leading-relaxed">
-                    Buat kategori custom seperti &quot;Pendidikan&quot; atau &quot;Subscription&quot; lalu tambahkan <strong>keywords</strong> agar bot otomatis mendeteksi kategori dari pesan kamu.
+                  <h4 className="font-semibold text-[15px] text-[#191919] dark:text-white mb-2">Budget Insights</h4>
+                  <p className="text-[14px] text-[#5f5e5e] dark:text-[#c8c6c5] leading-relaxed">
+                    Set a <strong>Budget Limit</strong> untuk kategori custom agar kamu bisa memantau pengeluaran dan mencegah <i>overbudget</i> setiap bulannya.
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Quick Add Card */}
-            <div className="bg-surface-white dark:bg-inverse-surface rounded-[24px] p-6 card-shadow">
-              <h4 className="font-title-card text-title-card text-text-primary dark:text-white mb-4">Quick Add Category</h4>
-              <p className="font-body-main text-body-main text-text-muted mb-4">
-                Tambah kategori baru untuk tracking pengeluaran atau pemasukan secara lebih detail.
+             {/* Quick Add Card */}
+             <div className="bg-white dark:bg-[#1a1c1b] rounded-[24px] p-6 shadow-sm border border-[#E8E8E8] dark:border-transparent">
+              <h4 className="font-semibold text-[15px] text-[#191919] dark:text-white mb-4">Quick Action</h4>
+              <p className="text-[14px] text-[#5f5e5e] dark:text-[#c8c6c5] mb-4">
+                Tambah kategori baru dan atur limit untuk tracker otomatis.
               </p>
               <button
                 onClick={openCreateModal}
-                className="w-full py-3 bg-[#1a1c1b] text-white rounded-full font-label-button text-label-button hover:bg-black transition-colors flex items-center justify-center gap-2"
+                className="w-full py-3 bg-[#1a1c1b] dark:bg-white text-white dark:text-[#1a1c1b] rounded-full font-bold text-[13px] hover:bg-black transition-colors flex items-center justify-center gap-2"
               >
                 <span className="material-symbols-outlined text-[18px]">add</span>
                 New Category
               </button>
             </div>
+            
           </div>
         </div>
-      </div>
-
-      {/* ======= MOBILE ======= */}
-      <div className="md:hidden space-y-stack-lg relative w-full pt-4 pb-20">
-        <div className="ambient-glow"></div>
-
-        {/* Header */}
-        <section className="text-center space-y-stack-sm relative z-10">
-          <p className="font-label-muted text-label-muted text-text-muted">Total Categories</p>
-          <h2 className="font-headline-hero text-3xl font-bold text-text-primary dark:text-white tracking-tight">{loading ? "..." : categories.length}</h2>
-          <div className="flex justify-center pt-4">
-            <button
-              onClick={openCreateModal}
-              className="h-14 bg-primary-container rounded-full flex items-center justify-center text-text-primary shadow-lg hover:scale-105 active:scale-95 transition-transform px-8"
-            >
-              <span className="material-symbols-outlined text-[28px]">add</span>
-            </button>
-          </div>
-        </section>
-
-        {/* Quick Stats */}
-        <section className="grid grid-cols-2 gap-stack-md">
-          <div className="bg-surface-white dark:bg-inverse-surface rounded-[24px] p-4 card-shadow flex flex-col justify-between h-[100px]">
-            <div className="flex items-center gap-2 text-text-muted">
-              <div className="w-6 h-6 rounded-full bg-surface-muted dark:bg-[#2A2A2A] flex items-center justify-center">
-                <span className="material-symbols-outlined text-[14px]">trending_down</span>
-              </div>
-              <span className="font-label-muted text-label-muted">Expense</span>
-            </div>
-            <p className="font-title-card text-title-card text-text-primary dark:text-white">{expenseCategories.length} kategori</p>
-          </div>
-
-          <div className="bg-surface-white dark:bg-inverse-surface rounded-[24px] p-4 card-shadow flex flex-col justify-between h-[100px]">
-            <div className="flex items-center gap-2 text-text-muted">
-              <div className="w-6 h-6 rounded-full bg-surface-muted dark:bg-[#2A2A2A] flex items-center justify-center">
-                <span className="material-symbols-outlined text-[14px]">trending_up</span>
-              </div>
-              <span className="font-label-muted text-label-muted">Income</span>
-            </div>
-            <p className="font-title-card text-title-card text-text-primary dark:text-white">{incomeCategories.length} kategori</p>
-          </div>
-        </section>
-
-        {/* Category Cards */}
-        <section className="space-y-stack-md">
-          <div className="flex items-center justify-between pb-2">
-            <h3 className="font-headline-section text-headline-section text-text-primary dark:text-white">Categories</h3>
-          </div>
-
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="w-7 h-7 border-2 border-[#c7ff00] border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-4">
-              {categories.map((cat) => {
-                const color = getCategoryColor(cat);
-                return (
-                  <div
-                    key={cat.id}
-                    className="bg-surface-white dark:bg-inverse-surface rounded-[24px] p-4 card-shadow hover-lift flex flex-col justify-between"
-                    onClick={() => !cat.is_default && openEditModal(cat)}
-                  >
-                    <div className="flex flex-col gap-2 mb-4">
-                      <div
-                        className="w-10 h-10 rounded-full flex items-center justify-center"
-                        style={{ backgroundColor: `${color}20`, color }}
-                      >
-                        <span className="material-symbols-outlined icon-fill">{getCategoryIcon(cat)}</span>
-                      </div>
-                      <div>
-                        <h4 className="font-title-card text-title-card text-text-primary dark:text-white truncate">{cat.name}</h4>
-                        <p className="font-label-muted text-label-muted text-text-muted">{TYPE_LABELS[cat.type]}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      {cat.is_default ? (
-                        <span className="text-[10px] font-bold text-[#9E9E9E] bg-[#F1F2F0] px-2 py-0.5 rounded-full uppercase">Default</span>
-                      ) : (
-                        <span className="text-[10px] font-bold rounded-full uppercase px-2 py-0.5" style={{ backgroundColor: `${color}20`, color }}>Custom</span>
-                      )}
-                      {!cat.is_default && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(cat.id); }}
-                          className="p-1 rounded-lg text-[#D5D8DC] hover:text-red-400 transition-colors"
-                        >
-                          <span className="material-symbols-outlined text-[16px]">delete</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
       </div>
 
       {/* ======= CREATE/EDIT MODAL ======= */}
@@ -444,32 +396,32 @@ export function BudgetsTab() {
           style={{ margin: 0 }}
           onClick={(e) => { if (e.target === e.currentTarget) setIsModalOpen(false); }}
         >
-          <div className="bg-white rounded-[28px] p-6 sm:p-8 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200 relative">
+          <div className="bg-white dark:bg-[#1a1c1b] rounded-[28px] p-6 sm:p-8 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200 relative">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-[#1a1c1b]">
+              <h2 className="text-xl font-bold text-[#1a1c1b] dark:text-white">
                 {editingCategory ? "Edit Category" : "Set New Budget"}
               </h2>
-              <button onClick={() => setIsModalOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#F1F2F0] transition-colors border-none bg-transparent cursor-pointer">
-                <span className="material-symbols-outlined text-[#6F6F6F]">close</span>
+              <button onClick={() => setIsModalOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#F1F2F0] dark:hover:bg-[#2A2A2A] transition-colors border-none bg-transparent cursor-pointer">
+                <span className="material-symbols-outlined text-[#6F6F6F] dark:text-[#9A9A9A]">close</span>
               </button>
             </div>
 
             <div className="space-y-5">
               {/* Name */}
               <div>
-                <label className="block text-xs font-semibold text-[#6F6F6F] mb-1.5">Category Name</label>
+                <label className="block text-xs font-semibold text-[#6F6F6F] dark:text-[#9A9A9A] mb-1.5">Category Name</label>
                 <input
                   type="text"
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
                   placeholder="contoh: Pendidikan"
-                  className="w-full bg-[#F1F2F0] border-none rounded-xl py-3 px-4 text-sm font-medium text-[#1a1c1b] focus:ring-1 focus:ring-[#c7ff00] outline-none"
+                  className="w-full bg-[#F1F2F0] dark:bg-[#2A2A2A] dark:text-white border-none rounded-xl py-3 px-4 text-sm font-medium text-[#1a1c1b] focus:ring-1 focus:ring-[#c7ff00] outline-none"
                 />
               </div>
 
               {/* Type */}
               <div>
-                <label className="block text-xs font-semibold text-[#6F6F6F] mb-1.5">Type</label>
+                <label className="block text-xs font-semibold text-[#6F6F6F] dark:text-[#9A9A9A] mb-1.5">Type</label>
                 <div className="flex gap-2">
                   {(["expense", "income", "both"] as const).map((t) => (
                     <button
@@ -477,8 +429,8 @@ export function BudgetsTab() {
                       onClick={() => setFormType(t)}
                       className={`flex-1 px-3 py-2.5 rounded-xl text-sm font-medium transition-all border-none cursor-pointer ${
                         formType === t
-                          ? "bg-[#1a1c1b] text-white"
-                          : "bg-[#F1F2F0] text-[#6F6F6F] hover:bg-[#E8E8E8]"
+                          ? "bg-[#1a1c1b] dark:bg-white text-white dark:text-[#1a1c1b]"
+                          : "bg-[#F1F2F0] dark:bg-[#2A2A2A] text-[#6F6F6F] dark:text-[#9A9A9A] hover:bg-[#E8E8E8] dark:hover:bg-[#3f3f3f]"
                       }`}
                     >
                       {TYPE_LABELS[t]}
@@ -489,24 +441,42 @@ export function BudgetsTab() {
 
               {/* Color */}
               <div>
-                <label className="block text-xs font-semibold text-[#6F6F6F] mb-1.5">Color</label>
+                <label className="block text-xs font-semibold text-[#6F6F6F] dark:text-[#9A9A9A] mb-1.5">Color</label>
                 <div className="flex gap-2 flex-wrap">
                   {PALETTE_COLORS.map((c) => (
                     <button
                       key={c}
                       onClick={() => setFormColor(c)}
                       className={`w-8 h-8 rounded-full transition-all border-none cursor-pointer ${
-                        formColor === c ? "ring-2 ring-offset-2 ring-[#1a1c1b] scale-110" : "hover:scale-105"
+                        formColor === c ? "ring-2 ring-offset-2 ring-[#1a1c1b] dark:ring-white scale-110" : "hover:scale-105"
                       }`}
                       style={{ backgroundColor: c }}
                     />
                   ))}
                 </div>
               </div>
+              
+              {/* Budget Limit */}
+              <div>
+                <label className="block text-xs font-semibold text-[#6F6F6F] dark:text-[#9A9A9A] mb-1.5">
+                  Budget Limit <span className="font-normal text-[#BDBDBD]">(Opsional)</span>
+                </label>
+                <div className="relative">
+                    <span className="absolute left-4 top-3 text-[14px] font-semibold text-[#BDBDBD]">Rp</span>
+                    <input
+                    type="number"
+                    value={formBudgetLimit}
+                    onChange={(e) => setFormBudgetLimit(e.target.value)}
+                    placeholder="0"
+                    min="0"
+                    className="w-full bg-[#F1F2F0] dark:bg-[#2A2A2A] dark:text-white border-none rounded-xl py-3 pl-10 pr-4 text-sm font-medium text-[#1a1c1b] focus:ring-1 focus:ring-[#c7ff00] outline-none"
+                    />
+                </div>
+              </div>
 
               {/* Keywords */}
               <div>
-                <label className="block text-xs font-semibold text-[#6F6F6F] mb-1.5">
+                <label className="block text-xs font-semibold text-[#6F6F6F] dark:text-[#9A9A9A] mb-1.5">
                   Auto-detect Keywords <span className="font-normal text-[#BDBDBD]">(pisah dengan koma)</span>
                 </label>
                 <input
@@ -514,7 +484,7 @@ export function BudgetsTab() {
                   value={formKeywords}
                   onChange={(e) => setFormKeywords(e.target.value)}
                   placeholder="contoh: kuliah, tugas, kampus"
-                  className="w-full bg-[#F1F2F0] border-none rounded-xl py-3 px-4 text-sm font-medium text-[#1a1c1b] focus:ring-1 focus:ring-[#c7ff00] outline-none"
+                  className="w-full bg-[#F1F2F0] dark:bg-[#2A2A2A] dark:text-white border-none rounded-xl py-3 px-4 text-sm font-medium text-[#1a1c1b] focus:ring-1 focus:ring-[#c7ff00] outline-none"
                 />
                 <p className="text-[11px] text-[#BDBDBD] mt-1.5">
                   Bot akan otomatis mendeteksi kategori berdasarkan keyword ini
@@ -525,7 +495,7 @@ export function BudgetsTab() {
             <button
               onClick={handleSave}
               disabled={!formName.trim() || formSaving}
-              className="w-full mt-6 bg-[#1a1c1b] hover:bg-black text-white py-3.5 rounded-full text-sm font-bold transition-colors border-none cursor-pointer shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full mt-6 bg-[#1a1c1b] dark:bg-white hover:bg-black text-white dark:text-[#1a1c1b] py-3.5 rounded-full text-sm font-bold transition-colors border-none cursor-pointer shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {formSaving ? "Saving..." : editingCategory ? "Save Changes" : "Create Category"}
             </button>
@@ -536,18 +506,18 @@ export function BudgetsTab() {
       {/* ======= DELETE CONFIRM MODAL ======= */}
       {deleteConfirmId !== null && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200" style={{ margin: 0 }}>
-          <div className="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl animate-in zoom-in-95 duration-200 relative">
-            <div className="w-12 h-12 rounded-full flex items-center justify-center mb-4 mx-auto bg-red-100 text-red-600">
+          <div className="bg-white dark:bg-[#1a1c1b] rounded-3xl p-8 w-full max-w-sm shadow-2xl animate-in zoom-in-95 duration-200 relative">
+            <div className="w-12 h-12 rounded-full flex items-center justify-center mb-4 mx-auto bg-red-100 text-[#EF6B6B]">
               <span className="material-symbols-outlined text-2xl">delete</span>
             </div>
-            <h3 className="text-lg font-bold text-center text-[#1a1c1b] mb-2">Hapus Kategori?</h3>
-            <p className="text-sm text-center text-[#6F6F6F] mb-8">
+            <h3 className="text-lg font-bold text-center text-[#1a1c1b] dark:text-white mb-2">Hapus Kategori?</h3>
+            <p className="text-sm text-center text-[#6F6F6F] dark:text-[#9A9A9A] mb-8">
               Kategori &quot;{categories.find((c) => c.id === deleteConfirmId)?.name}&quot; akan dihapus. Transaksi yang sudah tercatat tidak akan berubah.
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setDeleteConfirmId(null)}
-                className="flex-1 py-3 rounded-full text-sm font-semibold bg-[#F1F2F0] text-[#1a1c1b] hover:bg-[#E8E8E8] transition-colors border-none cursor-pointer"
+                className="flex-1 py-3 rounded-full text-sm font-semibold bg-[#F1F2F0] dark:bg-[#2A2A2A] text-[#1a1c1b] dark:text-white hover:bg-[#E8E8E8] dark:hover:bg-[#3f3f3f] transition-colors border-none cursor-pointer"
               >
                 Batal
               </button>
@@ -556,7 +526,7 @@ export function BudgetsTab() {
                   const cat = categories.find((c) => c.id === deleteConfirmId);
                   if (cat) handleDelete(cat);
                 }}
-                className="flex-1 py-3 rounded-full text-sm font-semibold bg-red-500 text-white hover:bg-red-600 transition-colors border-none cursor-pointer"
+                className="flex-1 py-3 rounded-full text-sm font-semibold bg-[#EF6B6B] text-white hover:bg-red-600 transition-colors border-none cursor-pointer"
               >
                 Hapus
               </button>
