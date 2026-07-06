@@ -13,7 +13,6 @@ import { SettingsTab } from "@/components/tabs/settings-tab";
 const navigationItems = [
   { label: "Overview", icon: "dashboard", href: "/?tab=overview", id: "overview" },
   { label: "Transactions", icon: "receipt_long", href: "/?tab=transactions", id: "transactions" },
-  { label: "Categories", icon: "category", href: "/?tab=categories", id: "categories" },
   { label: "Chat AI", icon: "smart_toy", href: "/?tab=chat", id: "chat", isAi: true },
   { label: "Scan Receipt", icon: "document_scanner", href: "/?tab=receipt_scan", id: "receipt_scan" },
   { label: "Reports", icon: "bar_chart", href: "/?tab=reports", id: "reports" },
@@ -24,7 +23,7 @@ const mobileNavigationItems = [
   { label: "Overview", icon: "dashboard", href: "/?tab=overview", id: "overview" },
   { label: "Transactions", icon: "receipt_long", href: "/?tab=transactions", id: "transactions" },
   { label: "Chat AI", icon: "smart_toy", href: "/?tab=chat", id: "chat", isAi: true },
-  { label: "Categories", icon: "category", href: "/?tab=categories", id: "categories" },
+  { label: "Budgets", icon: "account_balance_wallet", href: "/?tab=budgets", id: "budgets" },
   { label: "Reports", icon: "bar_chart", href: "/?tab=reports", id: "reports" },
 ];
 
