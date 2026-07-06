@@ -58,6 +58,12 @@ jobs:
           #!/bin/bash
           set -e
 
+          # ===== HEARTBEAT =====
+          # Kirim output setiap 10 detik agar Cloudflare tunnel tidak kill websocket
+          (while true; do echo "  💓 heartbeat $(date +%H:%M:%S)"; sleep 10; done) &
+          HEARTBEAT_PID=$!
+          trap "kill $HEARTBEAT_PID 2>/dev/null" EXIT
+
           cd ~/sakoo_bot/sakoo-finance-bot
 
           echo "📥 Pulling latest code..."
@@ -67,17 +73,8 @@ jobs:
           echo "🔨 Building and restarting containers..."
           cd infra/docker
 
-          # Pull images terlebih dahulu
-          docker compose --env-file ../../.env pull 2>&1 | tail -5
-
-          # Build dengan progress output agar koneksi tidak idle
-          docker compose --env-file ../../.env build --progress=plain 2>&1 | \
-            while IFS= read -r line; do
-              echo "$line"
-            done
-
-          # Start containers
-          docker compose --env-file ../../.env up -d --remove-orphans 2>&1
+          docker compose --env-file ../../.env pull
+          docker compose --env-file ../../.env up -d --build --remove-orphans
           docker compose --env-file ../../.env restart nginx
 
           echo "🧹 Cleaning up old images..."
@@ -96,6 +93,7 @@ jobs:
             if curl -sf "$health_url" > /dev/null 2>&1; then
               echo "  ✅ Health check passed!"
               echo "✅ Deployment successful!"
+              kill $HEARTBEAT_PID 2>/dev/null
               exit 0
             fi
             sleep 10
@@ -105,6 +103,7 @@ jobs:
           docker compose --env-file ../../.env ps
           docker compose --env-file ../../.env logs --tail=30 backend || true
           docker compose --env-file ../../.env logs --tail=30 nginx || true
+          kill $HEARTBEAT_PID 2>/dev/null
           exit 1
           SCRIPT
 
@@ -112,12 +111,13 @@ jobs:
 
       - name: Upload deploy script
         run: |
-          scp -o ServerAliveInterval=15 -o ServerAliveCountMax=20 \
+          scp -o ServerAliveInterval=10 -o ServerAliveCountMax=30 \
             /tmp/deploy.sh sakoo-server:/tmp/deploy.sh
 
       - name: Deploy via SSH
         run: |
-          ssh -o ServerAliveInterval=15 \
-              -o ServerAliveCountMax=20 \
+          ssh -o ServerAliveInterval=10 \
+              -o ServerAliveCountMax=30 \
               -o TCPKeepAlive=yes \
               -T sakoo-server "bash /tmp/deploy.sh"
+
