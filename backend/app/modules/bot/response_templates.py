@@ -19,7 +19,7 @@ class CategoryLike(Protocol):
 def format_help_response() -> str:
     return (
         "👋 Halo, aku *Sakoo*!\n"
-        "Aku bisa bantu catat dan cek keuangan kamu lewat chat.\n\n"
+        "Asisten keuangan pribadimu lewat chat 💰\n\n"
         "✏️ *Catat transaksi:*\n"
         "• beli makan 20 ribu\n"
         "• bayar bensin 30rb\n"
@@ -31,11 +31,16 @@ def format_help_response() -> str:
         "• list pemasukan\n"
         "• laporan bulan ini\n"
         "• export laporan bulan ini\n\n"
+        "💡 *Tanya keuangan:*\n"
+        "• tips menabung\n"
+        "• cara mengatur keuangan\n"
+        "• bulan ini aku boros gak?\n\n"
         "⚡ *Command:*\n"
         "• /saldo\n"
         "• /laporan\n"
         "• /export\n"
-        "• /help"
+        "• /help\n\n"
+        "Yuk mulai catat keuanganmu! 🚀"
     )
 
 
@@ -124,24 +129,24 @@ def format_confirmation_request(
 
 def format_unknown_response() -> str:
     return (
-        "Aku belum nangkep maksudnya.\n\n"
-        "Kalau ini soal keuangan, coba tulis seperti:\n"
-        "• beli kopi 18 ribu\n"
-        "• saldo\n"
-        "• laporan bulan ini\n"
-        "• bulan ini aku boros gak?\n"
-        "• /help"
+        "Hmm, aku belum paham maksudnya 🤔\n\n"
+        "Coba tanya seputar keuangan, misalnya:\n"
+        "• 💡 tips menabung\n"
+        "• 📊 laporan bulan ini\n"
+        "• 💰 saldo\n"
+        "• ✍️ beli kopi 18rb\n\n"
+        "Ketik /help untuk lihat semua fitur! 😊"
     )
 
 
 def format_llm_error_response() -> str:
     """Shown when LLM provider fails (API error, timeout, etc.)."""
     return (
-        "⚠️ Maaf, aku sedang tidak bisa menjawab.\n"
-        "Coba lagi dalam beberapa saat.\n\n"
-        "Atau coba kirim perintah langsung:\n"
-        "• saldo\n"
-        "• laporan bulan ini\n"
+        "😅 Ups, aku lagi ada gangguan nih.\n"
+        "Coba lagi dalam beberapa saat ya!\n\n"
+        "Sementara itu, kamu bisa pakai:\n"
+        "• 💰 saldo\n"
+        "• 📊 laporan bulan ini\n"
         "• /help"
     )
 

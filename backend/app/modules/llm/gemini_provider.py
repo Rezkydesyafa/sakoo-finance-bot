@@ -39,7 +39,7 @@ class GeminiProvider(BaseLlmProvider):
                     "parts": [{"text": user_prompt}]
                 }
             ],
-            "generationConfig": {"temperature": 0.4, "maxOutputTokens": 300},
+            "generationConfig": {"temperature": 0.4, "maxOutputTokens": 500},
         }
         try:
             response = httpx.post(

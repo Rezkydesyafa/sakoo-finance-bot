@@ -41,6 +41,7 @@ from app.modules.parser.transaction_text import (
     INTENT_ADD_TRANSACTION,
     INTENT_DELETE_LAST_TRANSACTION,
     INTENT_EXPORT_PDF,
+    INTENT_FINANCE_CHAT,
     INTENT_GET_BALANCE,
     INTENT_GET_REPORT,
     INTENT_HELP,
@@ -211,7 +212,7 @@ def handle_text_transaction(
             transaction_type=forced_transaction_type,
         )
     if parse_result.intent != INTENT_ADD_TRANSACTION:
-        if parse_result.intent == INTENT_UNKNOWN:
+        if parse_result.intent in {INTENT_UNKNOWN, INTENT_FINANCE_CHAT}:
             llm_chat = _handle_llm_finance_chat(
                 db=db,
                 user_id=user_id,
@@ -920,6 +921,11 @@ def _format_command_response(
         )
     if parse_result.intent == INTENT_UNKNOWN:
         return format_unknown_response()
+    if parse_result.intent == INTENT_FINANCE_CHAT:
+        return (
+            "😅 Maaf, aku belum bisa jawab pertanyaan itu sekarang.\n\n"
+            "Coba lagi nanti, atau tanya hal lain seputar keuanganmu! 💬"
+        )
     return "Perintah terdeteksi."
 
 

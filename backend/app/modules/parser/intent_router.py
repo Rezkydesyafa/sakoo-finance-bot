@@ -13,6 +13,7 @@ from app.modules.parser.schemas import (
     INTENT_ADD_TRANSACTION,
     INTENT_DELETE_LAST_TRANSACTION,
     INTENT_EXPORT_PDF,
+    INTENT_FINANCE_CHAT,
     INTENT_GET_BALANCE,
     INTENT_GET_REPORT,
     INTENT_HELP,
@@ -62,6 +63,21 @@ DELETE_LAST_PHRASES = (
     "batalkan transaksi terakhir",
 )
 LINK_ACCOUNT_PHRASES = ("hubungkan", "link akun", "sambungkan")
+FINANCE_EDUCATION_RE = re.compile(
+    r"\b(?:"
+    r"tips?\s+(?:menabung|hemat|keuangan|investasi|nabung|budgeting|finansial)"
+    r"|strategi\s+(?:menabung|keuangan|nabung|finansial|investasi|saving)"
+    r"|cara\s+(?:mengatur|mengelola|manage|atur)\s+(?:uang|keuangan|finansial|gaji)"
+    r"|cara\s+(?:menabung|nabung|hemat|saving|investasi)"
+    r"|(?:penting|manfaat|keuntungan|fungsi|tujuan).*(?:keuangan|menabung|nabung|budgeting|investasi|finansial)"
+    r"|(?:keuangan|menabung|nabung|budgeting|investasi|finansial).*(?:penting|manfaat|keuntungan|fungsi|tujuan)"
+    r"|apa\s+(?:itu|yang dimaksud)\s+(?:budgeting|investasi|tabungan|reksadana|saham|obligasi|deposito|inflasi|finansial)"
+    r"|jelaskan.*(?:keuangan|menabung|nabung|budgeting|investasi|finansial|tabungan|uang)"
+    r"|saran\s+(?:keuangan|finansial|investasi|menabung|nabung)"
+    r"|(?:tolong|bantu|coba).*(?:strategi|tips?|saran|rencana).*(?:menabung|nabung|keuangan|hemat|investasi)"
+    r")\b",
+    re.IGNORECASE,
+)
 
 COMMAND_INTENTS = {
     "/start": INTENT_HELP,
@@ -109,6 +125,9 @@ def detect_intent(text: str) -> IntentMatch:
 
     if _has_transaction_language(normalized):
         return IntentMatch(intent=INTENT_ADD_TRANSACTION, confidence=0.75)
+
+    if FINANCE_EDUCATION_RE.search(normalized):
+        return IntentMatch(intent=INTENT_FINANCE_CHAT, confidence=0.90)
 
     return IntentMatch(intent=INTENT_UNKNOWN, confidence=0.25)
 
