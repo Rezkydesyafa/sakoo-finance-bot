@@ -106,7 +106,14 @@ export function OverviewTab({
               <span className="material-symbols-outlined text-3xl text-[#6F6F6F]">account_balance_wallet</span>
               <span className="text-[13px] font-semibold text-[#191919]">Add Income</span>
             </button>
-            <button onClick={() => window.dispatchEvent(new Event("open_mobile_scan"))} className="bg-white card-shadow rounded-[20px] p-4 flex flex-col items-center justify-center gap-2 hover-lift border-none cursor-pointer">
+            {/* Desktop Scan Receipt Button */}
+            <Link href="/?tab=receipt_scan" className="hidden md:flex bg-white card-shadow rounded-[20px] p-4 flex-col items-center justify-center gap-2 hover-lift border-none cursor-pointer no-underline">
+              <span className="material-symbols-outlined text-3xl text-[#6F6F6F]">document_scanner</span>
+              <span className="text-[13px] font-semibold text-[#191919]">Scan Receipt</span>
+            </Link>
+            
+            {/* Mobile Scan Receipt Button */}
+            <button onClick={() => window.dispatchEvent(new Event("open_mobile_scan"))} className="md:hidden bg-white card-shadow rounded-[20px] p-4 flex flex-col items-center justify-center gap-2 hover-lift border-none cursor-pointer">
               <span className="material-symbols-outlined text-3xl text-[#6F6F6F]">document_scanner</span>
               <span className="text-[13px] font-semibold text-[#191919]">Scan Receipt</span>
             </button>

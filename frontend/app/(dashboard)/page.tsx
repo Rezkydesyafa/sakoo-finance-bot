@@ -248,8 +248,15 @@ export default function Home() {
 
 
 
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  async function handleDownloadPDF() {
+  
+  function handleDownloadPDF() {
+    setIsExportModalOpen(true);
+  }
+
+  async function executeDownloadPDF() {
+    setIsExportModalOpen(false);
     const token = getStoredAuthToken();
     if (!token) {
       alert("Silakan login terlebih dahulu.");
@@ -275,6 +282,7 @@ export default function Home() {
       setIsExporting(false);
     }
   }
+
 
 
 
@@ -526,6 +534,34 @@ export default function Home() {
                 Ya, Hapus
               </button>
               <button onClick={() => setDeleteTxId(null)} className="w-full py-3 bg-white border border-[#E8E8E8] text-[#1a1c1b] rounded-full text-sm font-bold hover:bg-[#F1F2F0] transition-colors cursor-pointer">
+                Batal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isExportModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200" style={{ margin: 0 }} onClick={() => setIsExportModalOpen(false)}>
+          <div className="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl animate-in zoom-in-95 duration-200 relative" onClick={(e) => e.stopPropagation()}>
+            <div className="w-12 h-12 rounded-full flex items-center justify-center mb-4 mx-auto bg-[#F1F2F0] text-[#1a1c1b]">
+              <span className="material-symbols-outlined text-2xl">
+                picture_as_pdf
+              </span>
+            </div>
+            
+            <h3 className="text-lg font-bold text-center text-[#1a1c1b] mb-2">
+              Ekspor ke PDF?
+            </h3>
+            <p className="text-sm text-center text-[#6F6F6F] mb-8">
+              Apakah Anda yakin ingin mengekspor data laporan ini ke format PDF?
+            </p>
+            
+            <div className="flex flex-col gap-3">
+              <button onClick={executeDownloadPDF} className="w-full py-3 rounded-full text-sm font-bold border-none cursor-pointer transition-colors bg-[#c7ff00] hover:bg-[#bff500] text-[#151f00]">
+                Ya, Ekspor
+              </button>
+              <button onClick={() => setIsExportModalOpen(false)} className="w-full py-3 bg-white border border-[#E8E8E8] text-[#1a1c1b] rounded-full text-sm font-bold hover:bg-[#F1F2F0] transition-colors cursor-pointer">
                 Batal
               </button>
             </div>
