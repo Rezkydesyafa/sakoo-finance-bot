@@ -15,7 +15,7 @@ os.environ["LLM_PROVIDER"] = "none"
 
 from app.config import get_settings
 from app.database import Base
-from app.models import BotLog, Category, MediaFile, Receipt, Transaction, User, UserPreference
+from app.models import BotLog, Category, CategoryBudget, MediaFile, Receipt, Transaction, User, UserPreference
 from app.modules.transactions.service import handle_text_transaction
 
 
@@ -407,7 +407,7 @@ def test_common_finance_questions_use_local_insights_before_llm(
     assert spending.status == "spending_check"
     assert "Pengeluaran bulan ini" in spending.reply_text
     assert advice.status == "saving_advice"
-    assert "Saran cepat" in advice.reply_text
+    assert "Batas aman harian" in advice.reply_text
     assert reason.status == "cashflow_reason"
     assert "Saldo cepat habis" in reason.reply_text
     assert health.status == "finance_health"
@@ -614,6 +614,212 @@ def test_expense_list_uses_current_user_id(
     assert "kopi user b" not in result.reply_text
 
 
+def test_expense_list_all_and_total_period_context(
+    session_factory: sessionmaker[Session],
+) -> None:
+    with session_factory() as db:
+        user = _create_user(db)
+        food = db.scalar(select(Category).where(Category.name == "Makanan"))
+        for index in range(11):
+            db.add(
+                Transaction(
+                    user_id=user.id,
+                    type="expense",
+                    amount=Decimal("1000.00"),
+                    category_id=food.id if food else None,
+                    description=f"item {index + 1}",
+                    transaction_date=date.today(),
+                    source="telegram_text",
+                    status="confirmed",
+                )
+            )
+        db.commit()
+
+        result = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="tampilkan semua pengeluaran bulan ini",
+            source="telegram_text",
+        )
+
+    assert result.status == "list_expense"
+    assert "item 11" in result.reply_text
+    assert "Total ditampilkan" in result.reply_text
+    assert "Total bulan ini" in result.reply_text
+
+
+def test_today_and_week_list_requests_are_lists_not_summary(
+    session_factory: sessionmaker[Session],
+) -> None:
+    with session_factory() as db:
+        user = _create_user(db)
+        food = db.scalar(select(Category).where(Category.name == "Makanan"))
+        week_start = date.today() - timedelta(days=date.today().weekday())
+        db.add_all(
+            [
+                Transaction(
+                    user_id=user.id,
+                    type="expense",
+                    amount=Decimal("14000.00"),
+                    category_id=food.id if food else None,
+                    description="beras hari ini",
+                    transaction_date=date.today(),
+                    source="telegram_text",
+                    status="confirmed",
+                ),
+                Transaction(
+                    user_id=user.id,
+                    type="expense",
+                    amount=Decimal("18000.00"),
+                    category_id=food.id if food else None,
+                    description="minggu ini",
+                    transaction_date=week_start,
+                    source="telegram_text",
+                    status="confirmed",
+                ),
+                Transaction(
+                    user_id=user.id,
+                    type="expense",
+                    amount=Decimal("50000.00"),
+                    category_id=food.id if food else None,
+                    description="minggu lalu",
+                    transaction_date=week_start - timedelta(days=1),
+                    source="telegram_text",
+                    status="confirmed",
+                ),
+            ]
+        )
+        db.commit()
+
+        today_result = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="list pengeluaran hari ini apa saja",
+            source="telegram_text",
+        )
+        week_result = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="coba list pengeluaran saya minggu ini",
+            source="telegram_text",
+        )
+
+    assert today_result.status == "list_expense"
+    assert "beras hari ini" in today_result.reply_text
+    assert "minggu lalu" not in today_result.reply_text
+    assert week_result.status == "list_expense"
+    assert "minggu ini" in week_result.reply_text
+    assert "minggu lalu" not in week_result.reply_text
+
+
+def test_oldest_sort_and_visibility_check_are_factual(
+    session_factory: sessionmaker[Session],
+) -> None:
+    with session_factory() as db:
+        user = _create_user(db)
+        food = db.scalar(select(Category).where(Category.name == "Makanan"))
+        old_date = date.today().replace(day=1)
+        db.add_all(
+            [
+                Transaction(
+                    user_id=user.id,
+                    type="expense",
+                    amount=Decimal("10000.00"),
+                    category_id=food.id if food else None,
+                    description="lama",
+                    transaction_date=old_date,
+                    source="telegram_text",
+                    status="confirmed",
+                ),
+                Transaction(
+                    user_id=user.id,
+                    type="expense",
+                    amount=Decimal("14000.00"),
+                    category_id=food.id if food else None,
+                    description="beras",
+                    transaction_date=date.today(),
+                    source="telegram_text",
+                    status="confirmed",
+                ),
+            ]
+        )
+        db.commit()
+        beras = db.scalar(select(Transaction).where(Transaction.description == "beras"))
+
+        sorted_result = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="urutkan dari yang terlama dan tampilkan semua listnya",
+            source="telegram_text",
+        )
+        visibility = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="kenapa transaksi beras tadi tidak masuk list? tampilkan semua listnya",
+            source="telegram_text",
+        )
+
+    assert sorted_result.status == "sorted_expense"
+    assert sorted_result.reply_text.find("lama") < sorted_result.reply_text.find("beras")
+    assert visibility.status == "transaction_visibility_check"
+    assert beras is not None
+    assert f"#{beras.id}" in visibility.reply_text
+    assert "mungkin" not in visibility.reply_text.lower()
+
+
+def test_saving_advice_and_limited_cash_are_actionable(
+    session_factory: sessionmaker[Session],
+) -> None:
+    with session_factory() as db:
+        user = _create_user(db)
+        food = db.scalar(select(Category).where(Category.name == "Makanan"))
+        income = db.scalar(select(Category).where(Category.name == "Gaji"))
+        db.add_all(
+            [
+                Transaction(
+                    user_id=user.id,
+                    type="income",
+                    amount=Decimal("1000000.00"),
+                    category_id=income.id if income else None,
+                    description="gaji",
+                    transaction_date=date.today(),
+                    source="telegram_text",
+                    status="confirmed",
+                ),
+                Transaction(
+                    user_id=user.id,
+                    type="expense",
+                    amount=Decimal("250000.00"),
+                    category_id=food.id if food else None,
+                    description="makan",
+                    transaction_date=date.today(),
+                    source="telegram_text",
+                    status="confirmed",
+                ),
+            ]
+        )
+        db.commit()
+
+        advice = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="kasih saran biar ga boros",
+            source="telegram_text",
+        )
+        limited = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="aku cuma punya 100rb sampai minggu depan, gimana?",
+            source="telegram_text",
+        )
+
+    assert advice.status == "saving_advice"
+    assert "Batas aman harian" in advice.reply_text
+    assert "Kurangi dulu" in advice.reply_text
+    assert limited.status == "limited_cash_plan"
+    assert "per hari" in limited.reply_text
+
+
 def test_success_reply_only_after_database_commit(
     session_factory: sessionmaker[Session],
     monkeypatch: pytest.MonkeyPatch,
@@ -664,6 +870,116 @@ def test_create_category_requires_confirmation_and_saves(
     assert requested.status == "category_create_needs_confirmation"
     assert confirmed.status == "category_created"
     assert category is not None
+
+
+def test_pending_category_create_can_be_replaced(
+    session_factory: sessionmaker[Session],
+) -> None:
+    with session_factory() as db:
+        user = _create_user(db)
+        first = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="buatkan kategori tugas kuliah",
+            source="whatsapp_text",
+        )
+        second = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="bikin kategori nongkrong",
+            source="whatsapp_text",
+        )
+        confirmed = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="YA",
+            source="whatsapp_text",
+        )
+        category_names = set(db.scalars(select(Category.name).where(Category.user_id == user.id)))
+
+    assert first.status == "category_create_needs_confirmation"
+    assert second.status == "category_create_needs_confirmation"
+    assert confirmed.status == "category_created"
+    assert "Nongkrong" in category_names
+    assert "Tugas Kuliah" not in category_names
+
+
+def test_pending_category_create_does_not_block_budget_question(
+    session_factory: sessionmaker[Session],
+) -> None:
+    with session_factory() as db:
+        user = _create_user(db)
+        handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="buatkan kategori tugas kuliah",
+            source="whatsapp_text",
+        )
+
+        result = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="budget makan tinggal berapa?",
+            source="whatsapp_text",
+        )
+
+    assert result.status == "budget_remaining"
+    assert "Masih menunggu" not in result.reply_text
+
+
+def test_bot_can_set_check_and_list_budget(
+    session_factory: sessionmaker[Session],
+) -> None:
+    with session_factory() as db:
+        user = _create_user(db)
+        food = db.scalar(select(Category).where(Category.name == "Makanan"))
+        assert food is not None
+
+        saved = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="set budget makan 600rb",
+            source="whatsapp_text",
+        )
+        budget = db.scalar(select(CategoryBudget).where(CategoryBudget.user_id == user.id))
+        assert saved.status == "budget_saved"
+        assert budget is not None
+        assert budget.monthly_limit == Decimal("600000.00")
+
+        db.add(
+            Transaction(
+                user_id=user.id,
+                type="expense",
+                amount=Decimal("420000.00"),
+                category_id=food.id,
+                description="makan bulan ini",
+                transaction_date=date.today(),
+                source="whatsapp_text",
+                status="confirmed",
+            )
+        )
+        db.commit()
+
+        remaining = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="budget makan tinggal berapa?",
+            source="whatsapp_text",
+        )
+        listed = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="list budget",
+            source="whatsapp_text",
+        )
+
+    assert remaining.status == "budget_remaining"
+    assert "Budget Makanan: Rp600.000" in remaining.reply_text
+    assert "Terpakai Rp420.000" in remaining.reply_text
+    assert "Sisa Rp180.000" in remaining.reply_text
+    assert listed.status == "budget_list"
+    assert "Makanan" in listed.reply_text
+    assert "Sisa total: Rp180.000" in listed.reply_text
 
 
 def test_reset_expense_requires_confirmation(

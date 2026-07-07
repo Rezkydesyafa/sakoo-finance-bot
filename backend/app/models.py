@@ -86,6 +86,10 @@ class User(TimestampMixin, Base):
         cascade="all, delete-orphan",
         uselist=False,
     )
+    category_budgets: Mapped[list["CategoryBudget"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
     categories: Mapped[list["Category"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
@@ -194,6 +198,7 @@ class Category(TimestampMixin, Base):
 
     user: Mapped["User | None"] = relationship(back_populates="categories")
     transactions: Mapped[list["Transaction"]] = relationship(back_populates="category")
+    budgets: Mapped[list["CategoryBudget"]] = relationship(back_populates="category")
 
     __table_args__ = (
         CheckConstraint(
@@ -202,6 +207,29 @@ class Category(TimestampMixin, Base):
         ),
         UniqueConstraint("user_id", "name", "type", name="uq_categories_user_name_type"),
         Index("ix_categories_user_id", "user_id"),
+    )
+
+
+class CategoryBudget(TimestampMixin, Base):
+    __tablename__ = "category_budgets"
+
+    id: Mapped[int] = mapped_column(BigIntPk, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    category_id: Mapped[int] = mapped_column(
+        ForeignKey("categories.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    monthly_limit: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+
+    user: Mapped["User"] = relationship(back_populates="category_budgets")
+    category: Mapped["Category"] = relationship(back_populates="budgets")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "category_id", name="uq_category_budgets_user_category"),
+        Index("ix_category_budgets_user_id", "user_id"),
     )
 
 
@@ -475,7 +503,7 @@ class BotLog(Base):
     message_type: Mapped[str] = mapped_column(String(40), nullable=False)
     raw_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     parsed_result: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
-    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    status: Mapped[str] = mapped_column(String(64), nullable=False)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

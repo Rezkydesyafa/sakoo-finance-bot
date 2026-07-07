@@ -290,6 +290,59 @@ def test_waha_receipt_double_confirmation_does_not_duplicate_transaction(
         assert len(transactions) == 1
 
 
+def test_waha_receipt_yes_does_not_steal_category_confirmation(
+    test_client: tuple[
+        TestClient,
+        sessionmaker[Session],
+        FakeWahaClient,
+        FakeOcrClient,
+        list[dict[str, Any]],
+    ],
+) -> None:
+    client, session_factory, fake_waha, _fake_ocr, _queued_jobs = test_client
+    _create_linked_whatsapp_user(session_factory)
+
+    with session_factory() as db:
+        user = db.scalar(select(User))
+        category = db.scalar(select(Category).where(Category.name == "Lainnya"))
+        assert user is not None
+        db.add(
+            Transaction(
+                user_id=user.id,
+                type="expense",
+                amount=Decimal("50000.00"),
+                category_id=category.id if category else None,
+                description="Struk lama",
+                transaction_date=date.today(),
+                source="receipt_ocr",
+                status="confirmed",
+            )
+        )
+        db.add(
+            BotLog(
+                user_id=user.id,
+                platform="whatsapp",
+                message_type="category_create",
+                raw_message="bikin kategori nongkrong",
+                parsed_result={"kind": "category_create", "name": "Nongkrong", "type": "expense"},
+                status="pending_category_create",
+            )
+        )
+        db.commit()
+
+    response = client.post("/webhook/waha", json=_waha_text_update("YA"))
+
+    assert response.status_code == 200, response.text
+    assert response.json()["transaction_status"] == "category_created"
+    assert "kategori Nongkrong sudah tersimpan" in fake_waha.sent_messages[-1]["text"]
+
+    with session_factory() as db:
+        created = db.scalar(
+            select(Category).where(Category.name == "Nongkrong", Category.type == "expense")
+        )
+        assert created is not None
+
+
 def test_waha_receipt_duplicate_ocr_result_is_not_saved_twice(
     test_client: tuple[
         TestClient,

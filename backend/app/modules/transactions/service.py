@@ -10,6 +10,12 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.models import BotLog, Category, Receipt, Transaction, User, UserPreference
+from app.modules.budgets.service import (
+    find_visible_expense_category_by_name,
+    get_budget_for_category,
+    get_budget_overview,
+    upsert_category_budget,
+)
 from app.modules.bot.conversation_state import (
     CANCELLED_TRANSACTION_STATUS,
     CONFIRMED_TRANSACTION_STATUS,
@@ -34,7 +40,7 @@ from app.modules.bot.response_templates import (
     format_unknown_response,
 )
 from app.modules.bot.service import handle_bot_text_message
-from app.modules.parser.amount_parser import parse_amount
+from app.modules.parser.amount_parser import extract_amount, parse_amount
 from app.modules.parser.date_parser import parse_transaction_date
 from app.modules.parser.normalizer import normalize_text
 from app.modules.parser.service import ParsedMessage
@@ -84,13 +90,30 @@ BOT_PROFILE_RE = re.compile(
     re.IGNORECASE,
 )
 SPENDING_CHECK_RE = re.compile(r"\b(?:boros|hemat|pengeluaran.*hari ini|hari ini.*keluar)\b", re.IGNORECASE)
+LIST_ITEM_REQUEST_RE = re.compile(
+    r"\b(?:list|daftar|tampilkan|lihat|liat|kasih\s+lihat|kasih\s+liat|buatkan)\b"
+    r".*\b(?P<type>pengeluaran|pemasukan)\b"
+    r"|\b(?P<type2>pengeluaran|pemasukan)\b.*\b(?:apa\s+saja|apa\s+aja|list|daftar)\b",
+    re.IGNORECASE,
+)
+DATE_SORT_REQUEST_RE = re.compile(
+    r"\b(?:urutkan|sortir|sort|susun)\b.*\b(?P<order>terlama|terbaru|terkini)\b",
+    re.IGNORECASE,
+)
 PURCHASE_LIST_RE = re.compile(
     r"\b(?:bulan ini|minggu ini|hari ini)\b.*\b(?:beli|belanja|jajan)\b.*\b(?:apa aja|apa saja)\b|"
     r"\b(?:apa aja|apa saja)\b.*\b(?:dibeli|aku beli|saya beli|belanja)\b",
     re.IGNORECASE,
 )
 TOP_EXPENSE_RE = re.compile(r"\b(?:pengeluaran terbesar|paling gede|terbesar apa|top pengeluaran)\b", re.IGNORECASE)
-SAVING_ADVICE_RE = re.compile(r"\b(?:saran hemat|tips hemat|cara hemat|hemat minggu ini)\b", re.IGNORECASE)
+SAVING_ADVICE_RE = re.compile(
+    r"\b(?:saran hemat|tips hemat|cara hemat|hemat minggu ini|saran.*boros|biar.*(?:ga|gak|nggak|tidak)\s+boros)\b",
+    re.IGNORECASE,
+)
+LIMITED_CASH_RE = re.compile(
+    r"\b(?:cuma|tinggal|sisa|punya)\b.*\b(?:sampai|sampe)\b.*\b(?:minggu depan|akhir minggu|minggu ini)\b",
+    re.IGNORECASE,
+)
 CASHFLOW_REASON_RE = re.compile(r"\b(?:kenapa.*(?:saldo|uang).*(?:habis|cepat habis)|saldo.*cepat habis)\b", re.IGNORECASE)
 WEEK_COMPARE_RE = re.compile(r"\b(?:bandingkan|dibanding|compare).*(?:minggu ini|minggu lalu)|\bminggu ini.*minggu lalu\b", re.IGNORECASE)
 CUTBACK_RE = re.compile(r"\b(?:apa yang harus dikurangi|kurangi apa|yang perlu dikurangi|pengeluaran.*dikurangi)\b", re.IGNORECASE)
@@ -99,6 +122,20 @@ INCOME_SOURCE_RE = re.compile(
     re.IGNORECASE,
 )
 SEARCH_TRANSACTION_RE = re.compile(r"^\s*(?:cari|search|temukan)\s+(?P<keyword>.+?)\s*$", re.IGNORECASE)
+BUDGET_SET_RE = re.compile(
+    r"\b(?:set|atur|pasang|buat(?:kan)?)\s+budget\s+(?P<body>.+)$",
+    re.IGNORECASE,
+)
+BUDGET_LIST_RE = re.compile(r"\b(?:list|daftar|cek|lihat)?\s*budget(?:\s+bulan ini)?\s*$", re.IGNORECASE)
+BUDGET_REMAINING_RE = re.compile(
+    r"\bbudget\s+(?P<category>.+?)\s+(?:tinggal|sisa|tersisa|remaining|berapa)\b",
+    re.IGNORECASE,
+)
+VISIBILITY_CHECK_RE = re.compile(
+    r"\b(?:tidak|ga|gak|nggak|belum)\s+masuk\b.*\b(?:dashboard|list|daftar)\b"
+    r"|\b(?:dashboard|list|daftar)\b.*\b(?:tidak|ga|gak|nggak|belum)\s+masuk\b",
+    re.IGNORECASE,
+)
 FINANCE_HEALTH_RE = re.compile(
     r"\b(?:aman|sehat|gimana|bagaimana|kondisi)\b.*\b(?:keuangan|bulan ini|saldo|cashflow)\b|"
     r"\b(?:keuangan|bulan ini|saldo|cashflow)\b.*\b(?:aman|sehat|gimana|bagaimana|kondisi)\b",
@@ -132,6 +169,7 @@ CATEGORY_CREATE_MESSAGE_TYPE = "category_create"
 PENDING_CATEGORY_CREATE_STATUS = "pending_category_create"
 CONFIRMED_CATEGORY_CREATE_STATUS = "confirmed_category_create"
 CANCELLED_CATEGORY_CREATE_STATUS = "cancelled_category_create"
+EXPIRED_CATEGORY_CREATE_STATUS = "expired_category_create"
 TRANSACTION_STATUS_CONFIRMED = "confirmed"
 
 
@@ -453,6 +491,26 @@ def _handle_category_create_reply(
         payload = pending.parsed_result or {}
         name = str(payload.get("name") or "").strip()
         transaction_type = str(payload.get("type") or "expense")
+        replacement = _parse_category_create_request(text)
+        if replacement is not None:
+            name, transaction_type = replacement
+            pending.raw_message = text
+            pending.parsed_result = {
+                "kind": "category_create",
+                "name": name,
+                "type": transaction_type,
+            }
+            db.commit()
+            label = "pengeluaran" if transaction_type == "expense" else "pemasukan"
+            return TextTransactionResult(
+                status="category_create_needs_confirmation",
+                reply_text=f"Aku akan buat kategori {label}: {name}. Balas YA untuk simpan atau batal.",
+                parse_result=_synthetic_parse_result(
+                    text=text,
+                    source=source,
+                    intent=INTENT_CREATE_CATEGORY,
+                ),
+            )
 
         if CANCEL_RE.match(normalized):
             pending.status = CANCELLED_CATEGORY_CREATE_STATUS
@@ -489,15 +547,7 @@ def _handle_category_create_reply(
                 ),
             )
 
-        return TextTransactionResult(
-            status="category_create_confirmation_pending",
-            reply_text=f"Masih menunggu konfirmasi buat kategori {name}. Balas YA atau batal.",
-            parse_result=_synthetic_parse_result(
-                text=text,
-                source=source,
-                intent=INTENT_CREATE_CATEGORY,
-            ),
-        )
+        return None
 
     request = _parse_category_create_request(text)
     if request is None:
@@ -549,7 +599,7 @@ def _handle_category_create_reply(
 
 
 def _get_pending_category_create(db: Session, *, user_id: int) -> BotLog | None:
-    return db.scalar(
+    pending = db.scalar(
         select(BotLog)
         .where(
             BotLog.user_id == user_id,
@@ -558,6 +608,14 @@ def _get_pending_category_create(db: Session, *, user_id: int) -> BotLog | None:
         )
         .order_by(BotLog.created_at.desc(), BotLog.id.desc())
     )
+    if pending is None:
+        return None
+    created_at = pending.created_at if pending.created_at.tzinfo else pending.created_at.replace(tzinfo=timezone.utc)
+    if datetime.now(timezone.utc) - created_at > PENDING_TRANSACTION_TTL:
+        pending.status = EXPIRED_CATEGORY_CREATE_STATUS
+        db.flush()
+        return None
+    return pending
 
 
 def _parse_category_create_request(text: str) -> tuple[str, str] | None:
@@ -845,6 +903,61 @@ def _handle_lightweight_message(
                 intent="bot_profile",
             ),
         )
+    budget_result = _handle_budget_message(
+        db=db,
+        user_id=user_id,
+        text=normalized,
+        source=source,
+    )
+    if budget_result is not None:
+        return budget_result
+    if VISIBILITY_CHECK_RE.search(normalized):
+        return TextTransactionResult(
+            status="transaction_visibility_check",
+            reply_text=_format_visibility_check_response(db, user_id, normalized),
+            parse_result=_synthetic_parse_result(
+                text=text,
+                source=source,
+                intent="transaction_visibility_check",
+            ),
+        )
+    date_sort_match = DATE_SORT_REQUEST_RE.search(normalized)
+    if date_sort_match and ("pengeluaran" in normalized or "list" in normalized):
+        order = date_sort_match.group("order").lower()
+        return TextTransactionResult(
+            status="sorted_expense",
+            reply_text=_format_sorted_expense_response(
+                db,
+                user_id,
+                period=_detect_period_from_text(normalized) or "month",
+                sort_order="date_asc" if order == "terlama" else "date_desc",
+                limit=50 if _wants_all_items(normalized) else None,
+            ),
+            parse_result=_synthetic_parse_result(
+                text=text,
+                source=source,
+                intent=INTENT_SORTED_EXPENSE,
+            ),
+        )
+    list_match = LIST_ITEM_REQUEST_RE.search(normalized)
+    if list_match:
+        txn_word = (list_match.group("type") or list_match.group("type2")).lower()
+        transaction_type = "income" if txn_word == "pemasukan" else "expense"
+        return TextTransactionResult(
+            status=INTENT_LIST_INCOME if transaction_type == "income" else INTENT_LIST_EXPENSE,
+            reply_text=_format_transaction_list_response(
+                db,
+                user_id,
+                transaction_type=transaction_type,
+                period=_detect_period_from_text(normalized),
+                limit=50 if _wants_all_items(normalized) else None,
+            ),
+            parse_result=_synthetic_parse_result(
+                text=text,
+                source=source,
+                intent=INTENT_LIST_INCOME if transaction_type == "income" else INTENT_LIST_EXPENSE,
+            ),
+        )
     if PURCHASE_LIST_RE.search(normalized):
         return TextTransactionResult(
             status="purchase_list",
@@ -873,6 +986,16 @@ def _handle_lightweight_message(
                 text=text,
                 source=source,
                 intent="saving_advice",
+            ),
+        )
+    if LIMITED_CASH_RE.search(normalized) and parse_amount(normalized) is not None:
+        return TextTransactionResult(
+            status="limited_cash_plan",
+            reply_text=_format_limited_cash_plan_response(normalized),
+            parse_result=_synthetic_parse_result(
+                text=text,
+                source=source,
+                intent="limited_cash_plan",
             ),
         )
     if CASHFLOW_REASON_RE.search(normalized):
@@ -1118,6 +1241,7 @@ def _format_command_response(
             user_id,
             period=parse_result.period,
             sort_order=parse_result.sort_order or "desc",
+            limit=parse_result.limit,
         )
     if parse_result.intent == INTENT_CATEGORY_DETAIL:
         return _format_category_detail_response(
@@ -1244,7 +1368,7 @@ def _format_transaction_list_response(
     period: str | None,
     limit: int | None = None,
 ) -> str:
-    effective_limit = limit or 10
+    effective_limit = min(max(limit or 10, 1), 50)
     start_date, end_date = _period_bounds(period)
     transactions = list_transactions(
         db,
@@ -1267,8 +1391,31 @@ def _format_transaction_list_response(
         f"{f' - {item.description}' if item.description else ''}"
         for index, item in enumerate(transactions, start=1)
     ]
-    total = sum(item.amount for item in transactions)
-    total_line = f"\n\nTotal: {format_rupiah(total)}"
+    displayed_total = sum(item.amount for item in transactions)
+    period_total = sum_transactions(
+        db,
+        user_id,
+        transaction_type=transaction_type,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    total_count = _count_transactions(
+        db,
+        user_id=user_id,
+        transaction_type=transaction_type,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    shown_line = (
+        f"\nMenampilkan {len(transactions)} dari {total_count} transaksi."
+        if total_count > len(transactions)
+        else ""
+    )
+    total_line = (
+        f"\n\nTotal ditampilkan: {format_rupiah(displayed_total)}\n"
+        f"Total {_period_total_label(period)}: {format_rupiah(period_total)}"
+        f"{shown_line}"
+    )
     return (
         f"Aku cek, {name}. List {label} {_format_period(period)} kamu:\n\n"
         + "\n".join(lines)
@@ -1282,23 +1429,50 @@ def _format_sorted_expense_response(
     *,
     period: str | None,
     sort_order: str = "desc",
+    limit: int | None = None,
 ) -> str:
     start_date, end_date = _period_bounds(period or "month")
-    transactions = list_transactions(
-        db,
-        user_id,
-        transaction_type="expense",
-        start_date=start_date,
-        end_date=end_date,
-        limit=10,
-        sort_by_amount=True,
-        sort_order=sort_order,
-    )
+    effective_limit = min(max(limit or 10, 1), 50)
+    if sort_order in {"date_asc", "date_desc"}:
+        order_by = (
+            (Transaction.transaction_date.asc(), Transaction.id.asc())
+            if sort_order == "date_asc"
+            else (Transaction.transaction_date.desc(), Transaction.id.desc())
+        )
+        transactions = list(
+            db.scalars(
+                select(Transaction)
+                .where(
+                    Transaction.user_id == user_id,
+                    Transaction.type == "expense",
+                    Transaction.status == TRANSACTION_STATUS_CONFIRMED,
+                    Transaction.transaction_date >= start_date,
+                    Transaction.transaction_date <= end_date,
+                )
+                .order_by(*order_by)
+                .limit(effective_limit)
+            )
+        )
+    else:
+        transactions = list_transactions(
+            db,
+            user_id,
+            transaction_type="expense",
+            start_date=start_date,
+            end_date=end_date,
+            limit=effective_limit,
+            sort_by_amount=True,
+            sort_order=sort_order,
+        )
     name = _user_first_name(db, user_id)
     if not transactions:
         return f"Belum ada pengeluaran {_format_period(period or 'month')}, {name}."
 
-    order_label = "terbesar ke terkecil" if sort_order == "desc" else "terkecil ke terbesar"
+    order_label = {
+        "asc": "terkecil ke terbesar",
+        "date_asc": "terlama ke terbaru",
+        "date_desc": "terbaru ke terlama",
+    }.get(sort_order, "terbesar ke terkecil")
     lines = [
         f"{index}. {format_rupiah(item.amount)} - "
         f"{item.category.name if item.category else 'Tanpa kategori'}"
@@ -1306,11 +1480,19 @@ def _format_sorted_expense_response(
         f" ({item.transaction_date.isoformat()})"
         for index, item in enumerate(transactions, start=1)
     ]
-    total = sum(item.amount for item in transactions)
+    displayed_total = sum(item.amount for item in transactions)
+    period_total = sum_transactions(
+        db,
+        user_id,
+        transaction_type="expense",
+        start_date=start_date,
+        end_date=end_date,
+    )
     return (
         f"Pengeluaran {_format_period(period or 'month')} ({order_label}), {name}:\n\n"
         + "\n".join(lines)
-        + f"\n\nTotal: {format_rupiah(total)}"
+        + f"\n\nTotal ditampilkan: {format_rupiah(displayed_total)}\n"
+        + f"Total {_period_total_label(period or 'month')}: {format_rupiah(period_total)}"
     )
 
 
@@ -1523,15 +1705,34 @@ def _format_top_expense_response(db: Session, user_id: int) -> str:
 
 def _format_saving_advice_response(db: Session, user_id: int) -> str:
     today = date.today()
-    week_start = today - timedelta(days=today.weekday())
-    top_category = top_expense_category(db, user_id, start_date=week_start, end_date=today)
-    if not top_category:
-        return "Belum ada pengeluaran minggu ini. Mulai catat transaksi dulu biar sarannya akurat."
+    month_start = today.replace(day=1)
+    top_categories = _top_expense_categories(db, user_id, start_date=month_start, end_date=today)
+    month_income = sum_transactions(
+        db,
+        user_id,
+        transaction_type="income",
+        start_date=month_start,
+        end_date=today,
+    )
+    month_expense = sum_transactions(
+        db,
+        user_id,
+        transaction_type="expense",
+        start_date=month_start,
+        end_date=today,
+    )
+    if not top_categories:
+        return "Belum ada pengeluaran bulan ini. Mulai catat transaksi dulu biar sarannya akurat."
 
-    category_name, total = top_category
+    remaining_days = max((today.replace(day=28) + timedelta(days=4)).replace(day=1) - today, timedelta(days=1)).days
+    daily_limit = max((month_income - month_expense) / Decimal(remaining_days), Decimal("0"))
+    category_name, total = top_categories[0]
+    cutbacks = ", ".join(name for name, _total in top_categories[:2])
     return (
-        f"Minggu ini paling besar di {category_name}: {format_rupiah(total)}.\n"
-        "Saran cepat: tahan transaksi kecil yang berulang di kategori itu dulu."
+        f"Fokus hemat bulan ini:\n"
+        f"1. Rem {category_name}: sudah {format_rupiah(total)}.\n"
+        f"2. Batas aman harian sampai akhir bulan: {format_rupiah(daily_limit)}.\n"
+        f"3. Kurangi dulu: {cutbacks}."
     )
 
 
@@ -1699,6 +1900,249 @@ def _format_cashflow_reason_response(db: Session, user_id: int) -> str:
     )
 
 
+def _format_visibility_check_response(db: Session, user_id: int, text: str) -> str:
+    limit = 50 if _wants_all_items(text) else 10
+    transactions = list_transactions(db, user_id, limit=limit, newest_by_created=True)
+    if not transactions:
+        return "Aku cek database akun ini: belum ada transaksi confirmed yang bisa ditampilkan."
+
+    lines = [
+        f"{index}. #{item.id} {item.transaction_date.isoformat()} - "
+        f"{'Pemasukan' if item.type == 'income' else 'Pengeluaran'} "
+        f"{format_rupiah(item.amount)} - "
+        f"{item.category.name if item.category else 'Tanpa kategori'}"
+        f"{f' - {item.description}' if item.description else ''}"
+        for index, item in enumerate(transactions, start=1)
+    ]
+    return (
+        "Aku cek dari database akun ini. Transaksi confirmed terbaru:\n\n"
+        + "\n".join(lines)
+        + "\n\nKalau belum tampil di dashboard, cek akun login, filter tanggal/tipe, lalu refresh."
+    )
+
+
+def _handle_budget_message(
+    *,
+    db: Session,
+    user_id: int,
+    text: str,
+    source: str,
+) -> TextTransactionResult | None:
+    set_match = BUDGET_SET_RE.search(text)
+    if set_match:
+        return _handle_set_budget_message(
+            db=db,
+            user_id=user_id,
+            text=text,
+            source=source,
+            body=set_match.group("body"),
+        )
+
+    remaining_match = BUDGET_REMAINING_RE.search(text)
+    if remaining_match:
+        return _handle_budget_remaining_message(
+            db=db,
+            user_id=user_id,
+            text=text,
+            source=source,
+            category_text=remaining_match.group("category"),
+        )
+
+    if BUDGET_LIST_RE.fullmatch(text):
+        return TextTransactionResult(
+            status="budget_list",
+            reply_text=_format_budget_list_response(db, user_id),
+            parse_result=_synthetic_parse_result(
+                text=text,
+                source=source,
+                intent="budget_list",
+            ),
+        )
+    return None
+
+
+def _handle_set_budget_message(
+    *,
+    db: Session,
+    user_id: int,
+    text: str,
+    source: str,
+    body: str,
+) -> TextTransactionResult:
+    amount_match = extract_amount(body)
+    if amount_match is None:
+        return TextTransactionResult(
+            status="budget_invalid",
+            reply_text="Nominal budget belum terbaca. Contoh: set budget makan 600rb.",
+            parse_result=_synthetic_parse_result(text=text, source=source, intent="budget_invalid"),
+        )
+
+    category_name = re.sub(r"\s+", " ", body[:amount_match.start] + body[amount_match.end:]).strip(" -,.")
+    category = _find_budget_category(db, user_id=user_id, category_text=category_name)
+    if category is None:
+        return TextTransactionResult(
+            status="budget_category_not_found",
+            reply_text=f"Kategori '{category_name or '-'}' belum ketemu. Contoh: set budget makan 600rb.",
+            parse_result=_synthetic_parse_result(text=text, source=source, intent="budget_category_not_found"),
+        )
+
+    budget = upsert_category_budget(
+        db,
+        user_id=user_id,
+        category=category,
+        monthly_limit=amount_match.value,
+    )
+    db.commit()
+    db.refresh(budget)
+    budget_state = get_budget_for_category(db, user_id, category)
+    item = budget_state[2] if budget_state else None
+    remaining = item.remaining if item else amount_match.value
+    return TextTransactionResult(
+        status="budget_saved",
+        reply_text=(
+            f"Budget {category.name}: {format_rupiah(amount_match.value)}.\n"
+            f"Terpakai {format_rupiah(item.spent if item else Decimal('0'))}. "
+            f"Sisa {format_rupiah(remaining)}."
+        ),
+        parse_result=_synthetic_parse_result(text=text, source=source, intent="budget_saved"),
+    )
+
+
+def _handle_budget_remaining_message(
+    *,
+    db: Session,
+    user_id: int,
+    text: str,
+    source: str,
+    category_text: str,
+) -> TextTransactionResult:
+    category = _find_budget_category(db, user_id=user_id, category_text=category_text)
+    if category is None:
+        reply = f"Kategori '{category_text.strip()}' belum ketemu. Coba: budget makan tinggal berapa?"
+    else:
+        budget_state = get_budget_for_category(db, user_id, category)
+        if budget_state is None:
+            reply = f"Budget {category.name} belum diset. Contoh: set budget {category.name.lower()} 600rb."
+        else:
+            _period_start, _period_end, item = budget_state
+            reply = (
+                f"Budget {item.category_name}: {format_rupiah(item.monthly_limit)}.\n"
+                f"Terpakai {format_rupiah(item.spent)}. "
+                f"Sisa {format_rupiah(item.remaining)}."
+            )
+    return TextTransactionResult(
+        status="budget_remaining",
+        reply_text=reply,
+        parse_result=_synthetic_parse_result(text=text, source=source, intent="budget_remaining"),
+    )
+
+
+def _format_budget_list_response(db: Session, user_id: int) -> str:
+    overview = get_budget_overview(db, user_id)
+    if not overview.items:
+        return "Belum ada budget. Contoh: set budget makan 600rb."
+
+    lines = [
+        f"{index}. {item.category_name}: {format_rupiah(item.monthly_limit)} - "
+        f"terpakai {format_rupiah(item.spent)} - sisa {format_rupiah(item.remaining)}"
+        for index, item in enumerate(overview.items, start=1)
+    ]
+    return (
+        "Budget bulan ini:\n\n"
+        + "\n".join(lines)
+        + f"\n\nTotal budget: {format_rupiah(overview.total_budgeted)}\n"
+        + f"Sisa total: {format_rupiah(overview.total_remaining)}"
+    )
+
+
+def _find_budget_category(db: Session, *, user_id: int, category_text: str) -> Category | None:
+    alias = _category_name_from_alias(category_text.strip(" -,."))
+    return find_visible_expense_category_by_name(db, user_id=user_id, name=alias)
+
+
+def _format_limited_cash_plan_response(text: str) -> str:
+    amount = parse_amount(text) or Decimal("0")
+    days = 7 if "minggu depan" in text else max(1, 7 - date.today().weekday())
+    daily_limit = amount / Decimal(days)
+    return (
+        f"Dengan {format_rupiah(amount)} sampai {days} hari ke depan, batas aman sekitar "
+        f"{format_rupiah(daily_limit)} per hari.\n"
+        "Prioritas: makan, transport, dan tagihan wajib dulu.\n"
+        "Tahan dulu: jajan, belanja, top up, dan nongkrong sampai ada pemasukan lagi."
+    )
+
+
+def _count_transactions(
+    db: Session,
+    *,
+    user_id: int,
+    transaction_type: str,
+    start_date: date | None,
+    end_date: date | None,
+) -> int:
+    query = select(func.count(Transaction.id)).where(
+        Transaction.user_id == user_id,
+        Transaction.type == transaction_type,
+        Transaction.status == TRANSACTION_STATUS_CONFIRMED,
+    )
+    if start_date is not None:
+        query = query.where(Transaction.transaction_date >= start_date)
+    if end_date is not None:
+        query = query.where(Transaction.transaction_date <= end_date)
+    return int(db.scalar(query) or 0)
+
+
+def _top_expense_categories(
+    db: Session,
+    user_id: int,
+    *,
+    start_date: date,
+    end_date: date,
+    limit: int = 2,
+) -> list[tuple[str, Decimal]]:
+    rows = db.execute(
+        select(Category.name, func.coalesce(func.sum(Transaction.amount), 0))
+        .join(Category, Transaction.category_id == Category.id, isouter=True)
+        .where(
+            Transaction.user_id == user_id,
+            Transaction.type == "expense",
+            Transaction.status == TRANSACTION_STATUS_CONFIRMED,
+            Transaction.transaction_date >= start_date,
+            Transaction.transaction_date <= end_date,
+        )
+        .group_by(Category.name)
+        .order_by(func.coalesce(func.sum(Transaction.amount), 0).desc())
+        .limit(limit)
+    )
+    return [(name or "Tanpa kategori", Decimal(str(total or 0))) for name, total in rows]
+
+
+def _detect_period_from_text(text: str) -> str | None:
+    if "hari ini" in text:
+        return "day"
+    if "kemarin" in text:
+        return "yesterday"
+    if "minggu ini" in text:
+        return "week"
+    if "bulan ini" in text:
+        return "month"
+    return None
+
+
+def _wants_all_items(text: str) -> bool:
+    return bool(re.search(r"\b(?:semua|seluruh|full)\b", text))
+
+
+def _period_total_label(period: str | None) -> str:
+    labels = {
+        "day": "hari ini",
+        "week": "minggu ini",
+        "month": "bulan ini",
+        "yesterday": "kemarin",
+    }
+    return labels.get(period or "", "semua transaksi")
+
+
 def _detect_reply_style_preference(text: str) -> str | None:
     match = REPLY_STYLE_PREFERENCE_RE.search(text)
     if not match:
@@ -1844,7 +2288,8 @@ def _period_bounds(period: str | None) -> tuple[date | None, date | None]:
         yesterday = today - timedelta(days=1)
         return yesterday, yesterday
     if period == "week":
-        return today - timedelta(days=today.weekday()), today
+        start = today - timedelta(days=today.weekday())
+        return start, start + timedelta(days=6)
     if period == "month":
         return today.replace(day=1), today
     return None, None
@@ -1882,10 +2327,14 @@ def _category_name_from_alias(alias: str) -> str:
     normalized = alias.lower()
     if normalized in {"makan", "makanan", "kopi"}:
         return "Makanan"
-    if normalized in {"transport", "bensin"}:
+    if normalized in {"transport", "transportasi", "bensin"}:
         return "Transportasi"
     if normalized in {"kos", "tagihan"}:
         return "Tagihan"
+    if normalized in {"kuliah", "kampus", "pendidikan"}:
+        return "Pendidikan"
+    if normalized in {"nongkrong", "hiburan"}:
+        return "Hiburan"
     return normalized.title()
 
 

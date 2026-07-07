@@ -1,10 +1,10 @@
-from datetime import date
+from datetime import date, datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Receipt, Transaction
-from app.modules.bot.conversation_state import get_pending_transaction
+from app.models import BotLog, Receipt, Transaction
+from app.modules.bot.conversation_state import PENDING_TRANSACTION_TTL, get_pending_transaction
 from app.modules.jobs.service import (
     JobQueueError,
     ReceiptOcrEnqueue,
@@ -28,6 +28,9 @@ from app.modules.ocr.receipt_chat import (
 from app.modules.transactions.repository import find_category
 from app.modules.waha.client import WahaClient, WahaClientError
 from app.modules.waha.parser import ParsedWahaMessage
+
+CATEGORY_CREATE_MESSAGE_TYPE = "category_create"
+PENDING_CATEGORY_CREATE_STATUS = "pending_category_create"
 
 
 def handle_whatsapp_receipt_image(
@@ -131,7 +134,13 @@ def handle_whatsapp_receipt_confirmation(
     if YES_CONFIRMATION_RE.match(text):
         receipt = _find_pending_receipt(db, user_id=user_id)
         if receipt is None:
-            if get_pending_transaction(db, user_id=user_id) is not None:
+            if (
+                get_pending_transaction(db, user_id=user_id) is not None
+                or _has_pending_category_create(
+                    db,
+                    user_id=user_id,
+                )
+            ):
                 return None
             latest_transaction = find_latest_saved_receipt_transaction(db, user_id=user_id)
             if latest_transaction is not None:
@@ -285,6 +294,30 @@ def _find_pending_receipt(db: Session, *, user_id: int) -> Receipt | None:
         )
         .order_by(Receipt.created_at.desc(), Receipt.id.desc())
     )
+
+
+def _has_pending_category_create(db: Session, *, user_id: int) -> bool:
+    pending = db.scalar(
+        select(BotLog)
+        .where(
+            BotLog.user_id == user_id,
+            BotLog.message_type == CATEGORY_CREATE_MESSAGE_TYPE,
+            BotLog.status == PENDING_CATEGORY_CREATE_STATUS,
+        )
+        .order_by(BotLog.created_at.desc(), BotLog.id.desc())
+    )
+    if pending is None:
+        return False
+    created_at = (
+        pending.created_at
+        if pending.created_at.tzinfo
+        else pending.created_at.replace(tzinfo=timezone.utc)
+    )
+    if datetime.now(timezone.utc) - created_at > PENDING_TRANSACTION_TTL:
+        pending.status = "expired_category_create"
+        db.flush()
+        return False
+    return True
 
 
 def _store_receipt_caption(

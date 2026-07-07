@@ -195,6 +195,12 @@ def test_transaction_parse_endpoint_uses_backend_parser(
         assert transaction.source == "dashboard_manual"
         assert transaction.description == "jajan kopi"
         assert transaction.amount == Decimal("18000.00")
+        assert transaction.status == "confirmed"
+
+    list_response = client.get("/api/transactions", headers=_auth_headers(token))
+    assert list_response.status_code == 200
+    list_payload = list_response.json()
+    assert any(item["id"] == payload["transaction_id"] for item in list_payload["items"])
 
 
 def test_transaction_list_supports_filters_pagination_and_newest_sort(

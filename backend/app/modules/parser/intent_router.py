@@ -107,12 +107,29 @@ LIST_LIMIT_SUFFIX_RE = re.compile(
     r"\s*(?:terakhir|terbaru|terkini)?\b",
     re.IGNORECASE,
 )
+ALL_LIST_RE = re.compile(
+    r"\b(?:semua|seluruh|full)\b.*\b(?P<type>pengeluaran|pemasukan|expense|income)\b"
+    r"|\b(?P<type2>pengeluaran|pemasukan|expense|income)\b.*\b(?:semua|seluruh|full)\b",
+    re.IGNORECASE,
+)
+GENERIC_LIST_RE = re.compile(
+    r"\b(?:list|daftar|tampilkan|lihat|liat|kasih\s+lihat|kasih\s+liat|buatkan)\b"
+    r".*\b(?P<type>pengeluaran|pemasukan|expense|income)\b"
+    r"|\b(?P<type2>pengeluaran|pemasukan|expense|income)\b.*\b(?:apa\s+saja|apa\s+aja|list|daftar)\b",
+    re.IGNORECASE,
+)
 
 # Match "urutkan pengeluaran terbesar bulan ini", "sortir pengeluaran terbesar"
 SORTED_EXPENSE_RE = re.compile(
     r"\b(?:urutkan|sortir|sort|ranking|peringkat|susun)\b"
     r".*\b(?:pengeluaran|pemasukan|expense|income)\b"
     r".*\b(?:terbesar|terkecil|tertinggi|terendah)\b",
+    re.IGNORECASE,
+)
+DATE_SORT_RE = re.compile(
+    r"\b(?:urutkan|sortir|sort|susun)\b.*\b(?:pengeluaran|list)\b.*"
+    r"\b(?P<order>terlama|terbaru|terkini)\b"
+    r"|\b(?:urutkan|sortir|sort|susun)\b.*\b(?P<order2>terlama|terbaru|terkini)\b",
     re.IGNORECASE,
 )
 
@@ -172,6 +189,22 @@ def detect_intent(text: str) -> IntentMatch:
             sort_order=sort_order,
         )
 
+    date_sort_match = DATE_SORT_RE.search(normalized)
+    if date_sort_match:
+        order = (date_sort_match.group("order") or date_sort_match.group("order2") or "").lower()
+        return IntentMatch(
+            intent=INTENT_SORTED_EXPENSE,
+            period=period or "month",
+            confidence=1.0,
+            sort_order="date_asc" if order == "terlama" else "date_desc",
+        )
+
+    all_list_match = ALL_LIST_RE.search(normalized)
+    if all_list_match:
+        txn_type_word = (all_list_match.group("type") or all_list_match.group("type2")).lower()
+        intent = INTENT_LIST_INCOME if txn_type_word in {"pemasukan", "income"} else INTENT_LIST_EXPENSE
+        return IntentMatch(intent=intent, period=period, confidence=1.0, limit=50)
+
     # List with explicit limit: "tampilkan 10 pengeluaran", "liat 5 pemasukan"
     limit_match = LIST_WITH_LIMIT_RE.search(normalized)
     if limit_match:
@@ -187,6 +220,12 @@ def detect_intent(text: str) -> IntentMatch:
         txn_type_word = limit_suffix_match.group("type").lower()
         intent = INTENT_LIST_INCOME if txn_type_word in {"pemasukan", "income"} else INTENT_LIST_EXPENSE
         return IntentMatch(intent=intent, period=period, confidence=1.0, limit=limit)
+
+    generic_list_match = GENERIC_LIST_RE.search(normalized)
+    if generic_list_match and not _looks_like_transaction_input(normalized):
+        txn_type_word = (generic_list_match.group("type") or generic_list_match.group("type2")).lower()
+        intent = INTENT_LIST_INCOME if txn_type_word in {"pemasukan", "income"} else INTENT_LIST_EXPENSE
+        return IntentMatch(intent=intent, period=period, confidence=1.0)
 
     # Category detail: "tagihan apa itu?", "makanan berapa bulan ini"
     category_detail_match = CATEGORY_DETAIL_RE.search(normalized)
