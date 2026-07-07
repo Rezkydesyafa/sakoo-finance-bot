@@ -545,6 +545,37 @@ def test_linked_telegram_user_can_save_text_transaction(
         assert transaction.description == "beli makan"
 
 
+def test_duplicate_telegram_update_is_skipped(
+    test_client: tuple[TestClient, sessionmaker[Session], FakeTelegramClient, list[dict[str, Any]]],
+) -> None:
+    client, session_factory, fake_telegram, _queued_jobs = test_client
+    with session_factory() as db:
+        user = _create_user(db)
+        _link_telegram_user(db, user.id)
+        db.commit()
+
+    payload = _telegram_update(text="beli makan 20 ribu", update_id=1501)
+    first = client.post(
+        "/webhook/telegram",
+        headers={"X-Telegram-Bot-Api-Secret-Token": "test-telegram-secret"},
+        json=payload,
+    )
+    second = client.post(
+        "/webhook/telegram",
+        headers={"X-Telegram-Bot-Api-Secret-Token": "test-telegram-secret"},
+        json=payload,
+    )
+
+    assert first.status_code == 200, first.text
+    assert second.status_code == 200, second.text
+    assert first.json()["transaction_status"] == "saved"
+    assert second.json()["status"] == "duplicate"
+    assert len(fake_telegram.sent_messages) == 1
+
+    with session_factory() as db:
+        assert len(db.scalars(select(Transaction)).all()) == 1
+
+
 def test_missing_amount_asks_telegram_user_to_clarify(
     test_client: tuple[TestClient, sessionmaker[Session], FakeTelegramClient, list[dict[str, Any]]],
 ) -> None:

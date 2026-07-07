@@ -31,27 +31,29 @@ DEFAULT_CATEGORIES = [
     {"name": "Lainnya", "type": "income"},
 ]
 
+BIGINT_PK = sa.BigInteger().with_variant(sa.Integer(), "sqlite")
+
 
 def upgrade() -> None:
     op.create_table(
         "users",
-        sa.Column("id", sa.BigInteger(), primary_key=True),
+        sa.Column("id", BIGINT_PK, primary_key=True),
         sa.Column("name", sa.String(length=120), nullable=False),
         sa.Column("email", sa.String(length=255), nullable=False),
         sa.Column("password_hash", sa.String(length=255), nullable=False),
         sa.Column("phone_number", sa.String(length=32), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
     )
     op.create_index("ix_users_email", "users", ["email"], unique=True)
     op.create_index("ix_users_phone_number", "users", ["phone_number"], unique=True)
 
     op.create_table(
         "categories",
-        sa.Column("id", sa.BigInteger(), primary_key=True),
+        sa.Column("id", BIGINT_PK, primary_key=True),
         sa.Column("name", sa.String(length=80), nullable=False),
         sa.Column("type", sa.String(length=16), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.CheckConstraint("type IN ('income', 'expense')", name="ck_categories_type"),
         sa.UniqueConstraint("name", "type", name="uq_categories_name_type"),
     )
@@ -65,13 +67,13 @@ def upgrade() -> None:
 
     op.create_table(
         "user_platform_accounts",
-        sa.Column("id", sa.BigInteger(), primary_key=True),
+        sa.Column("id", BIGINT_PK, primary_key=True),
         sa.Column("user_id", sa.BigInteger(), nullable=False),
         sa.Column("platform", sa.String(length=32), nullable=False),
         sa.Column("platform_user_id", sa.String(length=128), nullable=True),
         sa.Column("phone_number", sa.String(length=32), nullable=True),
         sa.Column("chat_id", sa.String(length=128), nullable=True),
-        sa.Column("linked_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("linked_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column("is_active", sa.Boolean(), server_default=sa.text("true"), nullable=False),
         sa.CheckConstraint(
             "platform IN ('whatsapp', 'telegram')",
@@ -88,12 +90,12 @@ def upgrade() -> None:
 
     op.create_table(
         "account_linking_codes",
-        sa.Column("id", sa.BigInteger(), primary_key=True),
+        sa.Column("id", BIGINT_PK, primary_key=True),
         sa.Column("user_id", sa.BigInteger(), nullable=False),
         sa.Column("code", sa.String(length=32), nullable=False),
         sa.Column("expired_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("used_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
     )
     op.create_index("ix_account_linking_codes_code", "account_linking_codes", ["code"], unique=True)
@@ -101,7 +103,7 @@ def upgrade() -> None:
 
     op.create_table(
         "transactions",
-        sa.Column("id", sa.BigInteger(), primary_key=True),
+        sa.Column("id", BIGINT_PK, primary_key=True),
         sa.Column("user_id", sa.BigInteger(), nullable=False),
         sa.Column("type", sa.String(length=16), nullable=False),
         sa.Column("amount", sa.Numeric(14, 2), nullable=False),
@@ -109,8 +111,8 @@ def upgrade() -> None:
         sa.Column("description", sa.Text(), nullable=True),
         sa.Column("transaction_date", sa.Date(), nullable=False),
         sa.Column("source", sa.String(length=40), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.CheckConstraint("type IN ('income', 'expense')", name="ck_transactions_type"),
         sa.CheckConstraint(
             "source IN ('whatsapp_text', 'telegram_text', 'dashboard_manual', "
@@ -125,7 +127,7 @@ def upgrade() -> None:
 
     op.create_table(
         "media_files",
-        sa.Column("id", sa.BigInteger(), primary_key=True),
+        sa.Column("id", BIGINT_PK, primary_key=True),
         sa.Column("user_id", sa.BigInteger(), nullable=False),
         sa.Column("file_type", sa.String(length=32), nullable=False),
         sa.Column("original_filename", sa.String(length=255), nullable=True),
@@ -133,14 +135,14 @@ def upgrade() -> None:
         sa.Column("mime_type", sa.String(length=128), nullable=True),
         sa.Column("size", sa.Integer(), nullable=True),
         sa.Column("source", sa.String(length=40), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
     )
     op.create_index("ix_media_files_user_id", "media_files", ["user_id"])
 
     op.create_table(
         "receipts",
-        sa.Column("id", sa.BigInteger(), primary_key=True),
+        sa.Column("id", BIGINT_PK, primary_key=True),
         sa.Column("user_id", sa.BigInteger(), nullable=False),
         sa.Column("media_file_id", sa.BigInteger(), nullable=False),
         sa.Column("ocr_text", sa.Text(), nullable=True),
@@ -150,7 +152,7 @@ def upgrade() -> None:
         sa.Column("confidence", sa.Numeric(5, 4), nullable=True),
         sa.Column("status", sa.String(length=32), server_default="pending", nullable=False),
         sa.Column("transaction_id", sa.BigInteger(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.ForeignKeyConstraint(["media_file_id"], ["media_files.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["transaction_id"], ["transactions.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
@@ -159,14 +161,14 @@ def upgrade() -> None:
 
     op.create_table(
         "voice_notes",
-        sa.Column("id", sa.BigInteger(), primary_key=True),
+        sa.Column("id", BIGINT_PK, primary_key=True),
         sa.Column("user_id", sa.BigInteger(), nullable=False),
         sa.Column("media_file_id", sa.BigInteger(), nullable=False),
         sa.Column("transcript_text", sa.Text(), nullable=True),
         sa.Column("stt_provider", sa.String(length=80), nullable=True),
         sa.Column("transaction_id", sa.BigInteger(), nullable=True),
         sa.Column("status", sa.String(length=32), server_default="pending", nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.ForeignKeyConstraint(["media_file_id"], ["media_files.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["transaction_id"], ["transactions.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
@@ -175,7 +177,7 @@ def upgrade() -> None:
 
     op.create_table(
         "reports",
-        sa.Column("id", sa.BigInteger(), primary_key=True),
+        sa.Column("id", BIGINT_PK, primary_key=True),
         sa.Column("user_id", sa.BigInteger(), nullable=False),
         sa.Column("period_start", sa.Date(), nullable=False),
         sa.Column("period_end", sa.Date(), nullable=False),
@@ -183,7 +185,7 @@ def upgrade() -> None:
         sa.Column("file_id", sa.BigInteger(), nullable=True),
         sa.Column("generated_from", sa.String(length=40), nullable=False),
         sa.Column("status", sa.String(length=32), server_default="pending", nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.ForeignKeyConstraint(["file_id"], ["media_files.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
     )
@@ -191,13 +193,13 @@ def upgrade() -> None:
 
     op.create_table(
         "jobs",
-        sa.Column("id", sa.BigInteger(), primary_key=True),
+        sa.Column("id", BIGINT_PK, primary_key=True),
         sa.Column("user_id", sa.BigInteger(), nullable=False),
         sa.Column("job_type", sa.String(length=40), nullable=False),
         sa.Column("status", sa.String(length=32), server_default="pending", nullable=False),
         sa.Column("result_id", sa.BigInteger(), nullable=True),
         sa.Column("error_message", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column("completed_at", sa.DateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
     )
@@ -205,7 +207,7 @@ def upgrade() -> None:
 
     op.create_table(
         "bot_logs",
-        sa.Column("id", sa.BigInteger(), primary_key=True),
+        sa.Column("id", BIGINT_PK, primary_key=True),
         sa.Column("user_id", sa.BigInteger(), nullable=True),
         sa.Column("platform", sa.String(length=32), nullable=False),
         sa.Column("message_type", sa.String(length=40), nullable=False),
@@ -213,7 +215,7 @@ def upgrade() -> None:
         sa.Column("parsed_result", sa.JSON(), nullable=True),
         sa.Column("status", sa.String(length=32), nullable=False),
         sa.Column("error_message", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="SET NULL"),
     )
     op.create_index("ix_bot_logs_user_created_at", "bot_logs", ["user_id", "created_at"])

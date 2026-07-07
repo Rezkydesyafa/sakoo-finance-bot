@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
@@ -7,7 +8,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import BotLog
+from app.models import BotLog, Receipt
 from app.modules.parser.service import ParsedMessage
 
 
@@ -19,6 +20,22 @@ EDITED_TRANSACTION_STATUS = "edited_transaction"
 EXPIRED_TRANSACTION_STATUS = "expired_transaction"
 # ponytail: fixed chat confirmation TTL; make configurable only if channel SLAs differ.
 PENDING_TRANSACTION_TTL = timedelta(minutes=30)
+PENDING_RECEIPT_STATUSES = (
+    "pending",
+    "processed",
+    "needs_confirmation",
+    "manual_input_required",
+)
+
+
+@dataclass(frozen=True)
+class ActivePendingState:
+    kind: str
+    label: str
+    instruction: str
+    status: str
+    log_id: int | None = None
+    receipt_id: int | None = None
 
 
 def store_pending_transaction(
@@ -90,6 +107,113 @@ def update_pending_transaction(
 def mark_pending_status(db: Session, *, pending_log: BotLog, status: str) -> None:
     pending_log.status = status
     db.flush()
+
+
+def get_active_pending_state(
+    db: Session,
+    *,
+    user_id: int,
+    exclude_kinds: set[str] | None = None,
+) -> ActivePendingState | None:
+    excluded = exclude_kinds or set()
+    log_specs = [
+        (
+            "transaction",
+            CONVERSATION_MESSAGE_TYPE,
+            PENDING_TRANSACTION_STATUS,
+            EXPIRED_TRANSACTION_STATUS,
+            "transaksi yang menunggu konfirmasi",
+            "Balas YA untuk simpan, edit untuk koreksi, atau batal.",
+        ),
+        (
+            "category",
+            "category_create",
+            "pending_category_create",
+            "expired_category_create",
+            "kategori baru yang menunggu konfirmasi",
+            "Balas YA untuk simpan, atau batal.",
+        ),
+        (
+            "reset",
+            "transaction_reset",
+            "pending_reset",
+            "expired_reset",
+            "reset transaksi yang menunggu konfirmasi",
+            "Balas YA RESET untuk lanjut, atau batal.",
+        ),
+    ]
+    for kind, message_type, pending_status, expired_status, label, instruction in log_specs:
+        if kind in excluded:
+            continue
+        pending = _get_pending_log(
+            db,
+            user_id=user_id,
+            message_type=message_type,
+            pending_status=pending_status,
+            expired_status=expired_status,
+        )
+        if pending is not None:
+            return ActivePendingState(
+                kind=kind,
+                label=label,
+                instruction=instruction,
+                status=pending.status,
+                log_id=pending.id,
+            )
+
+    if "receipt" not in excluded:
+        receipt = db.scalar(
+            select(Receipt)
+            .where(
+                Receipt.user_id == user_id,
+                Receipt.transaction_id.is_(None),
+                Receipt.status.in_(PENDING_RECEIPT_STATUSES),
+            )
+            .order_by(Receipt.created_at.desc(), Receipt.id.desc())
+        )
+        if receipt is not None:
+            return ActivePendingState(
+                kind="receipt",
+                label="struk OCR yang menunggu konfirmasi",
+                instruction="Balas YA untuk simpan, edit total/tanggal/kategori untuk koreksi, atau batal.",
+                status=receipt.status,
+                receipt_id=receipt.id,
+            )
+
+    return None
+
+
+def format_active_pending_message(pending: ActivePendingState) -> str:
+    return (
+        f"Masih ada {pending.label}.\n"
+        f"Biar datanya nggak nyampur, selesaikan dulu ya. {pending.instruction}"
+    )
+
+
+def _get_pending_log(
+    db: Session,
+    *,
+    user_id: int,
+    message_type: str,
+    pending_status: str,
+    expired_status: str,
+) -> BotLog | None:
+    pending = db.scalar(
+        select(BotLog)
+        .where(
+            BotLog.user_id == user_id,
+            BotLog.message_type == message_type,
+            BotLog.status == pending_status,
+        )
+        .order_by(BotLog.created_at.desc(), BotLog.id.desc())
+    )
+    if pending is None:
+        return None
+    if _is_pending_expired(pending.created_at):
+        pending.status = expired_status
+        db.flush()
+        return None
+    return pending
 
 
 def parsed_message_from_payload(payload: dict[str, Any]) -> ParsedMessage:

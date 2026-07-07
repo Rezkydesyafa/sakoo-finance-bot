@@ -21,6 +21,8 @@ from app.modules.bot.conversation_state import (
     CONFIRMED_TRANSACTION_STATUS,
     PENDING_TRANSACTION_TTL,
     clone_parsed_message,
+    format_active_pending_message,
+    get_active_pending_state,
     get_pending_transaction,
     mark_pending_status,
     store_pending_transaction,
@@ -138,10 +140,21 @@ BUDGET_SET_RE = re.compile(
     re.IGNORECASE,
 )
 BUDGET_LIST_RE = re.compile(r"\b(?:list|daftar|cek|lihat)?\s*budget(?:\s+bulan ini)?\s*$", re.IGNORECASE)
+BUDGET_CATEGORY_LIST_RE = re.compile(
+    r"\b(?:kategori\s+budget(?:nya)?|budget\s+kategori(?:nya)?)\b.*\b(?:apa|saja|tersedia|bisa|mana)\b"
+    r"|\b(?:ada|apa|list|daftar|lihat)\b.*\b(?:kategori\s+budget(?:nya)?|budget\s+kategori(?:nya)?)\b",
+    re.IGNORECASE,
+)
+BUDGET_HELP_RE = re.compile(
+    r"\bbudget\b.*\b(?:cara|gimana|bagaimana|format|contoh)\b"
+    r"|\b(?:cara|gimana|bagaimana|format|contoh)\b.*\bbudget\b",
+    re.IGNORECASE,
+)
 BUDGET_REMAINING_RE = re.compile(
     r"\bbudget\s+(?P<category>.+?)\s+(?:tinggal|sisa|tersisa|remaining|berapa)\b",
     re.IGNORECASE,
 )
+BUDGET_WORD_RE = re.compile(r"\b(?:budget|anggaran)\b", re.IGNORECASE)
 VISIBILITY_CHECK_RE = re.compile(
     r"\b(?:tidak|ga|gak|nggak|belum)\s+masuk\b.*\b(?:dashboard|list|daftar)\b"
     r"|\b(?:dashboard|list|daftar)\b.*\b(?:tidak|ga|gak|nggak|belum)\s+masuk\b",
@@ -196,6 +209,13 @@ class TextTransactionResult:
         payload = asdict(self)
         payload["parse_result"] = self.parse_result.to_log_payload()
         return payload
+
+
+@dataclass(frozen=True)
+class CategoryCreateRequest:
+    name: str
+    transaction_type: str
+    budget_amount: Decimal | None = None
 
 
 def handle_whatsapp_text_transaction(
@@ -299,6 +319,14 @@ def handle_text_transaction(
             reply_text=_format_command_response(db, user_id, parse_result),
             parse_result=parse_result,
             error_message=fallback_error,
+        )
+
+    active_pending = get_active_pending_state(db, user_id=user_id)
+    if active_pending is not None:
+        return _active_pending_result(
+            pending=active_pending,
+            text=text,
+            source=source,
         )
 
     if parse_result.need_confirmation:
@@ -475,6 +503,10 @@ def _handle_transaction_reset_reply(
     if reset_type is None:
         return None
 
+    active_pending = get_active_pending_state(db, user_id=user_id, exclude_kinds={"reset"})
+    if active_pending is not None:
+        return _active_pending_result(pending=active_pending, text=text, source=source)
+
     count = _count_reset_transactions(db, user_id=user_id, reset_type=reset_type)
     label = _reset_type_label(reset_type)
     if count == 0:
@@ -523,20 +555,27 @@ def _handle_category_create_reply(
         payload = pending.parsed_result or {}
         name = str(payload.get("name") or "").strip()
         transaction_type = str(payload.get("type") or "expense")
+        budget_amount = _payload_decimal(payload.get("budget_amount"))
         replacement = _parse_category_create_request(text)
         if replacement is not None:
-            name, transaction_type = replacement
+            name = replacement.name
+            transaction_type = replacement.transaction_type
+            budget_amount = replacement.budget_amount
             pending.raw_message = text
             pending.parsed_result = {
                 "kind": "category_create",
                 "name": name,
                 "type": transaction_type,
+                "budget_amount": str(budget_amount) if budget_amount is not None else None,
             }
             db.commit()
-            label = "pengeluaran" if transaction_type == "expense" else "pemasukan"
             return TextTransactionResult(
                 status="category_create_needs_confirmation",
-                reply_text=f"Aku akan buat kategori {label}: {name}. Balas YA untuk simpan atau batal.",
+                reply_text=_format_category_create_pending_reply(
+                    name=name,
+                    transaction_type=transaction_type,
+                    budget_amount=budget_amount,
+                ),
                 parse_result=_synthetic_parse_result(
                     text=text,
                     source=source,
@@ -567,11 +606,22 @@ def _handle_category_create_reply(
             if category is None or category.name.lower() != name.lower():
                 category = Category(name=name, type=transaction_type, user_id=user_id)
                 db.add(category)
+                db.flush()
+            if budget_amount is not None and transaction_type == "expense":
+                upsert_category_budget(
+                    db,
+                    user_id=user_id,
+                    category=category,
+                    monthly_limit=budget_amount,
+                )
             pending.status = CONFIRMED_CATEGORY_CREATE_STATUS
             db.commit()
             return TextTransactionResult(
                 status="category_created",
-                reply_text=f"Siap, kategori {name} sudah tersimpan.",
+                reply_text=_format_category_created_reply(
+                    name=name,
+                    budget_amount=budget_amount if transaction_type == "expense" else None,
+                ),
                 parse_result=_synthetic_parse_result(
                     text=text,
                     source=source,
@@ -585,7 +635,13 @@ def _handle_category_create_reply(
     if request is None:
         return None
 
-    name, transaction_type = request
+    name = request.name
+    transaction_type = request.transaction_type
+    budget_amount = request.budget_amount
+    active_pending = get_active_pending_state(db, user_id=user_id, exclude_kinds={"category"})
+    if active_pending is not None:
+        return _active_pending_result(pending=active_pending, text=text, source=source)
+
     existing = find_category(
         db=db,
         category_name=name,
@@ -613,15 +669,19 @@ def _handle_category_create_reply(
                 "kind": "category_create",
                 "name": name,
                 "type": transaction_type,
+                "budget_amount": str(budget_amount) if budget_amount is not None else None,
             },
             status=PENDING_CATEGORY_CREATE_STATUS,
         )
     )
     db.commit()
-    label = "pengeluaran" if transaction_type == "expense" else "pemasukan"
     return TextTransactionResult(
         status="category_create_needs_confirmation",
-        reply_text=f"Aku akan buat kategori {label}: {name}. Balas YA untuk simpan atau batal.",
+        reply_text=_format_category_create_pending_reply(
+            name=name,
+            transaction_type=transaction_type,
+            budget_amount=budget_amount,
+        ),
         parse_result=_synthetic_parse_result(
             text=text,
             source=source,
@@ -650,7 +710,7 @@ def _get_pending_category_create(db: Session, *, user_id: int) -> BotLog | None:
     return pending
 
 
-def _parse_category_create_request(text: str) -> tuple[str, str] | None:
+def _parse_category_create_request(text: str) -> CategoryCreateRequest | None:
     if not CREATE_CATEGORY_RE.search(text):
         return None
     normalized = normalize_text(text)
@@ -669,17 +729,74 @@ def _parse_category_create_request(text: str) -> tuple[str, str] | None:
     if not match:
         return None
 
+    raw_name = match.group("name")
+    amount_match = extract_amount(raw_name)
+    budget_amount = amount_match.value if amount_match is not None else None
+    if amount_match is not None:
+        raw_name = raw_name[: amount_match.start] + raw_name[amount_match.end :]
+
     raw_name = re.sub(
-        r"\b(?:pengeluaran|pemasukan|income|expense|untuk|saya|dong|ya)\b",
+        r"\b(?:set\s+budget(?:nya)?|budget(?:nya)?|anggaran|pengeluaran|pemasukan|income|expense|untuk|saya|dong|ya|dan|set|atur|pasang)\b",
         " ",
-        match.group("name"),
+        raw_name,
         flags=re.IGNORECASE,
     )
     name = re.sub(r"\s+", " ", raw_name).strip(" -,.")
     if len(name) < 3:
         return None
     transaction_type = "income" if re.search(r"\b(?:pemasukan|income)\b", normalized) else "expense"
-    return name.title(), transaction_type
+    return CategoryCreateRequest(
+        name=name.title(),
+        transaction_type=transaction_type,
+        budget_amount=budget_amount,
+    )
+
+
+def _payload_decimal(value: object) -> Decimal | None:
+    if value in (None, ""):
+        return None
+    try:
+        return Decimal(str(value))
+    except Exception:
+        return None
+
+
+def _format_category_create_pending_reply(
+    *,
+    name: str,
+    transaction_type: str,
+    budget_amount: Decimal | None,
+) -> str:
+    label = "pengeluaran" if transaction_type == "expense" else "pemasukan"
+    budget_part = (
+        f" dan set budget {format_rupiah(budget_amount)}"
+        if budget_amount is not None and transaction_type == "expense"
+        else ""
+    )
+    return f"Siap, aku siap buat kategori {label}: {name}{budget_part}. Balas YA untuk simpan, atau batal."
+
+
+def _format_category_created_reply(*, name: str, budget_amount: Decimal | None) -> str:
+    if budget_amount is None:
+        return f"Siap, kategori {name} sudah tersimpan."
+    return f"Kategori {name} dibuat. Budget {format_rupiah(budget_amount)} juga sudah diset."
+
+
+def _active_pending_result(
+    *,
+    pending: Any,
+    text: str,
+    source: str,
+) -> TextTransactionResult:
+    return TextTransactionResult(
+        status="active_pending",
+        reply_text=format_active_pending_message(pending),
+        parse_result=_synthetic_parse_result(
+            text=text,
+            source=source,
+            intent="active_pending",
+        ),
+    )
 
 
 def _get_pending_transaction_reset(db: Session, *, user_id: int) -> BotLog | None:
@@ -2142,8 +2259,27 @@ def _handle_budget_message(
     text: str,
     source: str,
 ) -> TextTransactionResult | None:
+    has_budget_word = BUDGET_WORD_RE.search(text) is not None
+
+    if BUDGET_CATEGORY_LIST_RE.search(text):
+        return TextTransactionResult(
+            status="budget_category_list",
+            reply_text=_format_budget_category_options(db, user_id),
+            parse_result=_synthetic_parse_result(
+                text=text,
+                source=source,
+                intent="budget_category_list",
+            ),
+        )
+
+    if BUDGET_HELP_RE.search(text) and extract_amount(text) is None:
+        return _budget_help_result(text=text, source=source)
+
     set_match = BUDGET_SET_RE.search(text)
     if set_match:
+        active_pending = get_active_pending_state(db, user_id=user_id)
+        if active_pending is not None:
+            return _active_pending_result(pending=active_pending, text=text, source=source)
         return _handle_set_budget_message(
             db=db,
             user_id=user_id,
@@ -2172,6 +2308,8 @@ def _handle_budget_message(
                 intent="budget_list",
             ),
         )
+    if has_budget_word:
+        return _budget_help_result(text=text, source=source)
     return None
 
 
@@ -2185,18 +2323,20 @@ def _handle_set_budget_message(
 ) -> TextTransactionResult:
     amount_match = extract_amount(body)
     if amount_match is None:
+        if BUDGET_HELP_RE.search(text):
+            return _budget_help_result(text=text, source=source)
         return TextTransactionResult(
             status="budget_invalid",
-            reply_text="Nominal budget belum terbaca. Contoh: set budget makan 600rb.",
+            reply_text=_budget_help_text("Nominal budget belum terbaca."),
             parse_result=_synthetic_parse_result(text=text, source=source, intent="budget_invalid"),
         )
 
-    category_name = re.sub(r"\s+", " ", body[:amount_match.start] + body[amount_match.end:]).strip(" -,.")
+    category_name = _clean_budget_category_name(body[:amount_match.start] + body[amount_match.end:])
     category = _find_budget_category(db, user_id=user_id, category_text=category_name)
     if category is None:
         return TextTransactionResult(
             status="budget_category_not_found",
-            reply_text=f"Kategori '{category_name or '-'}' belum ketemu. Contoh: set budget makan 600rb.",
+            reply_text=_budget_help_text(f"Kategori '{category_name or '-'}' belum ketemu."),
             parse_result=_synthetic_parse_result(text=text, source=source, intent="budget_category_not_found"),
         )
 
@@ -2211,25 +2351,14 @@ def _handle_set_budget_message(
     budget_state = get_budget_for_category(db, user_id, category)
     item = budget_state[2] if budget_state else None
     remaining = item.remaining if item else amount_match.value
-    fallback_reply = (
+    reply = (
         f"Budget {category.name}: {format_rupiah(amount_match.value)}.\n"
         f"Terpakai {format_rupiah(item.spent if item else Decimal('0'))}. "
         f"Sisa {format_rupiah(remaining)}."
     )
     return TextTransactionResult(
         status="budget_saved",
-        reply_text=_polish_budget_reply_with_llm(
-            db=db,
-            user_id=user_id,
-            user_text=text,
-            fallback_reply=fallback_reply,
-            facts=[
-                f"Kategori: {category.name}",
-                f"Limit: {format_rupiah(amount_match.value)}",
-                f"Terpakai: {format_rupiah(item.spent if item else Decimal('0'))}",
-                f"Sisa: {format_rupiah(remaining)}",
-            ],
-        ),
+        reply_text=reply,
         parse_result=_synthetic_parse_result(text=text, source=source, intent="budget_saved"),
     )
 
@@ -2256,19 +2385,6 @@ def _handle_budget_remaining_message(
                 f"Terpakai {format_rupiah(item.spent)}. "
                 f"Sisa {format_rupiah(item.remaining)}."
             )
-            reply = _polish_budget_reply_with_llm(
-                db=db,
-                user_id=user_id,
-                user_text=text,
-                fallback_reply=reply,
-                facts=[
-                    f"Kategori: {item.category_name}",
-                    f"Limit: {format_rupiah(item.monthly_limit)}",
-                    f"Terpakai: {format_rupiah(item.spent)}",
-                    f"Sisa: {format_rupiah(item.remaining)}",
-                    f"Status: {item.status}",
-                ],
-            )
     return TextTransactionResult(
         status="budget_remaining",
         reply_text=reply,
@@ -2292,77 +2408,77 @@ def _format_budget_list_response(db: Session, user_id: int) -> str:
         + f"\n\nTotal budget: {format_rupiah(overview.total_budgeted)}\n"
         + f"Sisa total: {format_rupiah(overview.total_remaining)}"
     )
-    facts = [
-        f"Total budget: {format_rupiah(overview.total_budgeted)}",
-        f"Total terpakai: {format_rupiah(overview.total_spent)}",
-        f"Sisa total: {format_rupiah(overview.total_remaining)}",
-        *[
-            f"{item.category_name}: limit {format_rupiah(item.monthly_limit)}, "
-            f"terpakai {format_rupiah(item.spent)}, sisa {format_rupiah(item.remaining)}"
-            for item in overview.items
-        ],
+    return fallback_reply
+
+
+def _budget_help_result(*, text: str, source: str) -> TextTransactionResult:
+    return TextTransactionResult(
+        status="budget_help",
+        reply_text=_budget_help_text(),
+        parse_result=_synthetic_parse_result(text=text, source=source, intent="budget_help"),
+    )
+
+
+def _budget_help_text(prefix: str | None = None) -> str:
+    lines = [
+        "Format budget:",
+        "- set budget kuliah 500rb",
+        "- budget kuliah tinggal berapa?",
+        "- list budget",
     ]
-    return _polish_budget_reply_with_llm(
-        db=db,
-        user_id=user_id,
-        user_text="list budget",
-        fallback_reply=fallback_reply,
-        facts=facts,
-    )
+    return "\n".join(([prefix, ""] if prefix else []) + lines)
 
 
-def _polish_budget_reply_with_llm(
-    *,
-    db: Session,
-    user_id: int,
-    user_text: str,
-    fallback_reply: str,
-    facts: list[str],
-) -> str:
-    prompt = (
-        "Tulis ulang jawaban budget ini supaya lebih natural dan ramah untuk chat.\n"
-        "Jangan hitung ulang, jangan tambah angka, jangan hilangkan angka Rupiah.\n"
-        "Maksimal 5 baris pendek.\n\n"
-        f"Pertanyaan user: {user_text}\n"
-        "Data budget:\n"
-        + "\n".join(f"- {fact}" for fact in facts)
-        + "\n\nJawaban wajib berdasarkan ini:\n"
-        + fallback_reply
-    )
-    try:
-        answer = answer_finance_question_with_llm(
-            prompt,
-            context="Budget user dari database:\n" + "\n".join(facts),
-            user_id=user_id,
-            db=db,
+def _format_budget_category_options(db: Session, user_id: int) -> str:
+    categories = db.scalars(
+        select(Category)
+        .where(
+            Category.is_active.is_(True),
+            Category.type.in_(("expense", "both")),
+            ((Category.user_id == user_id) | Category.user_id.is_(None)),
         )
-    except (LlmRateLimitExceeded, LlmProviderError):
-        return fallback_reply
+        .order_by(Category.user_id.is_(None).asc(), Category.name.asc(), Category.id.asc())
+    )
+    names: list[str] = []
+    seen: set[str] = set()
+    for category in categories:
+        key = category.name.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        names.append(category.name)
 
-    return _accept_budget_llm_reply(answer, fallback_reply)
-
-
-def _accept_budget_llm_reply(answer: str, fallback_reply: str) -> str:
-    cleaned = re.sub(r"\n{3,}", "\n\n", answer.strip())
-    if not cleaned or len(cleaned) > 700:
-        return fallback_reply
-
-    fallback_amounts = _extract_rupiah_amounts(fallback_reply)
-    answer_amounts = _extract_rupiah_amounts(cleaned)
-    if fallback_amounts and not fallback_amounts.issubset(answer_amounts):
-        return fallback_reply
-    if answer_amounts - fallback_amounts:
-        return fallback_reply
-    return cleaned
-
-
-def _extract_rupiah_amounts(text: str) -> set[str]:
-    return set(re.findall(r"Rp\d+(?:\.\d{3})*", text))
+    if not names:
+        return "Belum ada kategori pengeluaran yang bisa diberi budget."
+    return (
+        "Kategori yang bisa kamu kasih budget:\n"
+        + ", ".join(names)
+        + "\n\nBudget yang sudah diset bisa dicek dengan: list budget"
+    )
 
 
 def _find_budget_category(db: Session, *, user_id: int, category_text: str) -> Category | None:
-    alias = _category_name_from_alias(category_text.strip(" -,."))
+    cleaned = _clean_budget_category_name(category_text)
+    if not cleaned:
+        return None
+
+    exact = find_visible_expense_category_by_name(db, user_id=user_id, name=cleaned)
+    if exact is not None:
+        return exact
+
+    normalized = cleaned.lower()
+    if any(keyword in normalized for keyword in ("kuliah", "kampus")):
+        user_kuliah = find_visible_expense_category_by_name(db, user_id=user_id, name="Kuliah")
+        if user_kuliah is not None:
+            return user_kuliah
+
+    alias = _category_name_from_alias(cleaned)
     return find_visible_expense_category_by_name(db, user_id=user_id, name=alias)
+
+
+def _clean_budget_category_name(value: str) -> str:
+    cleaned = re.sub(r"\b(?:kategori|category|pengeluaran|bulanan)\b", " ", value, flags=re.IGNORECASE)
+    return re.sub(r"\s+", " ", cleaned).strip(" -,.")
 
 
 def _format_limited_cash_plan_response(text: str) -> str:

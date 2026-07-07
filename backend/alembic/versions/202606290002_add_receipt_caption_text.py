@@ -17,11 +17,12 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "receipts",
-        sa.Column("caption_text", sa.Text(), nullable=True),
-        if_not_exists=True,
-    )
+    columns = {column["name"] for column in sa.inspect(op.get_bind()).get_columns("receipts")}
+    if "caption_text" not in columns:
+        op.add_column(
+            "receipts",
+            sa.Column("caption_text", sa.Text(), nullable=True),
+        )
 
 
 def downgrade() -> None:

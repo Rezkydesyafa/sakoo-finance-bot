@@ -4,7 +4,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import BotLog, Receipt, Transaction
-from app.modules.bot.conversation_state import PENDING_TRANSACTION_TTL, get_pending_transaction
+from app.modules.bot.conversation_state import (
+    PENDING_TRANSACTION_TTL,
+    format_active_pending_message,
+    get_active_pending_state,
+    get_pending_transaction,
+)
 from app.modules.jobs.service import (
     JobQueueError,
     ReceiptOcrEnqueue,
@@ -12,6 +17,7 @@ from app.modules.jobs.service import (
 )
 from app.modules.media.service import MediaStorageError, save_media_bytes
 from app.modules.ocr.receipt_chat import (
+    CANCEL_CONFIRMATION_RE,
     PENDING_RECEIPT_STATUSES,
     ReceiptOcrFlowResult,
     YES_CONFIRMATION_RE,
@@ -43,6 +49,12 @@ def handle_whatsapp_receipt_image(
 ) -> ReceiptOcrFlowResult | None:
     if parsed.message_type != "image":
         return None
+    active_pending = get_active_pending_state(db, user_id=user_id)
+    if active_pending is not None:
+        return ReceiptOcrFlowResult(
+            status="active_pending",
+            reply_text=format_active_pending_message(active_pending),
+        )
     if not parsed.media_url:
         return ReceiptOcrFlowResult(
             status="download_failed",
@@ -129,6 +141,18 @@ def handle_whatsapp_receipt_confirmation(
     text: str | None,
 ) -> ReceiptOcrFlowResult | None:
     if not text:
+        return None
+
+    if CANCEL_CONFIRMATION_RE.match(text):
+        receipt = _find_pending_receipt(db, user_id=user_id)
+        if receipt is not None:
+            receipt.status = "cancelled"
+            db.commit()
+            return ReceiptOcrFlowResult(
+                status="cancelled",
+                receipt_id=receipt.id,
+                reply_text="Oke, struk ini aku batalkan. Data kamu belum berubah.",
+            )
         return None
 
     if YES_CONFIRMATION_RE.match(text):

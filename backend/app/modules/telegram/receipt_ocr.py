@@ -7,7 +7,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import BotLog, Receipt, Transaction
-from app.modules.bot.conversation_state import PENDING_TRANSACTION_TTL, get_pending_transaction
+from app.modules.bot.conversation_state import (
+    PENDING_TRANSACTION_TTL,
+    format_active_pending_message,
+    get_active_pending_state,
+    get_pending_transaction,
+)
 from app.modules.jobs.service import (
     JobQueueError,
     ReceiptOcrEnqueue,
@@ -15,6 +20,7 @@ from app.modules.jobs.service import (
 )
 from app.modules.media.service import MediaStorageError, save_media_bytes
 from app.modules.ocr.receipt_chat import (
+    CANCEL_CONFIRMATION_RE,
     PENDING_RECEIPT_STATUSES,
     ReceiptOcrFlowResult as TelegramReceiptOcrFlowResult,
     YES_CONFIRMATION_RE,
@@ -52,6 +58,13 @@ def handle_telegram_receipt_photo(
 ) -> TelegramReceiptOcrFlowResult | None:
     if parsed.message_type != "photo":
         return None
+
+    active_pending = get_active_pending_state(db, user_id=user_id)
+    if active_pending is not None:
+        return TelegramReceiptOcrFlowResult(
+            status="active_pending",
+            reply_text=format_active_pending_message(active_pending),
+        )
 
     if not parsed.file_id:
         return TelegramReceiptOcrFlowResult(
@@ -140,6 +153,10 @@ def handle_telegram_receipt_text(
 ) -> TelegramReceiptOcrFlowResult | None:
     if not text or not text.strip():
         return None
+
+    cancel_result = _handle_receipt_cancel_text(db=db, user_id=user_id, text=text)
+    if cancel_result is not None:
+        return cancel_result
 
     confirmation_result = _handle_receipt_confirmation_text(
         db=db,
@@ -327,6 +344,26 @@ def _handle_receipt_confirmation_text(
         status="edit_updated",
         receipt_id=receipt.id,
         reply_text=format_receipt_confirmation(receipt),
+    )
+
+
+def _handle_receipt_cancel_text(
+    *,
+    db: Session,
+    user_id: int,
+    text: str,
+) -> TelegramReceiptOcrFlowResult | None:
+    if not CANCEL_CONFIRMATION_RE.match(text):
+        return None
+    receipt = _find_pending_receipt(db, user_id=user_id)
+    if receipt is None:
+        return None
+    receipt.status = "cancelled"
+    db.commit()
+    return TelegramReceiptOcrFlowResult(
+        status="cancelled",
+        receipt_id=receipt.id,
+        reply_text="Oke, struk ini aku batalkan. Data kamu belum berubah.",
     )
 
 

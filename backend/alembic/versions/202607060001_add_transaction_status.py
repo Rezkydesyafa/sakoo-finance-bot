@@ -17,6 +17,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    dialect_name = op.get_bind().dialect.name
     op.add_column(
         "transactions",
         sa.Column(
@@ -26,11 +27,12 @@ def upgrade() -> None:
             nullable=False,
         ),
     )
-    op.create_check_constraint(
-        "ck_transactions_status",
-        "transactions",
-        "status IN ('pending_confirmation', 'confirmed', 'cancelled')",
-    )
+    if dialect_name != "sqlite":
+        op.create_check_constraint(
+            "ck_transactions_status",
+            "transactions",
+            "status IN ('pending_confirmation', 'confirmed', 'cancelled')",
+        )
     op.create_index(
         "ix_transactions_user_status_created",
         "transactions",
@@ -39,6 +41,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    dialect_name = op.get_bind().dialect.name
     op.drop_index("ix_transactions_user_status_created", table_name="transactions")
-    op.drop_constraint("ck_transactions_status", "transactions", type_="check")
+    if dialect_name != "sqlite":
+        op.drop_constraint("ck_transactions_status", "transactions", type_="check")
     op.drop_column("transactions", "status")

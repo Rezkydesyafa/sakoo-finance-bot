@@ -276,8 +276,8 @@ def test_waha_receipt_double_confirmation_does_not_duplicate_transaction(
 
     client.post("/webhook/waha", json=_waha_image_update())
     _run_queued_ocr_job(session_factory, fake_ocr, fake_waha, queued_jobs[0])
-    first_confirm = client.post("/webhook/waha", json=_waha_text_update("YA"))
-    second_confirm = client.post("/webhook/waha", json=_waha_text_update("YA"))
+    first_confirm = client.post("/webhook/waha", json=_waha_text_update("YA", message_id="msg-ya-1"))
+    second_confirm = client.post("/webhook/waha", json=_waha_text_update("YA", message_id="msg-ya-2"))
 
     assert first_confirm.status_code == 200, first_confirm.text
     assert first_confirm.json()["transaction_status"] == "saved"
@@ -560,8 +560,13 @@ def test_waha_receipt_image_returns_limit_message_before_second_queue(
     get_settings.cache_clear()
     _create_linked_whatsapp_user(session_factory)
 
-    first_response = client.post("/webhook/waha", json=_waha_image_update())
-    second_response = client.post("/webhook/waha", json=_waha_image_update())
+    first_response = client.post("/webhook/waha", json=_waha_image_update(message_id="msg-image-1"))
+    with session_factory() as db:
+        receipt = db.scalar(select(Receipt))
+        assert receipt is not None
+        receipt.status = "cancelled"
+        db.commit()
+    second_response = client.post("/webhook/waha", json=_waha_image_update(message_id="msg-image-2"))
 
     assert first_response.status_code == 200, first_response.text
     assert second_response.status_code == 200, second_response.text
@@ -616,7 +621,33 @@ def test_waha_from_me_message_is_logged_without_processing(
         assert db.scalar(select(Transaction)) is None
         log = db.scalar(select(BotLog))
         assert log is not None
-        assert log.status == "received"
+        assert log.status == "from_me"
+
+
+def test_waha_duplicate_webhook_message_is_skipped(
+    test_client: tuple[
+        TestClient,
+        sessionmaker[Session],
+        FakeWahaClient,
+        FakeOcrClient,
+        list[dict[str, Any]],
+    ],
+) -> None:
+    client, session_factory, fake_waha, _fake_ocr, _queued_jobs = test_client
+    _create_linked_whatsapp_user(session_factory)
+    payload = _waha_text_update("beli makan 20 ribu", message_id="msg-duplicate-save")
+
+    first = client.post("/webhook/waha", json=payload)
+    second = client.post("/webhook/waha", json=payload)
+
+    assert first.status_code == 200, first.text
+    assert second.status_code == 200, second.text
+    assert first.json()["transaction_status"] == "saved"
+    assert second.json()["status"] == "duplicate"
+    assert len(fake_waha.sent_messages) == 1
+
+    with session_factory() as db:
+        assert len(db.scalars(select(Transaction)).all()) == 1
 
 
 def _run_queued_ocr_job(
@@ -660,12 +691,12 @@ def _create_linked_whatsapp_user(session_factory: sessionmaker[Session]) -> None
         db.commit()
 
 
-def _waha_image_update(caption: str | None = None) -> dict[str, Any]:
+def _waha_image_update(caption: str | None = None, *, message_id: str = "msg-image-1") -> dict[str, Any]:
     payload = {
         "event": "message",
         "session": "default",
         "payload": {
-            "id": "msg-image-1",
+            "id": message_id,
             "from": "6281234567890@c.us",
             "fromMe": False,
             "hasMedia": True,
@@ -682,12 +713,17 @@ def _waha_image_update(caption: str | None = None) -> dict[str, Any]:
     return payload
 
 
-def _waha_text_update(text: str, *, from_me: bool = False) -> dict[str, Any]:
+def _waha_text_update(
+    text: str,
+    *,
+    from_me: bool = False,
+    message_id: str | None = None,
+) -> dict[str, Any]:
     return {
         "event": "message",
         "session": "default",
         "payload": {
-            "id": f"msg-{text}",
+            "id": message_id or f"msg-{text}",
             "from": "6281234567890@c.us",
             "fromMe": from_me,
             "body": text,

@@ -125,6 +125,15 @@ async def receive_telegram_webhook(
             detail=f"Invalid Telegram update: {exc}",
         ) from exc
 
+    external_event_id = _telegram_external_event_id(parsed)
+    duplicate_log = _find_duplicate_webhook_log(
+        db,
+        platform="telegram",
+        external_event_id=external_event_id,
+    )
+    if duplicate_log is not None:
+        return _duplicate_telegram_response(duplicate_log)
+
     user_id = _resolve_telegram_user_id(db, parsed)
     menu_command_result = _handle_menu_command_if_needed(
         parsed,
@@ -143,6 +152,7 @@ async def receive_telegram_webhook(
                 "menu_command": menu_command_result.to_log_payload(),
             },
             status=f"menu_{menu_command_result.status}",
+            external_event_id=external_event_id,
             error_message=menu_command_result.error_message,
         )
         db.add(bot_log)
@@ -189,6 +199,7 @@ async def receive_telegram_webhook(
                 "callback": callback_result.to_log_payload(),
             },
             status=f"callback_{callback_result.status}",
+            external_event_id=external_event_id,
             error_message=callback_result.error_message,
         )
         db.add(bot_log)
@@ -295,6 +306,7 @@ async def receive_telegram_webhook(
             report_pdf_result,
             transaction_result,
         ),
+        external_event_id=external_event_id,
         error_message=_resolve_error_message(
             linking_result.error_message,
             voice_result,
@@ -340,6 +352,62 @@ async def receive_telegram_webhook(
         job_id=_resolve_response_job_id(voice_result, receipt_result, report_pdf_result),
         reply_status=reply_status,
     )
+
+
+def _telegram_external_event_id(parsed: Any) -> str:
+    return str(parsed.update_id)
+
+
+def _find_duplicate_webhook_log(
+    db: Session,
+    *,
+    platform: str,
+    external_event_id: str | None,
+) -> BotLog | None:
+    if not external_event_id:
+        return None
+    return db.scalar(
+        select(BotLog).where(
+            BotLog.platform == platform,
+            BotLog.external_event_id == external_event_id,
+        )
+    )
+
+
+def _duplicate_telegram_response(bot_log: BotLog) -> TelegramWebhookResponse:
+    return TelegramWebhookResponse(
+        status="duplicate",
+        message_type=bot_log.message_type,
+        bot_log_id=bot_log.id,
+        user_id=bot_log.user_id,
+        linking_status="linked" if bot_log.user_id else "unlinked",
+        transaction_status=_duplicate_transaction_status(bot_log),
+        transaction_id=_duplicate_transaction_id(bot_log),
+        reply_status=None,
+    )
+
+
+def _duplicate_transaction_status(bot_log: BotLog) -> str | None:
+    payload = bot_log.parsed_result or {}
+    if not isinstance(payload, dict):
+        return None
+    for key in ("transaction", "receipt_ocr", "voice_stt", "report_pdf", "menu_command", "callback"):
+        value = payload.get(key)
+        if isinstance(value, dict):
+            status_value = value.get("transaction_status") or value.get("status")
+            return str(status_value) if status_value else None
+    return None
+
+
+def _duplicate_transaction_id(bot_log: BotLog) -> int | None:
+    payload = bot_log.parsed_result or {}
+    if not isinstance(payload, dict):
+        return None
+    for key in ("transaction", "receipt_ocr", "voice_stt"):
+        value = payload.get(key)
+        if isinstance(value, dict) and isinstance(value.get("transaction_id"), int):
+            return value["transaction_id"]
+    return None
 
 
 def _resolve_telegram_user_id(db: Session, parsed: Any) -> int | None:

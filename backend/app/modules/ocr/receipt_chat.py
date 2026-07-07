@@ -17,6 +17,10 @@ YES_CONFIRMATION_RE = re.compile(
     r"^\s*(?:ya|iya|y|yes|ok|oke|benar|setuju|simpan)\s*$",
     re.IGNORECASE,
 )
+CANCEL_CONFIRMATION_RE = re.compile(
+    r"^\s*(?:batal|cancel|ga jadi|gajadi|jangan(?:\s+simpan)?)\s*$",
+    re.IGNORECASE,
+)
 EDIT_TOTAL_RE = re.compile(r"^\s*edit(?:\s+total)?\s+(?P<amount>.+?)\s*$", re.IGNORECASE)
 EDIT_DATE_RE = re.compile(r"^\s*edit\s+tanggal\s+(?P<date>.+?)\s*$", re.IGNORECASE)
 EDIT_MERCHANT_RE = re.compile(r"^\s*edit\s+merchant\s+(?P<merchant>.+?)\s*$", re.IGNORECASE)

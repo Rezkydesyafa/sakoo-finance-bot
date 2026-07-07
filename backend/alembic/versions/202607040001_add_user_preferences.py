@@ -22,8 +22,8 @@ def upgrade() -> None:
         sa.Column("id", sa.BigInteger(), primary_key=True),
         sa.Column("user_id", sa.BigInteger(), nullable=False),
         sa.Column("reply_style", sa.String(length=16), server_default="friendly", nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.CheckConstraint(
             "reply_style IN ('friendly', 'detailed', 'short')",
             name="ck_user_preferences_reply_style",

@@ -504,6 +504,7 @@ class BotLog(Base):
     raw_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     parsed_result: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     status: Mapped[str] = mapped_column(String(64), nullable=False)
+    external_event_id: Mapped[str | None] = mapped_column(String(160), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -513,4 +514,7 @@ class BotLog(Base):
 
     user: Mapped["User | None"] = relationship(back_populates="bot_logs")
 
-    __table_args__ = (Index("ix_bot_logs_user_created_at", "user_id", "created_at"),)
+    __table_args__ = (
+        Index("ix_bot_logs_user_created_at", "user_id", "created_at"),
+        Index("uq_bot_logs_platform_external_event", "platform", "external_event_id", unique=True),
+    )

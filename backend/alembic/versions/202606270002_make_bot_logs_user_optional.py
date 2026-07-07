@@ -17,6 +17,8 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    if op.get_bind().dialect.name == "sqlite":
+        return
     op.drop_constraint("bot_logs_user_id_fkey", "bot_logs", type_="foreignkey")
     op.alter_column(
         "bot_logs",
@@ -35,6 +37,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    if op.get_bind().dialect.name == "sqlite":
+        return
     op.drop_constraint("bot_logs_user_id_fkey", "bot_logs", type_="foreignkey")
     op.alter_column(
         "bot_logs",

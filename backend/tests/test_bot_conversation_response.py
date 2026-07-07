@@ -16,8 +16,11 @@ os.environ["LLM_PROVIDER"] = "none"
 from app.config import get_settings
 from app.database import Base
 from app.models import BotLog, Category, CategoryBudget, MediaFile, Receipt, Transaction, User, UserPreference
-from app.modules.llm.base import LlmProviderError
-from app.modules.transactions.service import handle_text_transaction
+from app.modules.transactions.service import (
+    handle_telegram_text_transaction,
+    handle_text_transaction,
+    handle_whatsapp_text_transaction,
+)
 
 
 @pytest.fixture()
@@ -905,6 +908,47 @@ def test_pending_category_create_can_be_replaced(
     assert "Tugas Kuliah" not in category_names
 
 
+def test_pending_receipt_blocks_new_category_pending(
+    session_factory: sessionmaker[Session],
+) -> None:
+    with session_factory() as db:
+        user = _create_user(db)
+        media_file = MediaFile(
+            user_id=user.id,
+            file_type="receipt",
+            stored_path="receipts/pending.jpg",
+            source="telegram_receipt",
+        )
+        db.add(media_file)
+        db.flush()
+        db.add(
+            Receipt(
+                user_id=user.id,
+                media_file_id=media_file.id,
+                total_amount=Decimal("50000.00"),
+                status="needs_confirmation",
+            )
+        )
+        db.commit()
+
+        result = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="buatkan kategori nongkrong",
+            source="whatsapp_text",
+        )
+        pending_category = db.scalar(
+            select(BotLog).where(
+                BotLog.user_id == user.id,
+                BotLog.status == "pending_category_create",
+            )
+        )
+
+    assert result.status == "active_pending"
+    assert "struk OCR" in result.reply_text
+    assert pending_category is None
+
+
 def test_pending_category_create_does_not_block_budget_question(
     session_factory: sessionmaker[Session],
 ) -> None:
@@ -925,7 +969,7 @@ def test_pending_category_create_does_not_block_budget_question(
         )
 
     assert result.status == "budget_remaining"
-    assert "Masih menunggu" not in result.reply_text
+    assert "Masih ada" not in result.reply_text
 
 
 def test_bot_can_set_check_and_list_budget(
@@ -983,7 +1027,183 @@ def test_bot_can_set_check_and_list_budget(
     assert "Sisa total: Rp180.000" in listed.reply_text
 
 
-def test_budget_reply_uses_llm_when_available(
+def test_budget_command_with_kategori_does_not_create_transaction(
+    session_factory: sessionmaker[Session],
+) -> None:
+    with session_factory() as db:
+        user = _create_user(db)
+
+        result = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="Set budget kategori kuliah 300k",
+            source="whatsapp_text",
+        )
+        budget = db.scalar(select(CategoryBudget).where(CategoryBudget.user_id == user.id))
+        transaction = db.scalar(select(Transaction).where(Transaction.user_id == user.id))
+
+    assert result.status == "budget_saved"
+    assert budget is not None
+    assert budget.monthly_limit == Decimal("300000.00")
+    assert transaction is None
+
+
+def test_budget_prefers_user_kuliah_category_over_pendidikan_alias(
+    session_factory: sessionmaker[Session],
+) -> None:
+    with session_factory() as db:
+        user = _create_user(db)
+        kuliah = Category(name="Kuliah", type="expense", user_id=user.id)
+        db.add(kuliah)
+        db.commit()
+
+        result = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="set budget kuliah 500rb",
+            source="whatsapp_text",
+        )
+        budget = db.scalar(select(CategoryBudget).where(CategoryBudget.user_id == user.id))
+
+    assert result.status == "budget_saved"
+    assert budget is not None
+    assert budget.category_id == kuliah.id
+
+
+def test_budget_help_question_does_not_become_invalid_or_transaction(
+    session_factory: sessionmaker[Session],
+) -> None:
+    with session_factory() as db:
+        user = _create_user(db)
+
+        result = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="saya ingin set budget kategori kuliah gimana caranya",
+            source="whatsapp_text",
+        )
+        transaction = db.scalar(select(Transaction).where(Transaction.user_id == user.id))
+
+    assert result.status == "budget_help"
+    assert "set budget kuliah 500rb" in result.reply_text
+    assert "budget kuliah tinggal berapa" in result.reply_text
+    assert "list budget" in result.reply_text
+    assert transaction is None
+
+
+def test_budget_category_options_are_separate_from_budget_list(
+    session_factory: sessionmaker[Session],
+) -> None:
+    with session_factory() as db:
+        user = _create_user(db)
+        db.add(Category(name="Kuliah", type="expense", user_id=user.id))
+        db.commit()
+
+        result = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="ada kategori budget apa saja",
+            source="whatsapp_text",
+        )
+
+    assert result.status == "budget_category_list"
+    assert "Makanan" in result.reply_text
+    assert "Kuliah" in result.reply_text
+    assert "list budget" in result.reply_text
+
+
+def test_create_category_with_budget_sets_budget_after_confirmation(
+    session_factory: sessionmaker[Session],
+) -> None:
+    with session_factory() as db:
+        user = _create_user(db)
+
+        pending = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="tambahkan kategori budget nongkrong dan set budgetnya 400k",
+            source="whatsapp_text",
+        )
+        category_before_confirm = db.scalar(
+            select(Category).where(Category.user_id == user.id, Category.name == "Nongkrong")
+        )
+
+        confirmed = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="ya",
+            source="whatsapp_text",
+        )
+        category = db.scalar(
+            select(Category).where(Category.user_id == user.id, Category.name == "Nongkrong")
+        )
+        budget = db.scalar(select(CategoryBudget).where(CategoryBudget.user_id == user.id))
+
+    assert pending.status == "category_create_needs_confirmation"
+    assert "Nongkrong" in pending.reply_text
+    assert "Rp400.000" in pending.reply_text
+    assert "Budget Nongkrong" not in pending.reply_text
+    assert category_before_confirm is None
+    assert confirmed.status == "category_created"
+    assert "Kategori Nongkrong dibuat" in confirmed.reply_text
+    assert "Budget Rp400.000 juga sudah diset" in confirmed.reply_text
+    assert category is not None
+    assert budget is not None
+    assert budget.category_id == category.id
+    assert budget.monthly_limit == Decimal("400000.00")
+
+
+def test_budget_category_list_variants_are_deterministic(
+    session_factory: sessionmaker[Session],
+) -> None:
+    with session_factory() as db:
+        user = _create_user(db)
+        db.add(Category(name="Nongkrong", type="expense", user_id=user.id))
+        db.commit()
+
+        first = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="list kategori budgetnya ada apa saja",
+            source="whatsapp_text",
+        )
+        second = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="list kategori budget",
+            source="whatsapp_text",
+        )
+
+    assert first.status == "budget_category_list"
+    assert second.status == "budget_category_list"
+    assert first.reply_text == second.reply_text
+    assert "Nongkrong" in first.reply_text
+    assert "rekomendasi" not in first.reply_text.lower()
+
+
+def test_telegram_whatsapp_text_status_parity_for_budget_list(
+    session_factory: sessionmaker[Session],
+) -> None:
+    with session_factory() as db:
+        telegram_user = _create_user(db, email="parity-telegram@example.com")
+        whatsapp_user = _create_user(db, email="parity-whatsapp@example.com")
+
+        telegram = handle_telegram_text_transaction(
+            db=db,
+            user_id=telegram_user.id,
+            text="list budget",
+        )
+        whatsapp = handle_whatsapp_text_transaction(
+            db=db,
+            user_id=whatsapp_user.id,
+            text="list budget",
+        )
+
+    assert telegram.status == whatsapp.status == "budget_list"
+    assert telegram.reply_text == whatsapp.reply_text
+
+
+def test_budget_replies_do_not_use_llm_for_deterministic_commands(
     session_factory: sessionmaker[Session],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1000,61 +1220,30 @@ def test_budget_reply_uses_llm_when_available(
 
     with session_factory() as db:
         user = _create_user(db)
-        result = handle_text_transaction(
+        saved = handle_text_transaction(
             db=db,
             user_id=user.id,
             text="set budget makan 600rb",
             source="whatsapp_text",
         )
-
-    assert result.status == "budget_saved"
-    assert result.reply_text.startswith("Siap, budget Makanan")
-    assert calls
-    assert "Data budget" in str(calls[0]["message"])
-    assert "Budget user dari database" in str(calls[0]["context"])
-
-
-def test_budget_reply_falls_back_when_llm_fails_or_changes_numbers(
-    session_factory: sessionmaker[Session],
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    def fail_answer(*_args: object, **_kwargs: object) -> str:
-        raise LlmProviderError("provider_down")
-
-    monkeypatch.setattr(
-        "app.modules.transactions.service.answer_finance_question_with_llm",
-        fail_answer,
-    )
-
-    with session_factory() as db:
-        user = _create_user(db)
-        failed = handle_text_transaction(
+        remaining = handle_text_transaction(
             db=db,
             user_id=user.id,
-            text="set budget makan 600rb",
+            text="budget makan tinggal berapa?",
+            source="whatsapp_text",
+        )
+        listed = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="list budget",
             source="whatsapp_text",
         )
 
-    assert failed.reply_text == "Budget Makanan: Rp600.000.\nTerpakai Rp0. Sisa Rp600.000."
-
-    def unsafe_answer(*_args: object, **_kwargs: object) -> str:
-        return "Budgetnya Rp700.000 ya, masih aman."
-
-    monkeypatch.setattr(
-        "app.modules.transactions.service.answer_finance_question_with_llm",
-        unsafe_answer,
-    )
-
-    with session_factory() as db:
-        user = _create_user(db, email="unsafe-budget@example.com")
-        unsafe = handle_text_transaction(
-            db=db,
-            user_id=user.id,
-            text="set budget makan 600rb",
-            source="whatsapp_text",
-        )
-
-    assert unsafe.reply_text == "Budget Makanan: Rp600.000.\nTerpakai Rp0. Sisa Rp600.000."
+    assert saved.status == "budget_saved"
+    assert remaining.status == "budget_remaining"
+    assert listed.status == "budget_list"
+    assert saved.reply_text == "Budget Makanan: Rp600.000.\nTerpakai Rp0. Sisa Rp600.000."
+    assert calls == []
 
 
 def test_reset_expense_requires_confirmation(
