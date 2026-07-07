@@ -46,6 +46,7 @@ LIST_EXPENSE_PHRASES = (
     "pengeluaran minggu ini",
     "pengeluaran hari ini",
     "pengeluaran kemarin",
+    "pengeluaran terbaru",
     "apa saja pengeluaran",
     "apa aja pengeluaran",
 )
@@ -89,6 +90,8 @@ FINANCE_EDUCATION_RE = re.compile(
     r"|jelaskan.*(?:keuangan|menabung|nabung|budgeting|investasi|finansial|tabungan|uang)"
     r"|saran\s+(?:keuangan|finansial|investasi|menabung|nabung)"
     r"|(?:tolong|bantu|coba).*(?:strategi|tips?|saran|rencana).*(?:menabung|nabung|keuangan|hemat|investasi)"
+    r"|(?:bantu|tolong).*(?:atur|kelola).*(?:uang|keuangan)"
+    r"|(?:evaluasi|sehat|ngurangin|kurangi|stop langganan|target nabung|pengen nabung).*(?:uang|keuangan|pengeluaran|jajan|tabungan|nabung|langganan)?"
     r")\b",
     re.IGNORECASE,
 )
@@ -136,7 +139,7 @@ DATE_SORT_RE = re.compile(
 # Match category detail queries like "tagihan apa itu", "makanan berapa bulan ini"
 CATEGORY_DETAIL_RE = re.compile(
     r"\b(?P<category>makan(?:an)?|kopi|transport(?:asi)?|bensin|tagihan|belanja|"
-    r"hiburan|kesehatan|pendidikan|kos|gaji|tabungan)\b"
+    r"hiburan|kesehatan|pendidikan|kuliah|kampus|kos|gaji|tabungan)\b"
     r"\s+(?:apa\s+(?:itu|saja|aja)|berapa|rincian|detail|rinci)",
     re.IGNORECASE,
 )
@@ -311,7 +314,7 @@ def _category_name_from_alias(alias: str) -> str:
         return "Hiburan"
     if normalized == "kesehatan":
         return "Kesehatan"
-    if normalized == "pendidikan":
+    if normalized in {"pendidikan", "kuliah", "kampus"}:
         return "Pendidikan"
     if normalized == "gaji":
         return "Gaji"

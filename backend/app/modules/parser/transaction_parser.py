@@ -136,10 +136,10 @@ CATEGORY_KEYWORDS: tuple[tuple[str, str, set[str]], ...] = (
     (
         "Gaji",
         "income",
-        {"bonus", "freelance", "gaji", "invoice", "pendapatan", "salary", "upah"},
+        {"bonus", "freelance", "gaji", "gajian", "invoice", "pendapatan", "salary", "upah"},
     ),
-    ("Uang Saku", "income", {"uang saku", "uang jajan"}),
-    ("Tabungan", "income", {"investasi", "nabung", "saving", "tabung", "tabungan"}),
+    ("Uang Saku", "income", {"dikasih", "mama", "temen", "uang saku", "uang jajan"}),
+    ("Tabungan", "income", {"cashback", "investasi", "nabung", "refund", "saving", "tabung", "tabungan"}),
 )
 
 
@@ -226,6 +226,8 @@ def _detect_category(text: str) -> tuple[str | None, str | None, bool]:
         return "Uang Saku", "income", True
 
     tokens = _tokenize(text)
+    if tokens & {"refund", "cashback"}:
+        return "Tabungan", "income", True
     for category, category_type, keywords in CATEGORY_KEYWORDS:
         if tokens & keywords or any(keyword in text for keyword in keywords if " " in keyword):
             return category, category_type, True

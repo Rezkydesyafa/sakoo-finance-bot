@@ -108,6 +108,55 @@ export type TransactionTextParseResponse = {
   transaction_id: number | null;
 };
 
+// Category types
+export type CategoryResponse = {
+  id: number;
+  user_id: number | null;
+  name: string;
+  type: string;
+  icon: string | null;
+  color: string | null;
+  keywords: string[] | null;
+  is_default: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CategoryListResponse = {
+  items: CategoryResponse[];
+  total: number;
+};
+
+// Budget types
+export type BudgetUpsertRequest = {
+  monthly_limit: number;
+};
+
+export type BudgetItemResponse = {
+  category_id: number;
+  category_name: string;
+  monthly_limit: string | number;
+  spent: string | number;
+  remaining: string | number;
+  usage_percentage: string | number;
+  status: string;
+};
+
+export type BudgetListResponse = {
+  period_start: string;
+  period_end: string;
+  total_budgeted: string | number;
+  total_spent: string | number;
+  total_remaining: string | number;
+  items: BudgetItemResponse[];
+};
+
+export type BudgetResponse = BudgetItemResponse & {
+  period_start: string;
+  period_end: string;
+};
+
 // Report types
 export type ReportTransactionItem = {
   id: number;
@@ -334,6 +383,27 @@ export const apiClient = {
         method: "POST",
         token,
         body: JSON.stringify(payload),
+      }),
+  },
+
+  categories: {
+    list: (token: string) =>
+      apiRequest<CategoryListResponse>("/categories", { token }),
+  },
+
+  budgets: {
+    list: (token: string) =>
+      apiRequest<BudgetListResponse>("/budgets", { token }),
+    set: (token: string, categoryId: number, payload: BudgetUpsertRequest) =>
+      apiRequest<BudgetResponse>(`/budgets/${categoryId}`, {
+        method: "PUT",
+        token,
+        body: JSON.stringify(payload),
+      }),
+    remove: (token: string, categoryId: number) =>
+      apiRequest<void>(`/budgets/${categoryId}`, {
+        method: "DELETE",
+        token,
       }),
   },
 

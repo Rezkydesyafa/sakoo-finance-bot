@@ -44,7 +44,7 @@ function HomeContent() {
   const [addTxInitialType, setAddTxInitialType] = useState<TransactionType>("expense");
 
   const [editTxId, setEditTxId] = useState<number | null>(null);
-  const [editTxData, setEditTxData] = useState<{ type: TransactionType, title: string, amount: number } | null>(null);
+  const [editTxData, setEditTxData] = useState<{ type: TransactionType, title: string, amount: number, categoryId: number | null } | null>(null);
 
   const [deleteTxId, setDeleteTxId] = useState<number | null>(null);
   const [exitWarningShowing, setExitWarningShowing] = useState(false);
@@ -232,10 +232,11 @@ function HomeContent() {
       type: tx.type,
       title: tx.description || "",
       amount: tx.amount,
+      categoryId: tx.category_id,
     });
   }
 
-  async function handleSaveEditTransaction(data: { type: "income" | "expense"; title: string; amount: number }) {
+  async function handleSaveEditTransaction(data: { type: "income" | "expense"; title: string; amount: number; category_id: number | null }) {
     if (!editTxId) return;
     const id = editTxId;
     setEditTxId(null);
@@ -249,6 +250,7 @@ function HomeContent() {
         description: data.title.trim(),
         amount: data.amount,
         type: data.type,
+        category_id: data.category_id,
       });
       await refreshTransactions(token);
     } catch (error) {
@@ -301,7 +303,7 @@ function HomeContent() {
 
 
 
-  async function handleSaveModalTransaction(data: { type: "income" | "expense"; title: string; amount: number }) {
+  async function handleSaveModalTransaction(data: { type: "income" | "expense"; title: string; amount: number; category_id: number | null }) {
     setIsAddTxModalOpen(false);
     const token = getStoredAuthToken();
     if (!token) {
@@ -322,6 +324,7 @@ function HomeContent() {
         amount: data.amount,
         description: data.title.trim(),
         transaction_date: formatLocalDate(new Date()),
+        category_id: data.category_id,
       });
 
       setTransactions(prev => [
@@ -529,6 +532,7 @@ function HomeContent() {
           initialType={editTxData.type}
           initialTitle={editTxData.title}
           initialAmount={editTxData.amount}
+          initialCategoryId={editTxData.categoryId}
         />
       )}
 
@@ -608,6 +612,7 @@ function toDashboardTransaction(
     id: transaction.id,
     type: transaction.type,
     amount: parseFloat(transaction.amount),
+    category_id: transaction.category_id || null,
     category_name: transaction.category_name || fallbackCategory,
     description: transaction.description || "Transaksi Tanpa Keterangan",
     transaction_date: transaction.transaction_date,
