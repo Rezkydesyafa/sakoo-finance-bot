@@ -1,10 +1,12 @@
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
-import { useEffect, useState, useMemo } from "react";
+import { Suspense, useEffect, useState, useMemo } from "react";
 import { clearAuthToken, getStoredAuthToken } from "@/lib/auth-storage";
 import { ApiError, apiClient } from "@/lib/api";
 import type { Transaction as ApiTransaction, TransactionType } from "@/lib/api";
+import { DashboardShell } from "@/components/dashboard-shell";
+import { LandingPage } from "@/components/landing-page";
 import { OverviewTab } from "@/components/tabs/overview-tab";
 import { TransactionsTab } from "@/components/tabs/transactions-tab";
 import { ReportsTab } from "@/components/tabs/reports-tab";
@@ -17,12 +19,21 @@ import { ChatTab } from "@/components/tabs/chat-tab";
 import type { Transaction } from "./types";
 
 export default function Home() {
+  return (
+    <Suspense fallback={<LandingPage />}>
+      <HomeContent />
+    </Suspense>
+  );
+}
+
+function HomeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const activeTab = searchParams.get("tab") || "overview";
 
   const [userId, setUserId] = useState<number | null>(null);
   const [userName, setUserName] = useState("User");
+  const [authState, setAuthState] = useState<"checking" | "guest" | "authenticated">("checking");
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const searchTerm = searchParams.get("q") || "";
   const [expenseFilterType, setExpenseFilterType] = useState<"all" | "income" | "expense">("all");
@@ -119,27 +130,31 @@ export default function Home() {
       .then(() => setHealthStatus(prev => ({ ...prev, waha: "online" })))
       .catch(() => setHealthStatus(prev => ({ ...prev, waha: "offline" })));
 
-    if (token) {
-      apiClient.me(token)
-        .then((user) => {
-          setUserId(user.id);
-          if (user.name) setUserName(user.name);
-        })
-        .catch((error) => {
-          if (isAuthExpiredError(error)) {
-            clearAuthToken();
-            window.location.href = "/login?next=/";
-          }
-        });
-
-      refreshTransactions(token)
-        .catch((error) => {
-          if (isAuthExpiredError(error)) {
-            clearAuthToken();
-            window.location.href = "/login?next=/";
-          }
-        });
+    if (!token) {
+      setAuthState("guest");
+      return;
     }
+
+    setAuthState("authenticated");
+    apiClient.me(token)
+      .then((user) => {
+        setUserId(user.id);
+        if (user.name) setUserName(user.name);
+      })
+      .catch((error) => {
+        if (isAuthExpiredError(error)) {
+          clearAuthToken();
+          setAuthState("guest");
+        }
+      });
+
+    refreshTransactions(token)
+      .catch((error) => {
+        if (isAuthExpiredError(error)) {
+          clearAuthToken();
+          setAuthState("guest");
+        }
+      });
   }, []);
 
   const totalIncome = useMemo(() => {
@@ -416,8 +431,12 @@ export default function Home() {
     }
   };
 
+  if (authState !== "authenticated") {
+    return <LandingPage />;
+  }
+
   return (
-    <>
+    <DashboardShell>
       {/* Render Main Tab Content */}
       <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-both" style={{ animationDelay: '100ms' }}>
         {(activeTab === "overview" || activeTab === "settings") && (
@@ -577,7 +596,7 @@ export default function Home() {
         <span className="material-symbols-outlined text-[18px]">info</span>
         Ketuk lagi untuk keluar!
       </div>
-    </>
+    </DashboardShell>
   );
 }
 
