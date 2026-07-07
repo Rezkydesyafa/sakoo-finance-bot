@@ -12,82 +12,85 @@ type CategoryOption = {
   color: string | null;
 };
 
-type TransactionModalProps = {
+type SetBudgetModalProps = {
   isOpen: boolean;
-  mode: "add" | "edit";
   onClose: () => void;
-  onSave: (data: { type: "income" | "expense"; title: string; amount: number; category_id: number | null }) => void;
-  initialType: "income" | "expense";
-  initialTitle?: string;
+  onSave: () => void;
+  initialCategoryId?: number;
   initialAmount?: number;
-  initialCategoryId?: number | null;
 };
 
-export function TransactionModal({ 
+export function SetBudgetModal({ 
   isOpen, 
-  mode,
   onClose, 
   onSave, 
-  initialType,
-  initialTitle = "",
-  initialAmount,
   initialCategoryId,
-}: TransactionModalProps) {
-  const [type, setType] = useState<"income" | "expense">(initialType);
-  const [title, setTitle] = useState(initialTitle);
-  const [amount, setAmount] = useState(initialAmount ? initialAmount.toString() : "");
+  initialAmount,
+}: SetBudgetModalProps) {
   const [categoryId, setCategoryId] = useState<number | "">("");
-  
+  const [amount, setAmount] = useState("");
   const [categories, setCategories] = useState<CategoryOption[]>([]);
-  const [filteredCategories, setFilteredCategories] = useState<CategoryOption[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
-      setType(initialType);
-      setTitle(initialTitle);
-      setAmount(initialAmount ? initialAmount.toString() : "");
       setCategoryId(initialCategoryId || "");
+      setAmount(initialAmount ? initialAmount.toString() : "");
       
+      // Fetch expense categories
       const token = getStoredAuthToken();
       if (token) {
         apiClient.categories.list(token)
           .then(res => {
-            setCategories(res.items);
+            const expenseCategories = res.items
+              .filter(c => c.type === "expense" || c.type === "both")
+              .map(c => ({ 
+                id: c.id, 
+                name: c.name,
+                type: c.type,
+                icon: c.icon,
+                color: c.color
+              }));
+            setCategories(expenseCategories);
+            
+            // Auto-select first category if none is provided
+            if (!initialCategoryId && expenseCategories.length > 0) {
+              setCategoryId(expenseCategories[0].id);
+            }
           })
           .catch(err => console.error("Failed to fetch categories:", err));
       }
     }
-  }, [isOpen, initialType, initialTitle, initialAmount, initialCategoryId]);
-
-  useEffect(() => {
-    // Filter categories based on transaction type
-    const filtered = categories.filter(c => c.type === type || c.type === "both");
-    setFilteredCategories(filtered);
-    
-    // Auto-select first category if the current categoryId is not in the filtered list
-    if (filtered.length > 0) {
-      const isValid = filtered.some(c => c.id === categoryId);
-      if (!isValid) {
-        setCategoryId(filtered[0].id);
-      }
-    } else {
-      setCategoryId("");
-    }
-  }, [categories, type, categoryId]);
+  }, [isOpen, initialCategoryId, initialAmount]);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const numericAmount = parseFloat(amount);
-    if (isNaN(numericAmount) || numericAmount <= 0) {
-      alert("Nominal tidak valid!");
+    if (!categoryId) {
+      alert("Pilih kategori pengeluaran terlebih dahulu!");
       return;
     }
-    
-    const catId = categoryId === "" ? null : Number(categoryId);
-    onSave({ type, title, amount: numericAmount, category_id: catId });
+    const numericAmount = parseFloat(amount);
+    if (isNaN(numericAmount) || numericAmount <= 0) {
+      alert("Nominal limit tidak valid!");
+      return;
+    }
+
+    const token = getStoredAuthToken();
+    if (!token) return;
+
+    setIsLoading(true);
+    try {
+      await apiClient.budgets.set(token, Number(categoryId), { monthly_limit: numericAmount });
+      onSave();
+    } catch (err) {
+      console.error(err);
+      alert("Gagal mengatur budget. Silakan coba lagi.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -102,9 +105,7 @@ export function TransactionModal({
       >
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-bold text-[#1a1c1b]">
-            {mode === "edit" 
-              ? `Edit ${type === "expense" ? "Pengeluaran" : "Pemasukan"}` 
-              : `Tambah ${type === "expense" ? "Pengeluaran" : "Pemasukan"}`}
+            {initialCategoryId ? "Ubah Limit Budget" : "Set Limit Budget"}
           </h2>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#F1F2F0] transition-colors border-none bg-transparent cursor-pointer">
             <span className="material-symbols-outlined text-[#6F6F6F]">close</span>
@@ -113,31 +114,21 @@ export function TransactionModal({
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-xs font-semibold text-[#6F6F6F] mb-1.5">Judul Transaksi</label>
-            <input 
-              type="text" 
-              required
-              placeholder={type === "expense" ? "Cth: Makan Siang" : "Cth: Gaji Bulanan"}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full bg-[#F1F2F0] border-none rounded-xl py-3 px-4 text-sm font-medium text-[#1a1c1b] focus:ring-1 focus:ring-[#c7ff00]" 
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-[#6F6F6F] mb-1.5">Kategori</label>
+            <label className="block text-xs font-semibold text-[#6F6F6F] mb-1.5">Kategori Pengeluaran</label>
             <div 
-              className={`relative flex items-center bg-[#F1F2F0] rounded-xl px-4 py-3 transition-shadow cursor-pointer ${isDropdownOpen ? 'ring-1 ring-[#c7ff00]' : ''}`}
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className={`relative flex items-center bg-[#F1F2F0] rounded-xl px-4 py-3 transition-shadow ${isDropdownOpen ? 'ring-1 ring-[#c7ff00]' : ''} ${!!initialCategoryId ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+              onClick={() => {
+                if (!initialCategoryId) setIsDropdownOpen(!isDropdownOpen);
+              }}
             >
               <span className="material-symbols-outlined text-[#6F6F6F] mr-2 text-[18px] flex-shrink-0">category</span>
               
               <div className="flex-1 text-sm font-medium text-[#1a1c1b]">
-                {categoryId === "" 
-                  ? "Lainnya (Tanpa Kategori)" 
-                  : filteredCategories.find(c => c.id === categoryId)?.name || "Pilih Kategori..."}
+                {categoryId 
+                  ? categories.find(c => c.id === categoryId)?.name || "Pilih Kategori..."
+                  : "Pilih Kategori..."}
               </div>
-
+              
               <span className={`material-symbols-outlined text-[#6F6F6F] text-[18px] transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`}>
                 expand_more
               </span>
@@ -147,20 +138,7 @@ export function TransactionModal({
                   <div className="fixed inset-0 z-40 bg-transparent" onClick={(e) => { e.stopPropagation(); setIsDropdownOpen(false); }}></div>
                   
                   <div className="absolute top-[calc(100%+8px)] left-0 right-0 bg-white rounded-xl shadow-xl border border-[#E8E8E8] max-h-52 overflow-y-auto z-50 py-1 animate-in fade-in slide-in-from-top-2 duration-200">
-                    
-                    <div 
-                      onClick={(e) => { 
-                        e.stopPropagation();
-                        setCategoryId(""); 
-                        setIsDropdownOpen(false); 
-                      }}
-                      className={`px-4 py-3 text-sm cursor-pointer transition-colors flex items-center justify-between ${categoryId === "" ? 'bg-[#F1F2F0] text-[#151f00] font-bold' : 'text-[#1a1c1b] hover:bg-[#F1F2F0]'}`}
-                    >
-                      Lainnya (Tanpa Kategori)
-                      {categoryId === "" && <span className="material-symbols-outlined text-[16px]">check</span>}
-                    </div>
-
-                    {filteredCategories.map(c => (
+                    {categories.map(c => (
                       <div 
                         key={c.id} 
                         onClick={(e) => { 
@@ -181,7 +159,7 @@ export function TransactionModal({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-[#6F6F6F] mb-1.5">Nominal (Rp)</label>
+            <label className="block text-xs font-semibold text-[#6F6F6F] mb-1.5">Limit Bulanan (Rp)</label>
             <input 
               type="number" 
               required
@@ -193,8 +171,13 @@ export function TransactionModal({
             />
           </div>
 
-          <button type="submit" className="w-full bg-[#1a1c1b] hover:bg-black text-white py-3.5 rounded-full text-sm font-bold transition-colors border-none cursor-pointer mt-2 shadow-md">
-            {mode === "edit" ? "Simpan Perubahan" : "Simpan Transaksi"}
+          <button 
+            type="submit" 
+            disabled={isLoading}
+            className="w-full bg-[#1a1c1b] hover:bg-black text-white py-3.5 rounded-full text-sm font-bold transition-colors border-none cursor-pointer mt-2 shadow-md disabled:opacity-70 flex items-center justify-center gap-2"
+          >
+            {isLoading && <span className="w-4 h-4 rounded-full border-2 border-white/20 border-t-white animate-spin"></span>}
+            {initialCategoryId ? "Simpan Perubahan" : "Simpan Limit"}
           </button>
         </form>
       </div>
