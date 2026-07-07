@@ -389,6 +389,12 @@ export const apiClient = {
   categories: {
     list: (token: string) =>
       apiRequest<CategoryListResponse>("/categories", { token }),
+    create: (token: string, payload: { name: string; type: string; icon?: string; color?: string; keywords?: string[] }) =>
+      apiRequest<CategoryResponse>("/categories", {
+        method: "POST",
+        token,
+        body: JSON.stringify(payload),
+      }),
   },
 
   budgets: {

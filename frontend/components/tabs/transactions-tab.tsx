@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { Transaction } from "@/app/(dashboard)/types";
+import { apiClient, BudgetListResponse } from "@/lib/api";
+import { getStoredAuthToken } from "@/lib/auth-storage";
 
 type TransactionsTabProps = {
   transactions: Transaction[];
@@ -48,6 +50,28 @@ export function TransactionsTab({
 }: TransactionsTabProps) {
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   const [openDropdownId, setOpenDropdownId] = useState<number | null>(null);
+
+  const [budgetData, setBudgetData] = useState<BudgetListResponse | null>(null);
+  const [isLoadingBudgets, setIsLoadingBudgets] = useState(true);
+
+  useEffect(() => {
+    const fetchBudgets = async () => {
+      const token = getStoredAuthToken();
+      if (token) {
+        try {
+          const data = await apiClient.budgets.list(token);
+          setBudgetData(data);
+        } catch (err) {
+          console.error("Failed to fetch budgets:", err);
+        } finally {
+          setIsLoadingBudgets(false);
+        }
+      } else {
+        setIsLoadingBudgets(false);
+      }
+    };
+    fetchBudgets();
+  }, [transactions]);
 
   const todayStr = new Date().toISOString().split("T")[0];
   const yesterday = new Date();
@@ -307,34 +331,34 @@ export function TransactionsTab({
             </button>
           </div>
           <div className="space-y-6">
-            <div>
-              <div className="flex justify-between text-sm font-semibold text-[#1a1c1b] mb-2">
-                <span>Makan</span>
-                <span>Rp 2.5M / 3M</span>
-              </div>
-              <div className="h-3 w-full bg-[#F1F2F0] rounded-full overflow-hidden">
-                <div className="h-full bg-[#c7ff00] rounded-full w-[83%]"></div>
-              </div>
-            </div>
-            <div>
-              <div className="flex justify-between text-sm font-semibold text-[#1a1c1b] mb-2">
-                <span>Transportasi</span>
-                <span>Rp 800k / 1M</span>
-              </div>
-              <div className="h-3 w-full bg-[#F1F2F0] rounded-full overflow-hidden">
-                <div className="h-full bg-[#4e6700]/60 rounded-full w-[80%]"></div>
-              </div>
-            </div>
-            <div>
-              <div className="flex justify-between text-sm font-semibold text-[#1a1c1b] mb-2">
-                <span>Belanja</span>
-                <span className="text-[#EF6B6B]">Rp 1.2M / 1M</span>
-              </div>
-              <div className="h-3 w-full bg-[#F1F2F0] rounded-full overflow-hidden">
-                <div className="h-full bg-[#EF6B6B] rounded-full w-[100%]"></div>
-              </div>
-              <div className="text-xs text-[#EF6B6B] mt-1 text-right">Over budget</div>
-            </div>
+            {isLoadingBudgets ? (
+               <div className="text-center py-4 text-[#6F6F6F] text-sm flex items-center justify-center gap-2"><span className="w-4 h-4 rounded-full border-2 border-[#6F6F6F]/20 border-t-[#6F6F6F] animate-spin"></span> Loading...</div>
+            ) : !budgetData?.items || budgetData.items.length === 0 ? (
+               <div className="text-center py-4 text-[#6F6F6F] text-sm">Belum ada limit budget.</div>
+            ) : (
+               budgetData.items.slice(0, 3).map((item, idx) => {
+                 const pct = Number(item.usage_percentage);
+                 const isDanger = pct >= 100;
+                 const isWarning = pct >= 70 && pct < 100;
+                 const barColor = isDanger ? 'bg-danger-red' : (isWarning ? 'bg-orange-500' : 'bg-[#c7ff00]');
+                 const textColor = isDanger ? 'text-danger-red' : 'text-[#1a1c1b]';
+                 
+                 return (
+                   <div key={item.category_id || idx}>
+                     <div className={`flex justify-between text-sm font-semibold mb-2 ${textColor}`}>
+                       <span>{item.category_name}</span>
+                       <span>{formatCurrency(Number(item.spent))} / {formatCurrency(Number(item.monthly_limit)).replace("Rp", "").trim()}</span>
+                     </div>
+                     <div className="h-3 w-full bg-[#F1F2F0] rounded-full overflow-hidden">
+                       <div className={`h-full ${barColor} rounded-full`} style={{ width: `${Math.min(pct, 100)}%` }}></div>
+                     </div>
+                     {isDanger && (
+                       <div className="text-xs text-danger-red mt-1 text-right">Over budget</div>
+                     )}
+                   </div>
+                 );
+               })
+            )}
           </div>
         </div>
 

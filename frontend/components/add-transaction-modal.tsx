@@ -39,8 +39,9 @@ export function TransactionModal({
   const [categoryId, setCategoryId] = useState<number | "">("");
   
   const [categories, setCategories] = useState<CategoryOption[]>([]);
-  const [filteredCategories, setFilteredCategories] = useState<CategoryOption[]>([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -53,28 +54,63 @@ export function TransactionModal({
       if (token) {
         apiClient.categories.list(token)
           .then(res => {
-            setCategories(res.items);
+            const cats = res.items.map(c => ({ 
+              id: c.id, 
+              name: c.name,
+              type: c.type,
+              icon: c.icon,
+              color: c.color
+            }));
+            setCategories(cats);
           })
           .catch(err => console.error("Failed to fetch categories:", err));
       }
+    } else {
+      setSearchQuery("");
+      setIsDropdownOpen(false);
     }
   }, [isOpen, initialType, initialTitle, initialAmount, initialCategoryId]);
 
-  useEffect(() => {
-    // Filter categories based on transaction type
-    const filtered = categories.filter(c => c.type === type || c.type === "both");
-    setFilteredCategories(filtered);
+  const filteredCategories = categories
+    .filter(c => c.type === type || c.type === "both")
+    .filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()));
+
+  const exactMatch = categories
+    .filter(c => c.type === type || c.type === "both")
+    .find(c => c.name.toLowerCase() === searchQuery.toLowerCase().trim());
+
+  const handleCreateCategory = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!searchQuery.trim() || isCreatingCategory) return;
     
-    // Auto-select first category if the current categoryId is not in the filtered list
-    if (filtered.length > 0) {
-      const isValid = filtered.some(c => c.id === categoryId);
-      if (!isValid) {
-        setCategoryId(filtered[0].id);
+    setIsCreatingCategory(true);
+    const token = getStoredAuthToken();
+    if (token) {
+      try {
+        const newCat = await apiClient.categories.create(token, {
+          name: searchQuery.trim(),
+          type: type
+        });
+        
+        const newCatOption = {
+          id: newCat.id,
+          name: newCat.name,
+          type: newCat.type,
+          icon: newCat.icon,
+          color: newCat.color
+        };
+        
+        setCategories(prev => [...prev, newCatOption]);
+        setCategoryId(newCat.id);
+        setSearchQuery("");
+        setIsDropdownOpen(false);
+      } catch (err) {
+        console.error("Failed to create category:", err);
+      } finally {
+        setIsCreatingCategory(false);
       }
-    } else {
-      setCategoryId("");
     }
-  }, [categories, type, categoryId]);
+  };
 
   if (!isOpen) return null;
 
@@ -146,34 +182,64 @@ export function TransactionModal({
                 <>
                   <div className="fixed inset-0 z-40 bg-transparent" onClick={(e) => { e.stopPropagation(); setIsDropdownOpen(false); }}></div>
                   
-                  <div className="absolute top-[calc(100%+8px)] left-0 right-0 bg-white rounded-xl shadow-xl border border-[#E8E8E8] max-h-52 overflow-y-auto z-50 py-1 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="absolute top-[calc(100%+8px)] left-0 right-0 bg-white rounded-xl shadow-xl border border-[#E8E8E8] max-h-60 flex flex-col z-50 animate-in fade-in slide-in-from-top-2 duration-200">
                     
-                    <div 
-                      onClick={(e) => { 
-                        e.stopPropagation();
-                        setCategoryId(""); 
-                        setIsDropdownOpen(false); 
-                      }}
-                      className={`px-4 py-3 text-sm cursor-pointer transition-colors flex items-center justify-between ${categoryId === "" ? 'bg-[#F1F2F0] text-[#151f00] font-bold' : 'text-[#1a1c1b] hover:bg-[#F1F2F0]'}`}
-                    >
-                      Lainnya (Tanpa Kategori)
-                      {categoryId === "" && <span className="material-symbols-outlined text-[16px]">check</span>}
+                    <div className="px-3 py-2 border-b border-[#E8E8E8]">
+                      <input 
+                        type="text" 
+                        placeholder="Cari atau tambah baru..." 
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full text-sm outline-none px-2 py-1 bg-transparent"
+                        autoFocus
+                      />
                     </div>
 
-                    {filteredCategories.map(c => (
+                    <div className="overflow-y-auto py-1">
                       <div 
-                        key={c.id} 
                         onClick={(e) => { 
                           e.stopPropagation();
-                          setCategoryId(c.id); 
+                          setCategoryId(""); 
                           setIsDropdownOpen(false); 
+                          setSearchQuery("");
                         }}
-                        className={`px-4 py-3 text-sm cursor-pointer transition-colors flex items-center justify-between ${categoryId === c.id ? 'bg-[#F1F2F0] text-[#151f00] font-bold' : 'text-[#1a1c1b] hover:bg-[#F1F2F0]'}`}
+                        className={`px-4 py-3 text-sm cursor-pointer transition-colors flex items-center justify-between ${categoryId === "" ? 'bg-[#F1F2F0] text-[#151f00] font-bold' : 'text-[#1a1c1b] hover:bg-[#F1F2F0]'}`}
                       >
-                        {c.name}
-                        {categoryId === c.id && <span className="material-symbols-outlined text-[16px]">check</span>}
+                        Lainnya (Tanpa Kategori)
+                        {categoryId === "" && <span className="material-symbols-outlined text-[16px]">check</span>}
                       </div>
-                    ))}
+
+                      {filteredCategories.map(c => (
+                        <div 
+                          key={c.id} 
+                          onClick={(e) => { 
+                            e.stopPropagation();
+                            setCategoryId(c.id); 
+                            setIsDropdownOpen(false); 
+                            setSearchQuery("");
+                          }}
+                          className={`px-4 py-3 text-sm cursor-pointer transition-colors flex items-center justify-between ${categoryId === c.id ? 'bg-[#F1F2F0] text-[#151f00] font-bold' : 'text-[#1a1c1b] hover:bg-[#F1F2F0]'}`}
+                        >
+                          {c.name}
+                          {categoryId === c.id && <span className="material-symbols-outlined text-[16px]">check</span>}
+                        </div>
+                      ))}
+
+                      {searchQuery.trim() && !exactMatch && (
+                        <div 
+                          onClick={handleCreateCategory}
+                          className="px-4 py-3 text-sm cursor-pointer transition-colors flex items-center justify-between text-[#1a1c1b] hover:bg-[#F1F2F0]"
+                        >
+                          <span>Tambahkan &quot;{searchQuery.trim()}&quot;</span>
+                          {isCreatingCategory ? (
+                            <span className="w-4 h-4 rounded-full border-2 border-[#1a1c1b]/20 border-t-[#1a1c1b] animate-spin"></span>
+                          ) : (
+                            <span className="material-symbols-outlined text-[16px]">add</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </>
               )}

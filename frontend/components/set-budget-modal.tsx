@@ -32,6 +32,8 @@ export function SetBudgetModal({
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -61,8 +63,46 @@ export function SetBudgetModal({
           })
           .catch(err => console.error("Failed to fetch categories:", err));
       }
+    } else {
+      setSearchQuery("");
     }
   }, [isOpen, initialCategoryId, initialAmount]);
+
+  const filteredCategories = categories.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  const exactMatch = categories.find(c => c.name.toLowerCase() === searchQuery.toLowerCase().trim());
+
+  const handleCreateCategory = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!searchQuery.trim() || isCreatingCategory) return;
+    
+    setIsCreatingCategory(true);
+    const token = getStoredAuthToken();
+    if (token) {
+      try {
+        const newCat = await apiClient.categories.create(token, {
+          name: searchQuery.trim(),
+          type: "expense"
+        });
+        
+        const newCatOption = {
+          id: newCat.id,
+          name: newCat.name,
+          type: newCat.type,
+          icon: newCat.icon,
+          color: newCat.color
+        };
+        
+        setCategories(prev => [...prev, newCatOption]);
+        setCategoryId(newCat.id);
+        setSearchQuery("");
+        setIsDropdownOpen(false);
+      } catch (err) {
+        console.error("Failed to create category:", err);
+      } finally {
+        setIsCreatingCategory(false);
+      }
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -137,21 +177,49 @@ export function SetBudgetModal({
                 <>
                   <div className="fixed inset-0 z-40 bg-transparent" onClick={(e) => { e.stopPropagation(); setIsDropdownOpen(false); }}></div>
                   
-                  <div className="absolute top-[calc(100%+8px)] left-0 right-0 bg-white rounded-xl shadow-xl border border-[#E8E8E8] max-h-52 overflow-y-auto z-50 py-1 animate-in fade-in slide-in-from-top-2 duration-200">
-                    {categories.map(c => (
-                      <div 
-                        key={c.id} 
-                        onClick={(e) => { 
-                          e.stopPropagation();
-                          setCategoryId(c.id); 
-                          setIsDropdownOpen(false); 
-                        }}
-                        className={`px-4 py-3 text-sm cursor-pointer transition-colors flex items-center justify-between ${categoryId === c.id ? 'bg-[#F1F2F0] text-[#151f00] font-bold' : 'text-[#1a1c1b] hover:bg-[#F1F2F0]'}`}
-                      >
-                        {c.name}
-                        {categoryId === c.id && <span className="material-symbols-outlined text-[16px]">check</span>}
-                      </div>
-                    ))}
+                  <div className="absolute top-[calc(100%+8px)] left-0 right-0 bg-white rounded-xl shadow-xl border border-[#E8E8E8] max-h-60 flex flex-col z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="px-3 py-2 border-b border-[#E8E8E8]">
+                      <input 
+                        type="text" 
+                        placeholder="Cari atau tambah baru..." 
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full text-sm outline-none px-2 py-1 bg-transparent"
+                        autoFocus
+                      />
+                    </div>
+                    <div className="overflow-y-auto py-1">
+                      {filteredCategories.map(c => (
+                        <div 
+                          key={c.id} 
+                          onClick={(e) => { 
+                            e.stopPropagation();
+                            setCategoryId(c.id); 
+                            setIsDropdownOpen(false); 
+                            setSearchQuery("");
+                          }}
+                          className={`px-4 py-3 text-sm cursor-pointer transition-colors flex items-center justify-between ${categoryId === c.id ? 'bg-[#F1F2F0] text-[#151f00] font-bold' : 'text-[#1a1c1b] hover:bg-[#F1F2F0]'}`}
+                        >
+                          {c.name}
+                          {categoryId === c.id && <span className="material-symbols-outlined text-[16px]">check</span>}
+                        </div>
+                      ))}
+                      
+                      {searchQuery.trim() && !exactMatch && (
+                        <div 
+                          onClick={handleCreateCategory}
+                          className="px-4 py-3 text-sm cursor-pointer transition-colors flex items-center justify-between text-[#1a1c1b] hover:bg-[#F1F2F0]"
+                        >
+                          <span>Tambahkan &quot;{searchQuery.trim()}&quot;</span>
+                          {isCreatingCategory ? (
+                            <span className="w-4 h-4 rounded-full border-2 border-[#1a1c1b]/20 border-t-[#1a1c1b] animate-spin"></span>
+                          ) : (
+                            <span className="material-symbols-outlined text-[16px]">add</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </>
               )}
