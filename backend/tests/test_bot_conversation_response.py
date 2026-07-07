@@ -16,6 +16,7 @@ os.environ["LLM_PROVIDER"] = "none"
 from app.config import get_settings
 from app.database import Base
 from app.models import BotLog, Category, CategoryBudget, MediaFile, Receipt, Transaction, User, UserPreference
+from app.modules.llm.base import LlmProviderError
 from app.modules.transactions.service import handle_text_transaction
 
 
@@ -980,6 +981,80 @@ def test_bot_can_set_check_and_list_budget(
     assert listed.status == "budget_list"
     assert "Makanan" in listed.reply_text
     assert "Sisa total: Rp180.000" in listed.reply_text
+
+
+def test_budget_reply_uses_llm_when_available(
+    session_factory: sessionmaker[Session],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[dict[str, object]] = []
+
+    def fake_answer(message: str, **kwargs: object) -> str:
+        calls.append({"message": message, **kwargs})
+        return "Siap, budget Makanan kamu Rp600.000. Terpakai Rp0, jadi sisa Rp600.000."
+
+    monkeypatch.setattr(
+        "app.modules.transactions.service.answer_finance_question_with_llm",
+        fake_answer,
+    )
+
+    with session_factory() as db:
+        user = _create_user(db)
+        result = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="set budget makan 600rb",
+            source="whatsapp_text",
+        )
+
+    assert result.status == "budget_saved"
+    assert result.reply_text.startswith("Siap, budget Makanan")
+    assert calls
+    assert "Data budget" in str(calls[0]["message"])
+    assert "Budget user dari database" in str(calls[0]["context"])
+
+
+def test_budget_reply_falls_back_when_llm_fails_or_changes_numbers(
+    session_factory: sessionmaker[Session],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_answer(*_args: object, **_kwargs: object) -> str:
+        raise LlmProviderError("provider_down")
+
+    monkeypatch.setattr(
+        "app.modules.transactions.service.answer_finance_question_with_llm",
+        fail_answer,
+    )
+
+    with session_factory() as db:
+        user = _create_user(db)
+        failed = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="set budget makan 600rb",
+            source="whatsapp_text",
+        )
+
+    assert failed.reply_text == "Budget Makanan: Rp600.000.\nTerpakai Rp0. Sisa Rp600.000."
+
+    def unsafe_answer(*_args: object, **_kwargs: object) -> str:
+        return "Budgetnya Rp700.000 ya, masih aman."
+
+    monkeypatch.setattr(
+        "app.modules.transactions.service.answer_finance_question_with_llm",
+        unsafe_answer,
+    )
+
+    with session_factory() as db:
+        user = _create_user(db, email="unsafe-budget@example.com")
+        unsafe = handle_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="set budget makan 600rb",
+            source="whatsapp_text",
+        )
+
+    assert unsafe.reply_text == "Budget Makanan: Rp600.000.\nTerpakai Rp0. Sisa Rp600.000."
 
 
 def test_reset_expense_requires_confirmation(

@@ -73,11 +73,12 @@ from app.modules.transactions.repository import (
 
 
 YES_CONFIRMATION_RE = re.compile(
-    r"^\s*(?:ya|iya|y|yes|ok|oke|benar|setuju|simpan|gas|lanjut)\s*$",
+    r"^\s*(?:ya|iya|y|yes|ok|oke|benar|setuju|simpan|gas|lanjut)(?:\s+(?:simpan|catat))?\s*$",
     re.IGNORECASE,
 )
-CANCEL_RE = re.compile(r"^\s*(?:batal|cancel|ga jadi|gajadi|jangan|hapus)\s*$", re.IGNORECASE)
+CANCEL_RE = re.compile(r"^\s*(?:batal|cancel|ga jadi|gajadi|jangan(?:\s+simpan)?|hapus)\s*$", re.IGNORECASE)
 EDIT_RE = re.compile(r"^\s*(?:edit|ubah|ganti|koreksi|revisi|bukan)\b", re.IGNORECASE)
+NATURAL_AMOUNT_EDIT_RE = re.compile(r"\b(?:salah|totalnya|nominalnya)\b", re.IGNORECASE)
 THANKS_RE = re.compile(r"^\s*(?:makasih|terima kasih|thanks|thx|tengkyu)\s*[.!]*\s*$", re.IGNORECASE)
 ACK_RE = re.compile(r"^\s*(?:oke|ok|sip|siap|noted)\s*[.!]*\s*$", re.IGNORECASE)
 RESET_CONFIRM_RE = re.compile(r"^\s*(?:ya\s+)?reset\s*$", re.IGNORECASE)
@@ -93,7 +94,7 @@ SPENDING_CHECK_RE = re.compile(r"\b(?:boros|hemat|pengeluaran.*hari ini|hari ini
 LIST_ITEM_REQUEST_RE = re.compile(
     r"\b(?:list|daftar|tampilkan|lihat|liat|kasih\s+lihat|kasih\s+liat|buatkan)\b"
     r".*\b(?P<type>pengeluaran|pemasukan)\b"
-    r"|\b(?P<type2>pengeluaran|pemasukan)\b.*\b(?:apa\s+saja|apa\s+aja|list|daftar)\b",
+    r"|\b(?P<type2>pengeluaran|pemasukan)\b.*\b(?:apa\s+saja|apa\s+aja|list|daftar|terbaru)\b",
     re.IGNORECASE,
 )
 DATE_SORT_REQUEST_RE = re.compile(
@@ -107,16 +108,26 @@ PURCHASE_LIST_RE = re.compile(
 )
 TOP_EXPENSE_RE = re.compile(r"\b(?:pengeluaran terbesar|paling gede|terbesar apa|top pengeluaran)\b", re.IGNORECASE)
 SAVING_ADVICE_RE = re.compile(
-    r"\b(?:saran hemat|tips hemat|cara hemat|hemat minggu ini|saran.*boros|biar.*(?:ga|gak|nggak|tidak)\s+boros)\b",
+    r"\b(?:saran hemat|tips hemat|cara hemat|hemat minggu ini|saran.*boros|biar.*(?:ga|gak|nggak|tidak)\s+boros|atur uang|rencana hemat|cara ngurangin jajan|target nabung|pengen nabung|mending.*hemat)\b",
     re.IGNORECASE,
 )
+SAVING_GOAL_RE = re.compile(r"\b(?:target nabung|pengen nabung|mau nabung)\b", re.IGNORECASE)
 LIMITED_CASH_RE = re.compile(
     r"\b(?:cuma|tinggal|sisa|punya)\b.*\b(?:sampai|sampe)\b.*\b(?:minggu depan|akhir minggu|minggu ini)\b",
     re.IGNORECASE,
 )
 CASHFLOW_REASON_RE = re.compile(r"\b(?:kenapa.*(?:saldo|uang).*(?:habis|cepat habis)|saldo.*cepat habis)\b", re.IGNORECASE)
 WEEK_COMPARE_RE = re.compile(r"\b(?:bandingkan|dibanding|compare).*(?:minggu ini|minggu lalu)|\bminggu ini.*minggu lalu\b", re.IGNORECASE)
-CUTBACK_RE = re.compile(r"\b(?:apa yang harus dikurangi|kurangi apa|yang perlu dikurangi|pengeluaran.*dikurangi)\b", re.IGNORECASE)
+CUTBACK_RE = re.compile(r"\b(?:apa yang harus (?:aku\s+)?dikurangi|apa yang harus (?:aku\s+)?kurangi|kurangi apa|yang perlu dikurangi|pengeluaran.*dikurangi|stop langganan apa)\b", re.IGNORECASE)
+EDIT_LAST_CATEGORY_RE = re.compile(
+    r"\b(?:ganti|ubah|edit)\s+kategori\s+transaksi\s+terakhir\s+(?:jadi|ke)\s+(?P<category>.+)$",
+    re.IGNORECASE,
+)
+CATEGORY_LOOKUP_RE = re.compile(r"\bkategori\s+(?P<item>.+?)\s+masuk\s+mana\b", re.IGNORECASE)
+SPENDING_ANALYSIS_RE = re.compile(
+    r"\b(?:aku sering keluar uang (?:buat|untuk) apa|sering keluar uang (?:buat|untuk) apa|evaluasi keuangan|ini mahal gak|catat yang tadi|aku lupa nominalnya|tadi bayar dua kali|salah catat)\b",
+    re.IGNORECASE,
+)
 INCOME_SOURCE_RE = re.compile(
     r"\b(?:pemasukan|pemsukan|income|uang masuk)\b.*\b(?:dari mana|sumber|apa aja|apa saja)\b",
     re.IGNORECASE,
@@ -138,7 +149,7 @@ VISIBILITY_CHECK_RE = re.compile(
 )
 FINANCE_HEALTH_RE = re.compile(
     r"\b(?:aman|sehat|gimana|bagaimana|kondisi)\b.*\b(?:keuangan|bulan ini|saldo|cashflow)\b|"
-    r"\b(?:keuangan|bulan ini|saldo|cashflow)\b.*\b(?:aman|sehat|gimana|bagaimana|kondisi)\b",
+    r"\b(?:keuangan|bulan ini|saldo|cashflow|pengeluaran)\b.*\b(?:aman|sehat|gimana|bagaimana|kondisi|sehat)\b",
     re.IGNORECASE,
 )
 REPLY_STYLE_PREFERENCE_RE = re.compile(
@@ -151,7 +162,7 @@ CREATE_CATEGORY_RE = re.compile(
     re.IGNORECASE,
 )
 CATEGORY_SUMMARY_RE = re.compile(
-    r"\b(?P<category>makan(?:an)?|kopi|transport|bensin|tagihan|belanja|hiburan|kesehatan|pendidikan|kos)\b.*\b(?:berapa|total|bulan ini|minggu ini|hari ini)\b",
+    r"\b(?P<category>makan(?:an)?|kopi|transport|bensin|tagihan|belanja|hiburan|kesehatan|pendidikan|kuliah|kampus|kos)\b.*\b(?:berapa|total|bulan ini|minggu ini|hari ini)\b",
     re.IGNORECASE,
 )
 FINANCE_CHAT_RE = re.compile(
@@ -303,6 +314,27 @@ def handle_text_transaction(
             reply_text=_format_confirmation_request(parse_result),
             parse_result=parse_result,
             error_message=fallback_error or "low_confidence_parser",
+        )
+
+    if _needs_ambiguous_amount_confirmation(text, parse_result):
+        pending_parse = clone_parsed_message(
+            parse_result,
+            amount=None,
+            need_confirmation=True,
+            reasons=[*parse_result.reasons, "ambiguous_small_amount"],
+        )
+        store_pending_transaction(
+            db,
+            user_id=user_id,
+            platform=_platform_from_source(source),
+            raw_message=text,
+            parse_result=pending_parse,
+        )
+        return TextTransactionResult(
+            status="needs_confirmation",
+            reply_text="Nominalnya belum jelas. Maksudnya 18 ribu? Balas nominal lengkap, contoh: 18 ribu.",
+            parse_result=pending_parse,
+            error_message="ambiguous_small_amount",
         )
 
     return _save_transaction_from_parse_result(
@@ -756,6 +788,8 @@ def _handle_pending_transaction_reply(
     normalized = normalize_text(text)
 
     if pending is None:
+        if EDIT_LAST_CATEGORY_RE.search(normalized):
+            return None
         if (
             CANCEL_RE.match(normalized)
             or YES_CONFIRMATION_RE.match(normalized)
@@ -794,7 +828,11 @@ def _handle_pending_transaction_reply(
             pending_log=pending_log,
         )
 
-    if EDIT_RE.match(normalized) or _looks_like_missing_amount_reply(parse_result, normalized):
+    if (
+        EDIT_RE.match(normalized)
+        or NATURAL_AMOUNT_EDIT_RE.search(normalized)
+        or _looks_like_missing_amount_reply(parse_result, normalized)
+    ):
         edited = _apply_pending_transaction_edit(
             db=db,
             parse_result=parse_result,
@@ -893,6 +931,16 @@ def _handle_lightweight_message(
                 intent="acknowledged",
             ),
         )
+    if _is_amount_without_context(normalized):
+        return TextTransactionResult(
+            status="needs_confirmation",
+            reply_text="Nominalnya buat transaksi apa? Contoh: beli kopi 15k atau pemasukan 15k.",
+            parse_result=_synthetic_parse_result(
+                text=text,
+                source=source,
+                intent="needs_confirmation",
+            ),
+        )
     if BOT_PROFILE_RE.search(normalized):
         return TextTransactionResult(
             status="bot_profile",
@@ -911,6 +959,27 @@ def _handle_lightweight_message(
     )
     if budget_result is not None:
         return budget_result
+    edit_last_result = _handle_edit_last_category_message(
+        db=db,
+        user_id=user_id,
+        text=normalized,
+        source=source,
+    )
+    if edit_last_result is not None:
+        return edit_last_result
+    category_lookup = CATEGORY_LOOKUP_RE.search(normalized)
+    if category_lookup:
+        item = category_lookup.group("item")
+        category_name = _category_name_from_alias(item)
+        return TextTransactionResult(
+            status="category_lookup",
+            reply_text=f"{item.strip().title()} paling cocok masuk kategori {category_name}.",
+            parse_result=_synthetic_parse_result(
+                text=text,
+                source=source,
+                intent="category_lookup",
+            ),
+        )
     if VISIBILITY_CHECK_RE.search(normalized):
         return TextTransactionResult(
             status="transaction_visibility_check",
@@ -978,6 +1047,16 @@ def _handle_lightweight_message(
                 intent="top_expense",
             ),
         )
+    if SAVING_GOAL_RE.search(normalized):
+        return TextTransactionResult(
+            status="saving_goal",
+            reply_text=_format_saving_goal_response(normalized),
+            parse_result=_synthetic_parse_result(
+                text=text,
+                source=source,
+                intent="saving_goal",
+            ),
+        )
     if SAVING_ADVICE_RE.search(normalized):
         return TextTransactionResult(
             status="saving_advice",
@@ -1027,6 +1106,14 @@ def _handle_lightweight_message(
                 source=source,
                 intent="cutback_advice",
             ),
+        )
+    if SPENDING_ANALYSIS_RE.search(normalized):
+        return _handle_contextual_finance_message(
+            db=db,
+            user_id=user_id,
+            text=text,
+            normalized=normalized,
+            source=source,
         )
     if INCOME_SOURCE_RE.search(normalized):
         return TextTransactionResult(
@@ -1089,6 +1176,131 @@ def _handle_lightweight_message(
         )
 
     return None
+
+
+def _is_amount_without_context(text: str) -> bool:
+    amount_match = extract_amount(text)
+    if amount_match is None:
+        return False
+    rest = (text[: amount_match.start] + text[amount_match.end :]).strip(" -,.?")
+    return not re.search(r"[a-zA-Z\u00c0-\u024f]{2,}", rest)
+
+
+def _needs_ambiguous_amount_confirmation(text: str, parse_result: ParsedMessage) -> bool:
+    if parse_result.intent != INTENT_ADD_TRANSACTION or parse_result.amount is None:
+        return False
+    if parse_result.amount >= Decimal("1000"):
+        return False
+    return not re.search(r"\b(?:rp|rb|ribu|k|jt|juta)\b|[.,]\d{3}", text.lower())
+
+
+def _handle_edit_last_category_message(
+    *,
+    db: Session,
+    user_id: int,
+    text: str,
+    source: str,
+) -> TextTransactionResult | None:
+    match = EDIT_LAST_CATEGORY_RE.search(text)
+    if not match:
+        return None
+
+    category_name = _category_name_from_alias(match.group("category"))
+    category = find_category(
+        db=db,
+        category_name=category_name,
+        transaction_type="expense",
+        user_id=user_id,
+    )
+    if category is None:
+        return TextTransactionResult(
+            status="edit_last_transaction_category_not_found",
+            reply_text=f"Kategori {category_name} belum ada.",
+            parse_result=_synthetic_parse_result(
+                text=text,
+                source=source,
+                intent="edit_last_transaction",
+            ),
+        )
+
+    transaction = db.scalar(
+        select(Transaction)
+        .where(
+            Transaction.user_id == user_id,
+            Transaction.status == TRANSACTION_STATUS_CONFIRMED,
+        )
+        .order_by(Transaction.created_at.desc(), Transaction.id.desc())
+    )
+    if transaction is None:
+        return TextTransactionResult(
+            status="edit_last_transaction_not_found",
+            reply_text="Belum ada transaksi yang bisa diedit.",
+            parse_result=_synthetic_parse_result(
+                text=text,
+                source=source,
+                intent="edit_last_transaction",
+            ),
+        )
+
+    transaction.category_id = category.id
+    db.commit()
+    return TextTransactionResult(
+        status="edit_last_transaction",
+        reply_text=f"Siap, kategori transaksi terakhir kuganti jadi {category.name}.",
+        parse_result=_synthetic_parse_result(
+            text=text,
+            source=source,
+            intent="edit_last_transaction",
+        ),
+        transaction_id=transaction.id,
+    )
+
+
+def _handle_contextual_finance_message(
+    *,
+    db: Session,
+    user_id: int,
+    text: str,
+    normalized: str,
+    source: str,
+) -> TextTransactionResult:
+    if re.search(r"\b(?:catat yang tadi|aku lupa nominalnya|salah catat)\b", normalized):
+        status = "needs_context"
+    elif "tadi bayar dua kali" in normalized:
+        status = "duplicate_check"
+    else:
+        status = "finance_chat"
+    return TextTransactionResult(
+        status=status,
+        reply_text=_format_contextual_finance_response(db, user_id, normalized),
+        parse_result=_synthetic_parse_result(
+            text=text,
+            source=source,
+            intent=status,
+        ),
+    )
+
+
+def _format_contextual_finance_response(db: Session, user_id: int, text: str) -> str:
+    if re.search(r"\b(?:catat yang tadi|aku lupa nominalnya)\b", text):
+        return "Aku butuh detailnya dulu. Kirim seperti: beli kopi 18 ribu atau pemasukan 100rb."
+    if re.search(r"\b(?:tadi bayar dua kali|salah catat)\b", text):
+        return "Kalau transaksi terakhir salah, kirim: ganti kategori transaksi terakhir jadi makanan, atau kosongkan pengeluaran kalau mau reset."
+    if "mahal" in text:
+        return "Bisa aku bantu nilai kalau ada nominal dan konteksnya. Contoh: beli kopi 35 ribu, mahal gak?"
+    return _format_spending_check_response(db, user_id, text=text)
+
+
+def _format_saving_goal_response(text: str) -> str:
+    amount = parse_amount(text)
+    if amount is None:
+        return "Bisa. Sebutkan targetnya, contoh: aku pengen nabung 500rb bulan ini."
+    days_left = max(1, (date.today().replace(day=28) - date.today()).days + 4)
+    daily = amount / Decimal(days_left)
+    return (
+        f"Bisa. Target tabungan {format_rupiah(amount)} bulan ini berarti sekitar "
+        f"{format_rupiah(daily)} per hari. Sisihkan dulu setelah pemasukan, baru atur jajan dari sisanya."
+    )
 
 
 def _apply_pending_transaction_edit(
@@ -1188,6 +1400,8 @@ def _detect_category_edit(db: Session, text: str) -> str | None:
         "hiburan": "Hiburan",
         "kesehatan": "Kesehatan",
         "pendidikan": "Pendidikan",
+        "kuliah": "Pendidikan",
+        "kampus": "Pendidikan",
         "uang saku": "Uang Saku",
         "gaji": "Gaji",
     }
@@ -1997,12 +2211,24 @@ def _handle_set_budget_message(
     budget_state = get_budget_for_category(db, user_id, category)
     item = budget_state[2] if budget_state else None
     remaining = item.remaining if item else amount_match.value
+    fallback_reply = (
+        f"Budget {category.name}: {format_rupiah(amount_match.value)}.\n"
+        f"Terpakai {format_rupiah(item.spent if item else Decimal('0'))}. "
+        f"Sisa {format_rupiah(remaining)}."
+    )
     return TextTransactionResult(
         status="budget_saved",
-        reply_text=(
-            f"Budget {category.name}: {format_rupiah(amount_match.value)}.\n"
-            f"Terpakai {format_rupiah(item.spent if item else Decimal('0'))}. "
-            f"Sisa {format_rupiah(remaining)}."
+        reply_text=_polish_budget_reply_with_llm(
+            db=db,
+            user_id=user_id,
+            user_text=text,
+            fallback_reply=fallback_reply,
+            facts=[
+                f"Kategori: {category.name}",
+                f"Limit: {format_rupiah(amount_match.value)}",
+                f"Terpakai: {format_rupiah(item.spent if item else Decimal('0'))}",
+                f"Sisa: {format_rupiah(remaining)}",
+            ],
         ),
         parse_result=_synthetic_parse_result(text=text, source=source, intent="budget_saved"),
     )
@@ -2030,6 +2256,19 @@ def _handle_budget_remaining_message(
                 f"Terpakai {format_rupiah(item.spent)}. "
                 f"Sisa {format_rupiah(item.remaining)}."
             )
+            reply = _polish_budget_reply_with_llm(
+                db=db,
+                user_id=user_id,
+                user_text=text,
+                fallback_reply=reply,
+                facts=[
+                    f"Kategori: {item.category_name}",
+                    f"Limit: {format_rupiah(item.monthly_limit)}",
+                    f"Terpakai: {format_rupiah(item.spent)}",
+                    f"Sisa: {format_rupiah(item.remaining)}",
+                    f"Status: {item.status}",
+                ],
+            )
     return TextTransactionResult(
         status="budget_remaining",
         reply_text=reply,
@@ -2047,12 +2286,78 @@ def _format_budget_list_response(db: Session, user_id: int) -> str:
         f"terpakai {format_rupiah(item.spent)} - sisa {format_rupiah(item.remaining)}"
         for index, item in enumerate(overview.items, start=1)
     ]
-    return (
+    fallback_reply = (
         "Budget bulan ini:\n\n"
         + "\n".join(lines)
         + f"\n\nTotal budget: {format_rupiah(overview.total_budgeted)}\n"
         + f"Sisa total: {format_rupiah(overview.total_remaining)}"
     )
+    facts = [
+        f"Total budget: {format_rupiah(overview.total_budgeted)}",
+        f"Total terpakai: {format_rupiah(overview.total_spent)}",
+        f"Sisa total: {format_rupiah(overview.total_remaining)}",
+        *[
+            f"{item.category_name}: limit {format_rupiah(item.monthly_limit)}, "
+            f"terpakai {format_rupiah(item.spent)}, sisa {format_rupiah(item.remaining)}"
+            for item in overview.items
+        ],
+    ]
+    return _polish_budget_reply_with_llm(
+        db=db,
+        user_id=user_id,
+        user_text="list budget",
+        fallback_reply=fallback_reply,
+        facts=facts,
+    )
+
+
+def _polish_budget_reply_with_llm(
+    *,
+    db: Session,
+    user_id: int,
+    user_text: str,
+    fallback_reply: str,
+    facts: list[str],
+) -> str:
+    prompt = (
+        "Tulis ulang jawaban budget ini supaya lebih natural dan ramah untuk chat.\n"
+        "Jangan hitung ulang, jangan tambah angka, jangan hilangkan angka Rupiah.\n"
+        "Maksimal 5 baris pendek.\n\n"
+        f"Pertanyaan user: {user_text}\n"
+        "Data budget:\n"
+        + "\n".join(f"- {fact}" for fact in facts)
+        + "\n\nJawaban wajib berdasarkan ini:\n"
+        + fallback_reply
+    )
+    try:
+        answer = answer_finance_question_with_llm(
+            prompt,
+            context="Budget user dari database:\n" + "\n".join(facts),
+            user_id=user_id,
+            db=db,
+        )
+    except (LlmRateLimitExceeded, LlmProviderError):
+        return fallback_reply
+
+    return _accept_budget_llm_reply(answer, fallback_reply)
+
+
+def _accept_budget_llm_reply(answer: str, fallback_reply: str) -> str:
+    cleaned = re.sub(r"\n{3,}", "\n\n", answer.strip())
+    if not cleaned or len(cleaned) > 700:
+        return fallback_reply
+
+    fallback_amounts = _extract_rupiah_amounts(fallback_reply)
+    answer_amounts = _extract_rupiah_amounts(cleaned)
+    if fallback_amounts and not fallback_amounts.issubset(answer_amounts):
+        return fallback_reply
+    if answer_amounts - fallback_amounts:
+        return fallback_reply
+    return cleaned
+
+
+def _extract_rupiah_amounts(text: str) -> set[str]:
+    return set(re.findall(r"Rp\d+(?:\.\d{3})*", text))
 
 
 def _find_budget_category(db: Session, *, user_id: int, category_text: str) -> Category | None:
@@ -2325,13 +2630,13 @@ def _build_report_insight(
 
 def _category_name_from_alias(alias: str) -> str:
     normalized = alias.lower()
-    if normalized in {"makan", "makanan", "kopi"}:
+    if any(keyword in normalized for keyword in ["makan", "makanan", "kopi"]):
         return "Makanan"
-    if normalized in {"transport", "transportasi", "bensin"}:
+    if any(keyword in normalized for keyword in ["transport", "transportasi", "bensin", "gojek", "grab"]):
         return "Transportasi"
-    if normalized in {"kos", "tagihan"}:
+    if any(keyword in normalized for keyword in ["kos", "tagihan", "wifi", "pulsa", "paket data"]):
         return "Tagihan"
-    if normalized in {"kuliah", "kampus", "pendidikan"}:
+    if any(keyword in normalized for keyword in ["kuliah", "kampus", "pendidikan", "print", "jurnal", "fotokopi", "tugas", "buku"]):
         return "Pendidikan"
     if normalized in {"nongkrong", "hiburan"}:
         return "Hiburan"

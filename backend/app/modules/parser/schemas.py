@@ -60,12 +60,12 @@ TRANSACTION_TYPES = {"income", "expense", "none"}
 # source of truth for language detection.
 
 INCOME_KEYWORDS: frozenset[str] = frozenset({
-    "bonus", "cashback", "dapat", "dapet", "dibayar", "freelance",
-    "gaji", "income", "masuk", "pemasukan", "pendapatan", "refund",
-    "salary", "terima", "upah",
+    "bonus", "cashback", "dapat", "dapet", "dikasih", "dibayar", "freelance",
+    "gaji", "gajian", "income", "masuk", "msuk", "pemasukan", "pendapatan",
+    "refund", "salary", "terima", "upah",
 })
 
-INCOME_PHRASES: tuple[str, ...] = ("transfer masuk", "uang saku", "uang jajan")
+INCOME_PHRASES: tuple[str, ...] = ("transfer masuk", "uang saku", "uang jajan", "dikasih mama")
 
 EXPENSE_KEYWORDS: frozenset[str] = frozenset({
     "bayar", "beli", "belanja", "biaya", "checkout", "habis",
