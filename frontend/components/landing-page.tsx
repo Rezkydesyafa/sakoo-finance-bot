@@ -25,6 +25,8 @@ const dashboardItems = [
   ["04", "Monitor budgets by category", "Set category limits before spending goes too far."],
 ];
 
+const chatPills = ["WhatsApp", "Telegram", "Receipt", "Voice note", "PDF"];
+
 export function LandingPage() {
   const rootRef = useRef<HTMLElement | null>(null);
 
@@ -160,29 +162,82 @@ export function LandingPage() {
             Your personal finance assistant, always available on chat.
           </h2>
         </div>
-        <div data-scroll-reveal="rise" className="scroll-reveal mx-auto mt-12 max-w-2xl rounded-[28px] border border-[#e8e8e8] bg-white p-5 shadow-[0_10px_30px_rgba(0,0,0,0.06)]">
-          <div className="mb-4 flex flex-col gap-4">
-            <div className="landing-chat-bubble self-start rounded-2xl rounded-tl-sm border border-[#e8e8e8] bg-white p-4 shadow-sm">
-              How can I help you today?
+        <div data-scroll-reveal="rise" className="scroll-reveal relative mx-auto mt-12 max-w-6xl">
+          <div className="pointer-events-none absolute left-0 top-8 hidden w-56 text-left lg:block">
+            <span className="landing-cursor material-symbols-outlined absolute -right-8 -top-5 rotate-12 text-5xl text-[#202020]">
+              near_me
+            </span>
+            <div className="landing-side-card rounded-2xl border border-[#202020]/10 bg-white p-4 shadow-[0_18px_45px_rgba(0,0,0,0.09)]">
+              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-[#c7ff00] text-[#202020]">
+                <span className="material-symbols-outlined">forum</span>
+              </div>
+              <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-[#757575]">WhatsApp ready</p>
+              <p className="mt-2 text-sm font-bold leading-snug text-[#202020]">Log expenses from daily chat.</p>
             </div>
-            <div className="landing-chat-bubble landing-chat-bubble-late self-end rounded-2xl rounded-tr-sm bg-[#202020] p-4 text-white shadow-md">
-              Track my coffee expense.
+            <div className="landing-pill-cloud mt-7 flex flex-wrap gap-2">
+              {chatPills.slice(0, 3).map((pill) => (
+                <span key={pill} className="landing-mini-pill">
+                  {pill}
+                </span>
+              ))}
             </div>
           </div>
-          <div className="relative mt-8">
-            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[#9a9a9a]">chat_bubble</span>
-            <input
-              readOnly
-              className="w-full rounded-2xl border border-[#e8e8e8] bg-white py-4 pl-12 pr-16 text-sm shadow-sm outline-none transition-all duration-300 focus:ring-2 focus:ring-[#c7ff00]"
-              placeholder="Type a message..."
-              type="text"
-            />
-            <button className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center justify-center rounded-xl bg-[#c7ff00] p-2 text-[#202020]">
-              <span className="material-symbols-outlined">send</span>
-            </button>
-            <div className="absolute -bottom-7 left-12 flex items-center gap-2">
-              <span className="landing-dot" />
-              <span className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-[#6f6f6f]">Sakoo is typing</span>
+
+          <div className="pointer-events-none absolute right-0 top-10 hidden w-56 text-left lg:block">
+            <div className="landing-cube absolute -left-10 top-24" />
+            <div className="landing-side-card landing-side-card-late rounded-2xl border border-[#202020]/10 bg-[#202020] p-4 text-white shadow-[0_18px_45px_rgba(0,0,0,0.16)]">
+              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-white text-[#202020]">
+                <span className="material-symbols-outlined">send</span>
+              </div>
+              <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-white/55">Telegram bot</p>
+              <p className="mt-2 text-sm font-bold leading-snug">Ask, track, and export reports.</p>
+            </div>
+            <div className="landing-pill-cloud landing-pill-cloud-late mt-7 flex flex-wrap gap-2">
+              {chatPills.slice(2).map((pill) => (
+                <span key={pill} className="landing-mini-pill landing-mini-pill-dark">
+                  {pill}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="mx-auto max-w-2xl rounded-[28px] border border-[#e8e8e8] bg-white p-5 shadow-[0_10px_30px_rgba(0,0,0,0.06)]">
+            <div className="mb-4 flex flex-col gap-4">
+              <div className="landing-chat-bubble self-start rounded-2xl rounded-tl-sm border border-[#e8e8e8] bg-white p-4 shadow-sm">
+                How can I help you today?
+              </div>
+              <div className="landing-chat-bubble landing-chat-bubble-late self-end rounded-2xl rounded-tr-sm bg-[#202020] p-4 text-white shadow-md">
+                Track my coffee expense.
+              </div>
+            </div>
+            <div className="relative mt-8 rounded-2xl border border-[#e8e8e8] bg-white p-3 shadow-sm">
+              <div className="relative">
+                <span className="material-symbols-outlined absolute left-1 top-1/2 -translate-y-1/2 text-[#9a9a9a]">chat_bubble</span>
+                <input
+                  readOnly
+                  className="w-full bg-transparent py-2 pl-10 pr-14 text-sm outline-none"
+                  placeholder="Type a message..."
+                  type="text"
+                />
+                <button
+                  aria-label="Send message"
+                  className="absolute right-0 top-1/2 flex -translate-y-1/2 items-center justify-center rounded-xl bg-[#c7ff00] p-2 text-[#202020]"
+                  type="button"
+                >
+                  <span className="material-symbols-outlined">send</span>
+                </button>
+              </div>
+              <div className="mt-3 flex items-center gap-2 border-t border-[#eeeeee] pt-3 text-left">
+                <span className="landing-dot" />
+                <span className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-[#6f6f6f]">Sakoo is typing</span>
+              </div>
+            </div>
+            <div className="mt-5 flex flex-wrap justify-center gap-2 lg:hidden">
+              {chatPills.map((pill) => (
+                <span key={pill} className="landing-mini-pill">
+                  {pill}
+                </span>
+              ))}
             </div>
           </div>
         </div>
