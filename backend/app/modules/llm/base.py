@@ -11,7 +11,8 @@ import httpx
 FINANCE_CHAT_SYSTEM_PROMPT = (
     "Kamu adalah Sakoo 🐱, asisten keuangan pribadi yang ramah dan seru via chat. "
     "Kamu berbicara santai seperti teman, pakai emoji secara alami, dan selalu menyapa hangat.\n\n"
-    "FITUR UTAMA: catat transaksi, cek saldo, laporan keuangan, export PDF, OCR struk, voice note.\n\n"
+    "FITUR UTAMA: catat transaksi, cek saldo, set/cek budget, laporan keuangan, "
+    "export PDF, OCR struk, voice note.\n\n"
     "ATURAN RESPONS:\n"
     "- Jawab dalam Bahasa Indonesia yang santai dan natural\n"
     "- Gunakan emoji yang relevan (💰📊✨🎯💡🤔👋 dll) tapi jangan berlebihan\n"
@@ -33,16 +34,6 @@ FINANCE_CHAT_SYSTEM_PROMPT = (
 # ── User prompt template (context + question) ─────────────────────────
 FINANCE_CHAT_USER_TEMPLATE = 'Konteks:\n{context}\n\nPertanyaan: "{message}"'
 
-# Legacy single-string template kept for backward compatibility with
-# ``build_finance_chat_prompt``.
-FINANCE_CHAT_PROMPT_TEMPLATE = (
-    "Role:Sakoo, asisten keuangan chat. Reply ID, max 4 short lines. "
-    "Use ctx numbers only; do not invent. "
-    "Answer greetings, bot features, and finance questions. "
-    "If off-topic, politely redirect to finance. "
-    'Ctx:{context} Q:"{message}"'
-)
-
 
 class LlmProviderError(Exception):
     def __init__(self, detail: str) -> None:
@@ -63,6 +54,33 @@ class BaseLlmProvider:
     def __init__(self, config: LlmProviderConfig) -> None:
         self.config = config
 
+    def complete(
+        self,
+        prompt: str,
+        *,
+        system_prompt: str | None = None,
+        temperature: float = 0.1,
+        max_tokens: int = 500,
+    ) -> str:
+        if not self.config.model:
+            raise LlmProviderError(f"{self.provider_name}_model_missing")
+
+        api_url = getattr(self, "api_url", None)
+        if not api_url:
+            raise LlmProviderError(f"{self.provider_name}_completion_not_supported")
+
+        return request_openai_chat_completion(
+            provider_name=self.provider_name,
+            api_url=api_url,
+            api_key=self.config.api_key,
+            model=self.config.model,
+            prompt=prompt,
+            system_prompt=system_prompt,
+            timeout_seconds=self.config.timeout_seconds,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+
     def answer_finance_question(self, message: str, *, context: str) -> str:
         raise LlmProviderError(f"{self.provider_name}_finance_chat_not_supported")
 
@@ -74,22 +92,11 @@ def build_finance_chat_messages(
 ) -> tuple[str, str]:
     """Return ``(system_prompt, user_prompt)`` for multi-message LLM calls."""
     compact_message = re.sub(r"\s+", " ", message.strip())[:300]
-    compact_context = re.sub(r"\s+", " ", context.strip())[:900]
+    compact_context = re.sub(r"\s+", " ", context.strip())[:1600]
     user_prompt = FINANCE_CHAT_USER_TEMPLATE.replace(
         "{message}", compact_message,
     ).replace("{context}", compact_context)
     return FINANCE_CHAT_SYSTEM_PROMPT, user_prompt
-
-
-def build_finance_chat_prompt(message: str, *, context: str) -> str:
-    """Legacy single-string prompt for backward compatibility."""
-    compact_message = re.sub(r"\s+", " ", message.strip())
-    escaped_message = compact_message[:300].replace("\\", "\\\\").replace('"', '\\"')
-    compact_context = re.sub(r"\s+", " ", context.strip())[:900]
-    return FINANCE_CHAT_PROMPT_TEMPLATE.replace("{message}", escaped_message).replace(
-        "{context}",
-        compact_context,
-    )
 
 
 def compact_error_detail(raw_text: str, *, limit: int = 240) -> str:

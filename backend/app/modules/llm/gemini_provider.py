@@ -15,32 +15,39 @@ from app.modules.llm.base import (
 class GeminiProvider(BaseLlmProvider):
     provider_name = "gemini"
 
-    def answer_finance_question(self, message: str, *, context: str) -> str:
+    def complete(
+        self,
+        prompt: str,
+        *,
+        system_prompt: str | None = None,
+        temperature: float = 0.1,
+        max_tokens: int = 500,
+    ) -> str:
         if not self.config.api_key:
             raise LlmProviderError("gemini_api_key_missing")
 
         if not self.config.model:
             raise LlmProviderError("gemini_model_missing")
 
-        system_prompt, user_prompt = build_finance_chat_messages(
-            message, context=context,
-        )
-
         url = (
             "https://generativelanguage.googleapis.com/v1beta/models/"
             f"{self.config.model}:generateContent"
         )
         payload = {
-            "systemInstruction": {
-                "parts": [{"text": system_prompt}],
-            },
             "contents": [
                 {
-                    "parts": [{"text": user_prompt}]
+                    "parts": [{"text": prompt}]
                 }
             ],
-            "generationConfig": {"temperature": 0.4, "maxOutputTokens": 500},
+            "generationConfig": {
+                "temperature": temperature,
+                "maxOutputTokens": max_tokens,
+            },
         }
+        if system_prompt:
+            payload["systemInstruction"] = {
+                "parts": [{"text": system_prompt}],
+            }
         try:
             response = httpx.post(
                 url,
@@ -66,3 +73,13 @@ class GeminiProvider(BaseLlmProvider):
             return str(data["candidates"][0]["content"]["parts"][0]["text"]).strip()
         except (KeyError, IndexError, TypeError) as exc:
             raise LlmProviderError("gemini_response_missing_text") from exc
+
+    def answer_finance_question(self, message: str, *, context: str) -> str:
+        system_prompt, user_prompt = build_finance_chat_messages(
+            message, context=context,
+        )
+        return self.complete(
+            user_prompt,
+            system_prompt=system_prompt,
+            temperature=0.4,
+        )

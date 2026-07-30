@@ -1,2 +1,2 @@
-"""LLM fallback providers for the hybrid parser."""
+"""LLM providers for the LLM-first transaction parser."""
 

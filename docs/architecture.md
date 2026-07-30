@@ -12,17 +12,13 @@ Sakoo memakai pola modular monolith: satu aplikasi FastAPI, tetapi domain dipisa
 
 ## Channel Adapters
 
-- Namespace baru `app.modules.channels` menjadi pintu masuk adapter platform chat.
-- Saat ini namespace tersebut masih me-reexport module lama:
-  - `app.modules.channels.waha` -> `app.modules.waha`
-  - `app.modules.channels.telegram` -> `app.modules.telegram`
-- Pendekatan ini menjaga kompatibilitas import lama sambil memberi tempat yang lebih jelas untuk integrasi platform baru seperti WhatsApp Cloud API, Discord, atau LINE.
+- Adapter platform chat berada langsung di `app.modules.waha` dan `app.modules.telegram`.
+- `app.api.webhooks` memasang router kedua adapter tanpa lapisan re-export.
 
 ## Bot Flow
 
 - `app.modules.transactions.service` menangani orchestration transaksi dari teks chat: pending confirmation, edit, cancel, command ringan, dan response formatting.
-- `app.modules.bot.service` menjadi entry point aplikasi untuk parsing pesan bot.
-- `app.modules.bot.message_handler` tetap fokus ke pipeline NLP: rule parser, category model, dan LLM fallback hemat token.
+- `app.modules.bot.message_handler` menjadi entry point parsing pesan bot: LLM terkonfigurasi dicoba lebih dahulu, lalu rule parser menjadi fallback.
 - `app.modules.bot.response_templates` menjaga gaya respon agar tidak tersebar di service bisnis.
 
 ## Parser And LLM
@@ -30,7 +26,8 @@ Sakoo memakai pola modular monolith: satu aplikasi FastAPI, tetapi domain dipisa
 - `app.modules.parser` memegang normalisasi bahasa sehari-hari, intent, amount/date parser, transaction parser, dan model kategori.
 - Dataset kategori berada di `app/modules/parser/data/category_dataset.csv`.
 - Model kategori hasil training berada di `app/modules/parser/models/category_classifier.joblib`.
-- `app.modules.llm` hanya dipakai sebagai fallback saat parser lokal kurang yakin, sehingga token tetap hemat.
+- `app.modules.llm` menyediakan provider LLM bawaan dan provider OpenAI-compatible bernama melalui token `custom:<nama>`.
+- Provider dapat diurutkan bebas; jika semuanya gagal atau hasilnya tidak valid, alur kembali ke parser lokal.
 
 ## Transaction Data Access
 
@@ -46,10 +43,5 @@ Sakoo memakai pola modular monolith: satu aplikasi FastAPI, tetapi domain dipisa
 
 ## Direction
 
-Untuk pengembangan berikutnya, prioritaskan:
-
-- Memindahkan isi module lama `waha` dan `telegram` secara bertahap ke `channels` setelah import lama tidak lagi dipakai.
-- Memecah `transactions.service` menjadi submodule kecil jika flow semakin besar, misalnya `pending_flow.py`, `command_responses.py`, dan `save_transaction.py`.
-- Menambah test kontrak route setiap kali router baru ditambahkan.
-- Menambah contoh dataset NLP sebelum menambah hard-coded keyword baru, lalu retrain model kategori.
+Untuk pengembangan berikutnya, prioritaskan test kontrak route ketika router berubah dan tambah contoh dataset NLP sebelum menambah hard-coded keyword baru.
 

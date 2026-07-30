@@ -294,6 +294,26 @@ Jika memakai Gemini tetapi quota sering kena limit, gunakan OpenRouter dulu:
 LLM_PROVIDER=openrouter,gemini
 ```
 
+Provider OpenAI-compatible seperti 9Router dapat diberi nama dan disisipkan
+di posisi mana pun dalam fallback chain:
+
+```env
+LLM_PROVIDER=custom:9router,gemini,custom:backup,ollama
+CUSTOM_LLM_PROVIDERS={"9router":{"base_url":"http://host.docker.internal:20128/v1","api_key":"isi_api_key_9router","model":"premium-coding"},"backup":{"base_url":"https://provider.example/v1","api_key":"isi_api_key_backup","model":"model-id"}}
+```
+
+Gunakan base URL berikut sesuai lokasi providernya:
+
+- 9Router di host dan Sakoo di Docker: `http://host.docker.internal:20128/v1`
+- Sakoo tanpa Docker: `http://127.0.0.1:20128/v1`
+- 9Router sebagai service Compose: `http://9router:20128/v1`
+
+Backend menambahkan `/chat/completions` ke base URL. Setiap custom provider
+wajib memiliki `base_url`, `api_key`, dan `model`. Nama hanya boleh memakai
+huruf kecil, angka, `_`, atau `-`. Konfigurasi invalid menghentikan startup
+sebelum request jaringan dilakukan. Simpan API key hanya di `.env` atau secret
+deployment, jangan di source control.
+
 ## Menjalankan Docker
 
 Dari root project:
@@ -640,10 +660,12 @@ Jalankan migration manual:
 docker compose -f infra/docker/docker-compose.yml --env-file .env exec backend alembic upgrade head
 ```
 
-Jalankan test backend di container:
+Jalankan test backend dari environment development:
 
 ```bash
-docker compose -f infra/docker/docker-compose.yml --env-file .env exec backend pytest
+cd backend
+python -m pip install -r requirements-dev.txt
+python -m pytest
 ```
 
 Stop container tanpa hapus data:

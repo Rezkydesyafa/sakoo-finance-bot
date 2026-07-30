@@ -5,14 +5,17 @@ from datetime import date
 
 from sqlalchemy.orm import Session
 
-from app.modules.ai.ollama import ollama_available, parse_with_ollama
+from app.modules.ai.ollama import (
+    TRANSACTION_PARSE_SYSTEM_PROMPT,
+    build_transaction_parse_prompt,
+    parse_transaction_response,
+)
+from app.modules.categories.service import list_categories
+from app.modules.llm.llm_router import get_llm_providers
+from app.modules.parser.schemas import INTENT_UNKNOWN
 from app.modules.parser.service import ParsedMessage, parse_message
 
 logger = logging.getLogger(__name__)
-
-# If the rule-based parser confidence is below this threshold,
-# try the AI parser as a fallback.
-AI_FALLBACK_CONFIDENCE_THRESHOLD = 0.70
 
 
 def parse_bot_text_message(
@@ -23,36 +26,63 @@ def parse_bot_text_message(
     source: str,
     today: date | None = None,
 ) -> tuple[ParsedMessage, str | None]:
-    """Parse a bot text message, with optional AI fallback.
-
-    1. First, run the rule-based parser.
-    2. If confidence is below threshold AND Ollama is available,
-       try the AI parser as a fallback.
-    3. Use the result with the higher confidence.
-    """
-    result = parse_message(text, source=source, today=today)
-
-    # If rule-based confidence is good enough, return immediately.
-    if result.confidence >= AI_FALLBACK_CONFIDENCE_THRESHOLD:
-        return result, None
-
-    # Try AI fallback.
+    """Interpret with configured LLM providers, then fall back to rules."""
+    fallback_errors: list[str] = []
     try:
-        if ollama_available():
-            ai_result = parse_with_ollama(text, source=source, today=today)
-            if ai_result is not None and ai_result.confidence > result.confidence:
-                logger.info(
-                    "AI parser produced higher confidence (%.2f vs %.2f) for user %d",
-                    ai_result.confidence,
-                    result.confidence,
-                    user_id,
-                )
-                return ai_result, None
+        providers = get_llm_providers()
+        if providers:
+            category_options = [
+                (category.name, category.type)
+                for category in list_categories(db, user_id)
+            ]
+            current_date = today or date.today()
+            prompt = build_transaction_parse_prompt(
+                text,
+                today=current_date,
+                category_options=category_options,
+            )
+            for provider in providers:
+                try:
+                    raw_result = provider.complete(
+                        prompt,
+                        system_prompt=TRANSACTION_PARSE_SYSTEM_PROMPT,
+                        temperature=0.1,
+                        max_tokens=320,
+                    )
+                    llm_result = parse_transaction_response(
+                        raw_result,
+                        source=source,
+                        today=current_date,
+                        category_options=category_options,
+                        provider_name=provider.provider_name,
+                    )
+                except Exception as exc:
+                    fallback_errors.append(
+                        f"{provider.provider_name}:{type(exc).__name__}"
+                    )
+                    continue
+
+                if llm_result is not None and llm_result.intent != INTENT_UNKNOWN:
+                    logger.info(
+                        "%s interpreted message for user %d",
+                        provider.provider_name,
+                        user_id,
+                    )
+                    return llm_result, None
+                fallback_errors.append(f"{provider.provider_name}:invalid_result")
     except Exception:
+        fallback_errors.append("llm_router_error")
         logger.warning(
-            "AI parser fallback failed for user %d, using rule-based result",
+            "LLM-first parser setup failed for user %d",
             user_id,
             exc_info=True,
         )
 
-    return result, None
+    fallback_error = ";".join(fallback_errors) or None
+    if fallback_error:
+        logger.warning(
+            "LLM-first parsing failed for user %d; using rule parser (%s)",
+            user_id,
+            fallback_error,
+        )
+    return parse_message(text, source=source, today=today), fallback_error
