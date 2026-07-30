@@ -12,7 +12,6 @@ import { TransactionsTab } from "@/components/tabs/transactions-tab";
 import { ReportsTab } from "@/components/tabs/reports-tab";
 import { ReceiptScanTab } from "@/components/tabs/receipt-scan-tab";
 import { BudgetsTab } from "@/components/tabs/budgets-tab";
-import { SettingsTab } from "@/components/tabs/settings-tab";
 import { IntegrationsTab } from "@/components/tabs/integrations-tab";
 import { TransactionModal } from "@/components/add-transaction-modal";
 import { ChatTab } from "@/components/tabs/chat-tab";
@@ -51,12 +50,6 @@ function HomeContent() {
 
 
 
-  const [healthStatus, setHealthStatus] = useState({
-    db: "checking",
-    waha: "checking",
-    backend: "checking",
-  });
-
   // Receipt Scanner states (Desktop)
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
   const [scanStatus, setScanStatus] = useState<"idle" | "scanning" | "completed">("idle");
@@ -75,7 +68,7 @@ function HomeContent() {
       import("@capacitor/core").then(({ Capacitor }) => {
         if (Capacitor.isNativePlatform()) {
           import("@capacitor/app").then(({ App: CapacitorApp }) => {
-            CapacitorApp.addListener("backButton", ({ canGoBack }) => {
+            CapacitorApp.addListener("backButton", () => {
               if (isAddTxModalOpen) {
                 setIsAddTxModalOpen(false);
                 return;
@@ -113,22 +106,10 @@ function HomeContent() {
     return () => {
       if (listener) listener.remove();
     };
-  }, [exitWarningShowing, isAddTxModalOpen, editTxId, deleteTxId]);
+  }, [exitWarningShowing, isAddTxModalOpen, editTxId, deleteTxId, router]);
 
   useEffect(() => {
     const token = getStoredAuthToken();
-
-    apiClient.health()
-      .then(() => setHealthStatus(prev => ({ ...prev, backend: "online" })))
-      .catch(() => setHealthStatus(prev => ({ ...prev, backend: "offline" })));
-
-    apiClient.databaseHealth()
-      .then(() => setHealthStatus(prev => ({ ...prev, db: "online" })))
-      .catch(() => setHealthStatus(prev => ({ ...prev, db: "offline" })));
-
-    apiClient.wahaHealth()
-      .then(() => setHealthStatus(prev => ({ ...prev, waha: "online" })))
-      .catch(() => setHealthStatus(prev => ({ ...prev, waha: "offline" })));
 
     if (!token) {
       setAuthState("guest");
@@ -212,7 +193,7 @@ function HomeContent() {
     try {
       await apiClient.transactions.delete(token, deleteTxId);
       await refreshTransactions(token);
-    } catch (error) {
+    } catch {
       alert("Gagal menghapus transaksi.");
     } finally {
       setDeleteTxId(null);
@@ -253,7 +234,7 @@ function HomeContent() {
         category_id: data.category_id,
       });
       await refreshTransactions(token);
-    } catch (error) {
+    } catch {
       alert("Gagal mengubah transaksi.");
     }
   }

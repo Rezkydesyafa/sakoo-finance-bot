@@ -162,7 +162,3 @@ def _callback_button(text: str, callback_data: str) -> dict[str, Any]:
 
 def callback_data_values() -> set[str]:
     return CALLBACK_DATA_VALUES
-
-
-def as_reply_markup(markup: dict[str, Any] | None) -> dict[str, Any] | None:
-    return markup

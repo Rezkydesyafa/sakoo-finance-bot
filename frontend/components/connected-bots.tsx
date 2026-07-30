@@ -12,22 +12,16 @@ const channels: Array<{
   name: BotChannel;
   platform: Platform;
   label: string;
-  icon: string;
-  iconClassName: string;
 }> = [
   {
     name: "Telegram",
     platform: "telegram",
     label: "Telegram Bot",
-    icon: "send",
-    iconClassName: "text-blue-500",
   },
   {
     name: "WhatsApp",
     platform: "whatsapp",
     label: "WhatsApp Bot",
-    icon: "chat",
-    iconClassName: "text-green-500",
   },
 ];
 
@@ -161,8 +155,6 @@ export function ConnectedBots({ displayMode = "all" }: { displayMode?: "all" | "
               key={channel.platform}
               name={channel.label}
               detail={formatAccountDetail(account)}
-              icon={channel.icon}
-              iconClassName={channel.iconClassName}
               isLinked={Boolean(account?.is_active)}
               isLoading={loadingTarget === channel.name}
               onConnect={() => createLinkingCode(channel.name)}
@@ -413,8 +405,6 @@ function BotChannelsGrid({
 type BotRowProps = {
   name: string;
   detail: string;
-  icon: string;
-  iconClassName: string;
   isLinked: boolean;
   isLoading: boolean;
   onConnect: () => void;
@@ -424,8 +414,6 @@ type BotRowProps = {
 function BotRow({
   name,
   detail,
-  icon,
-  iconClassName,
   isLinked,
   isLoading,
   onConnect,

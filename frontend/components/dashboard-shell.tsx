@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 import { Suspense, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { LogoutButton } from "@/components/logout-button";
-import { apiClient, ApiError } from "@/lib/api";
+import { apiClient } from "@/lib/api";
 import { getStoredAuthToken, clearAuthToken } from "@/lib/auth-storage";
 import { SettingsTab } from "@/components/tabs/settings-tab";
 
@@ -99,7 +99,7 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
       window.removeEventListener("profile_image_updated", loadProfileImage);
       window.removeEventListener("open_mobile_scan", handleOpenScan);
     };
-  }, []);
+  }, [router]);
 
   if (isAuthChecking) {
     return (

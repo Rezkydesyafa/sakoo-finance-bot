@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Transaction, ChatMessage } from "@/app/(dashboard)/types";
+import type { Transaction } from "@/app/(dashboard)/types";
 import { ConnectedBots } from "@/components/connected-bots";
 
 import Link from "next/link";
@@ -251,20 +251,6 @@ export function OverviewTab({
               const isIncome = t.type === "income";
               const iconBg = isIncome ? "bg-[#c7ff00]/20 text-[#4e6700]" : "bg-[#F1F2F0] text-[#5f5e5e]";
               
-              let sourceIcon = "edit_square";
-              let sourceTitle = "Manual Entry";
-              let sourceBg = "bg-[#F1F2F0] text-[#6F6F6F]";
-              
-              if (t.source.includes("telegram")) {
-                sourceIcon = "send";
-                sourceTitle = "Telegram Bot";
-                sourceBg = "bg-[#E3F2FD] text-[#1976D2]";
-              } else if (t.source.includes("whatsapp")) {
-                sourceIcon = "chat";
-                sourceTitle = "WhatsApp Bot";
-                sourceBg = "bg-[#E8F5E9] text-[#2E7D32]";
-              }
-
               const dateObj = new Date(t.created_at || t.transaction_date);
               const timeStr = dateObj.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
 

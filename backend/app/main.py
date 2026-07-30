@@ -5,8 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import router as api_router
 from app.api.webhooks import router as webhook_router
-from app.core.config import get_settings
-from app.core.database import check_database_connection
+from app.config import get_settings
+from app.database import check_database_connection
 from app.modules.telegram.client import TelegramClientError
 from app.modules.telegram.commands import register_bot_commands
 
