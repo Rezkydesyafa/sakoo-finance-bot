@@ -30,6 +30,7 @@ from app.modules.bot.conversation_state import (
 )
 from app.modules.llm.base import LlmProviderError
 from app.modules.llm.llm_router import LlmRateLimitExceeded, answer_finance_question_with_llm
+from app.modules.notifications.enqueue import enqueue_budget_notification_check
 from app.modules.bot.response_templates import (
     format_cancelled_response,
     format_confirmation_request,
@@ -41,7 +42,7 @@ from app.modules.bot.response_templates import (
     format_saved_transaction as format_saved_transaction_template,
     format_unknown_response,
 )
-from app.modules.bot.service import handle_bot_text_message
+from app.modules.bot.message_handler import parse_bot_text_message as handle_bot_text_message
 from app.modules.parser.amount_parser import extract_amount, parse_amount
 from app.modules.parser.date_parser import parse_transaction_date
 from app.modules.parser.normalizer import normalize_text
@@ -154,7 +155,6 @@ BUDGET_REMAINING_RE = re.compile(
     r"\bbudget\s+(?P<category>.+?)\s+(?:tinggal|sisa|tersisa|remaining|berapa)\b",
     re.IGNORECASE,
 )
-BUDGET_WORD_RE = re.compile(r"\b(?:budget|anggaran)\b", re.IGNORECASE)
 VISIBILITY_CHECK_RE = re.compile(
     r"\b(?:tidak|ga|gak|nggak|belum)\s+masuk\b.*\b(?:dashboard|list|daftar)\b"
     r"|\b(?:dashboard|list|daftar)\b.*\b(?:tidak|ga|gak|nggak|belum)\s+masuk\b",
@@ -429,6 +429,7 @@ def _save_transaction_from_parse_result(
             )
         db.commit()
         db.refresh(transaction)
+        enqueue_budget_notification_check(transaction.id)
     except SQLAlchemyError as exc:
         db.rollback()
         return TextTransactionResult(
@@ -2259,8 +2260,6 @@ def _handle_budget_message(
     text: str,
     source: str,
 ) -> TextTransactionResult | None:
-    has_budget_word = BUDGET_WORD_RE.search(text) is not None
-
     if BUDGET_CATEGORY_LIST_RE.search(text):
         return TextTransactionResult(
             status="budget_category_list",
@@ -2308,8 +2307,6 @@ def _handle_budget_message(
                 intent="budget_list",
             ),
         )
-    if has_budget_word:
-        return _budget_help_result(text=text, source=source)
     return None
 
 
@@ -2633,6 +2630,7 @@ def _format_category_summary_response(
 def _build_llm_finance_context(db: Session, user_id: int) -> str:
     today = date.today()
     name = _user_first_name(db, user_id)
+    budget = get_budget_overview(db, user_id, today=today)
     month_start = today.replace(day=1)
     income_total = sum_transactions(db, user_id, transaction_type="income")
     expense_total = sum_transactions(db, user_id, transaction_type="expense")
@@ -2685,6 +2683,19 @@ def _build_llm_finance_context(db: Session, user_id: int) -> str:
         if top_category
         else "belum ada"
     )
+    budget_text = (
+        f"total {format_rupiah(budget.total_budgeted)}, "
+        f"terpakai {format_rupiah(budget.total_spent)}, "
+        f"sisa {format_rupiah(budget.total_remaining)}"
+        if budget.items
+        else "belum diset"
+    )
+    budget_items = "; ".join(
+        f"{item.category_name}: limit {format_rupiah(item.monthly_limit)}, "
+        f"terpakai {format_rupiah(item.spent)}, sisa {format_rupiah(item.remaining)}, "
+        f"status {item.status}"
+        for item in budget.items
+    )
     return "\n".join(
         [
             f"Nama user: {name}",
@@ -2696,6 +2707,8 @@ def _build_llm_finance_context(db: Session, user_id: int) -> str:
             f"Pengeluaran minggu ini: {format_rupiah(week_expense)}",
             f"Pengeluaran minggu lalu: {format_rupiah(last_week_expense)}",
             f"Kategori pengeluaran terbesar bulan ini: {top_text}",
+            f"Budget bulan ini: {budget_text}",
+            "Rincian budget: " + (budget_items or "belum ada"),
             "Transaksi terbaru: " + ("; ".join(recent_lines) if recent_lines else "belum ada"),
         ]
     )

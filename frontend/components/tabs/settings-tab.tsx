@@ -2,6 +2,13 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import {
+  apiClient,
+  ApiError,
+  type NotificationPreferencesResponse,
+  type NotificationPreferencesUpdate,
+} from "@/lib/api";
+import { clearAuthToken, getStoredAuthToken } from "@/lib/auth-storage";
 
 type SettingsTabProps = {
   userName: string;
@@ -29,6 +36,31 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferencesResponse>({
+    daily_reminder_enabled: false,
+    daily_reminder_time: "20:00",
+    weekly_summary_enabled: false,
+    monthly_summary_enabled: false,
+    budget_alert_enabled: true,
+    timezone: "Asia/Jakarta",
+    active_channels: [],
+  });
+  const [notificationLoading, setNotificationLoading] = useState(true);
+  const [notificationSaving, setNotificationSaving] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState("");
+  const [notificationError, setNotificationError] = useState("");
+
+  useEffect(() => {
+    const token = getStoredAuthToken();
+    if (!token) {
+      router.replace("/login");
+      return;
+    }
+    apiClient.notifications.preferences(token)
+      .then(setNotificationPreferences)
+      .catch((error) => handleNotificationAuthError(error, router, setNotificationError))
+      .finally(() => setNotificationLoading(false));
+  }, [router]);
 
   const [modalOpen, setModalOpen] = useState<"none" | "logout" | "deactivate" | "delete">("none");
 
@@ -78,6 +110,33 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
       window.dispatchEvent(new Event("profile_image_updated"));
     }
     alert("Profil dan foto berhasil disimpan!");
+  };
+
+  const handleSaveNotifications = async () => {
+    const token = getStoredAuthToken();
+    if (!token) {
+      router.replace("/login");
+      return;
+    }
+    setNotificationSaving(true);
+    setNotificationMessage("");
+    setNotificationError("");
+    const payload: NotificationPreferencesUpdate = {
+      daily_reminder_enabled: notificationPreferences.daily_reminder_enabled,
+      daily_reminder_time: notificationPreferences.daily_reminder_time,
+      weekly_summary_enabled: notificationPreferences.weekly_summary_enabled,
+      monthly_summary_enabled: notificationPreferences.monthly_summary_enabled,
+      budget_alert_enabled: notificationPreferences.budget_alert_enabled,
+      timezone: notificationPreferences.timezone,
+    };
+    try {
+      setNotificationPreferences(await apiClient.notifications.updatePreferences(token, payload));
+      setNotificationMessage("Pengaturan notifikasi berhasil disimpan.");
+    } catch (error) {
+      handleNotificationAuthError(error, router, setNotificationError);
+    } finally {
+      setNotificationSaving(false);
+    }
   };
 
   return (
@@ -279,16 +338,96 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
               Preferensi Aplikasi
             </h3>
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm font-bold text-[#1a1c1b] mb-1">Notifikasi Push</div>
-                  <div className="text-xs text-[#6F6F6F]">Terima notifikasi untuk laporan mingguan dan limit budget.</div>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" className="sr-only peer" defaultChecked />
-                  <div className="w-11 h-6 bg-[#E8E8E8] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#5FCF6A]"></div>
-                </label>
-              </div>
+              {notificationLoading ? (
+                <p className="text-sm text-[#6F6F6F]">Memuat pengaturan notifikasi...</p>
+              ) : (
+                <>
+                  <div className="rounded-2xl bg-[#F8F9F6] p-4">
+                    <div className="text-xs font-bold text-[#6F6F6F] uppercase tracking-wider mb-2">Dikirim melalui</div>
+                    {notificationPreferences.active_channels.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {notificationPreferences.active_channels.map((channel) => (
+                          <span key={channel} className="rounded-full bg-[#E9F8D0] px-3 py-1 text-xs font-bold text-[#4e6700] capitalize">
+                            {channel}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs font-medium text-orange-700">Belum ada WhatsApp atau Telegram aktif. Hubungkan bot agar notifikasi dapat dikirim.</p>
+                    )}
+                  </div>
+
+                  <NotificationToggle
+                    title="Pengingat dan rekap harian"
+                    description="Ingatkan pencatatan atau kirim rekap singkat jika transaksi sudah ada."
+                    checked={notificationPreferences.daily_reminder_enabled}
+                    onChange={(checked) => setNotificationPreferences((value) => ({ ...value, daily_reminder_enabled: checked }))}
+                  />
+
+                  <div className="border-t border-[#E8E8E8] pt-6 flex items-center justify-between gap-4">
+                    <div>
+                      <div className="text-sm font-bold text-[#1a1c1b] mb-1">Jam pengingat harian</div>
+                      <div className="text-xs text-[#6F6F6F]">Mengikuti zona waktu yang dipilih.</div>
+                    </div>
+                    <input
+                      type="time"
+                      value={notificationPreferences.daily_reminder_time}
+                      disabled={!notificationPreferences.daily_reminder_enabled}
+                      onChange={(event) => setNotificationPreferences((value) => ({ ...value, daily_reminder_time: event.target.value }))}
+                      className="bg-[#F1F2F0] disabled:opacity-50 border-none rounded-xl py-2 px-4 text-xs font-semibold text-[#1a1c1b] focus:ring-1 focus:ring-[#c7ff00]"
+                    />
+                  </div>
+
+                  <NotificationToggle
+                    title="Ringkasan mingguan"
+                    description="Dikirim setiap Senin pukul 08.00 untuk minggu sebelumnya."
+                    checked={notificationPreferences.weekly_summary_enabled}
+                    onChange={(checked) => setNotificationPreferences((value) => ({ ...value, weekly_summary_enabled: checked }))}
+                  />
+                  <NotificationToggle
+                    title="Ringkasan bulanan"
+                    description="Dikirim tanggal 1 pukul 08.00 untuk bulan sebelumnya."
+                    checked={notificationPreferences.monthly_summary_enabled}
+                    onChange={(checked) => setNotificationPreferences((value) => ({ ...value, monthly_summary_enabled: checked }))}
+                  />
+                  <NotificationToggle
+                    title="Peringatan budget"
+                    description="Kabar saat pemakaian budget mencapai 80% dan 100%."
+                    checked={notificationPreferences.budget_alert_enabled}
+                    onChange={(checked) => setNotificationPreferences((value) => ({ ...value, budget_alert_enabled: checked }))}
+                  />
+
+                  <div className="border-t border-[#E8E8E8] pt-6 flex items-center justify-between gap-4">
+                    <div>
+                      <div className="text-sm font-bold text-[#1a1c1b] mb-1">Zona waktu</div>
+                      <div className="text-xs text-[#6F6F6F]">Dipakai untuk semua jadwal notifikasi.</div>
+                    </div>
+                    <select
+                      value={notificationPreferences.timezone}
+                      onChange={(event) => setNotificationPreferences((value) => ({
+                        ...value,
+                        timezone: event.target.value as NotificationPreferencesResponse["timezone"],
+                      }))}
+                      className="bg-[#F1F2F0] border-none rounded-xl py-2 px-4 text-xs font-semibold text-[#1a1c1b] focus:ring-1 focus:ring-[#c7ff00] cursor-pointer"
+                    >
+                      <option value="Asia/Jakarta">WIB</option>
+                      <option value="Asia/Makassar">WITA</option>
+                      <option value="Asia/Jayapura">WIT</option>
+                    </select>
+                  </div>
+
+                  {notificationError && <p className="text-xs font-semibold text-red-600">{notificationError}</p>}
+                  {notificationMessage && <p className="text-xs font-semibold text-green-700">{notificationMessage}</p>}
+                  <button
+                    type="button"
+                    disabled={notificationSaving}
+                    onClick={handleSaveNotifications}
+                    className="bg-[#4e6700] disabled:opacity-60 hover:bg-[#3a4d00] text-white px-6 py-2.5 rounded-full text-xs font-semibold transition-colors border-none cursor-pointer"
+                  >
+                    {notificationSaving ? "Menyimpan..." : "Simpan Pengaturan"}
+                  </button>
+                </>
+              )}
               <div className="flex items-center justify-between border-t border-[#E8E8E8] pt-6">
                 <div>
                   <div className="text-sm font-bold text-[#1a1c1b] mb-1">Mode Gelap (Dark Mode)</div>
@@ -427,4 +566,42 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
 
     </div>
   );
+}
+
+function NotificationToggle({
+  title,
+  description,
+  checked,
+  onChange,
+}: {
+  title: string;
+  description: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 border-t border-[#E8E8E8] pt-6 first:border-0 first:pt-0">
+      <div>
+        <div className="text-sm font-bold text-[#1a1c1b] mb-1">{title}</div>
+        <div className="text-xs text-[#6F6F6F]">{description}</div>
+      </div>
+      <label className="relative inline-flex items-center cursor-pointer shrink-0">
+        <input type="checkbox" className="sr-only peer" checked={checked} onChange={(event) => onChange(event.target.checked)} />
+        <div className="w-11 h-6 bg-[#E8E8E8] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#5FCF6A]"></div>
+      </label>
+    </div>
+  );
+}
+
+function handleNotificationAuthError(
+  error: unknown,
+  router: ReturnType<typeof useRouter>,
+  setError: (message: string) => void,
+) {
+  if (error instanceof ApiError && error.status === 401) {
+    clearAuthToken();
+    router.replace("/login");
+    return;
+  }
+  setError("Pengaturan notifikasi belum dapat dimuat atau disimpan. Coba lagi.");
 }

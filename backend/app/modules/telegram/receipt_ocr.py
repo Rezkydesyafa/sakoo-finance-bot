@@ -19,6 +19,7 @@ from app.modules.jobs.service import (
     queue_receipt_ocr_job,
 )
 from app.modules.media.service import MediaStorageError, save_media_bytes
+from app.modules.notifications.enqueue import enqueue_budget_notification_check
 from app.modules.ocr.receipt_chat import (
     CANCEL_CONFIRMATION_RE,
     PENDING_RECEIPT_STATUSES,
@@ -420,6 +421,7 @@ def _confirm_receipt_transaction(
     db.commit()
     db.refresh(transaction)
     db.refresh(receipt)
+    enqueue_budget_notification_check(transaction.id)
 
     return TelegramReceiptOcrFlowResult(
         status="saved",

@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Any
 
@@ -15,6 +15,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    Time,
     UniqueConstraint,
     func,
 )
@@ -247,6 +248,42 @@ class UserPreference(TimestampMixin, Base):
         server_default="friendly",
         nullable=False,
     )
+    daily_reminder_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        server_default="false",
+        nullable=False,
+    )
+    daily_reminder_time: Mapped[time] = mapped_column(
+        Time,
+        default=time(20, 0),
+        server_default="20:00:00",
+        nullable=False,
+    )
+    weekly_summary_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        server_default="false",
+        nullable=False,
+    )
+    monthly_summary_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        server_default="false",
+        nullable=False,
+    )
+    budget_alert_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
+        server_default="true",
+        nullable=False,
+    )
+    timezone: Mapped[str] = mapped_column(
+        String(32),
+        default="Asia/Jakarta",
+        server_default="Asia/Jakarta",
+        nullable=False,
+    )
 
     user: Mapped["User"] = relationship(back_populates="preference")
 
@@ -254,6 +291,10 @@ class UserPreference(TimestampMixin, Base):
         CheckConstraint(
             "reply_style IN ('friendly', 'detailed', 'short')",
             name="ck_user_preferences_reply_style",
+        ),
+        CheckConstraint(
+            "timezone IN ('Asia/Jakarta', 'Asia/Makassar', 'Asia/Jayapura')",
+            name="ck_user_preferences_timezone",
         ),
         UniqueConstraint("user_id", name="uq_user_preferences_user_id"),
     )

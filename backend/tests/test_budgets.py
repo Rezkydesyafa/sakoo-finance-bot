@@ -17,6 +17,8 @@ from app.config import get_settings
 from app.database import Base, get_db
 from app.main import app
 from app.models import Category, Transaction, User
+from app.modules.parser.service import ParsedMessage
+from app.modules.transactions import service as transaction_service
 
 
 @pytest.fixture()
@@ -152,6 +154,82 @@ def test_budget_api_rejects_income_only_and_other_user_category(
         json={"monthly_limit": "250000"},
     )
     assert owner_category_response.status_code == 200, owner_category_response.text
+
+
+def test_llm_finance_context_includes_current_budget(
+    test_client: tuple[TestClient, sessionmaker[Session]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, session_factory = test_client
+    token = _register_and_login(client, "budget-context@example.com")
+    category_id = _category_ids(session_factory)["Makanan"]
+    response = client.put(
+        f"/api/budgets/{category_id}",
+        headers=_auth_headers(token),
+        json={"monthly_limit": "600000"},
+    )
+    assert response.status_code == 200, response.text
+
+    with session_factory() as db:
+        user = _user(db, "budget-context@example.com")
+        db.add(
+            Transaction(
+                user_id=user.id,
+                type="expense",
+                amount=Decimal("420000"),
+                category_id=category_id,
+                description="makan bulan ini",
+                transaction_date=date.today(),
+                source="dashboard_manual",
+                status="confirmed",
+            )
+        )
+        db.commit()
+        context = transaction_service._build_llm_finance_context(db, user.id)
+
+    assert "Budget bulan ini: total Rp600.000" in context
+    assert "Makanan: limit Rp600.000, terpakai Rp420.000, sisa Rp180.000" in context
+    assert "status warning" in context
+
+    parsed = ParsedMessage(
+        intent="finance_chat",
+        type=None,
+        amount=None,
+        category=None,
+        description="budget makanan cukup sampai akhir bulan?",
+        transaction_date=date.today(),
+        source="whatsapp_text",
+        confidence=0.9,
+        need_confirmation=False,
+        reasons=["test"],
+    )
+    monkeypatch.setattr(
+        transaction_service,
+        "handle_bot_text_message",
+        lambda **_kwargs: (parsed, None),
+    )
+    captured_context: list[str] = []
+
+    def answer_with_budget(_message: str, *, context: str, **_kwargs) -> str:
+        captured_context.append(context)
+        return "Masih cukup, tapi pemakaian sudah 70%."
+
+    monkeypatch.setattr(
+        transaction_service,
+        "answer_finance_question_with_llm",
+        answer_with_budget,
+    )
+    with session_factory() as db:
+        user = _user(db, "budget-context@example.com")
+        result = transaction_service.handle_whatsapp_text_transaction(
+            db=db,
+            user_id=user.id,
+            text="budget makanan cukup sampai akhir bulan?",
+        )
+
+    assert result.status == "finance_chat"
+    assert result.reply_text == "Masih cukup, tapi pemakaian sudah 70%."
+    assert "sisa Rp180.000" in captured_context[0]
 
 
 def _register_and_login(client: TestClient, email: str) -> str:

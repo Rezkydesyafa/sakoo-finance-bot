@@ -1,7 +1,3 @@
-import { Capacitor } from "@capacitor/core";
-
-
-
 const getBrowserApiBaseUrl = () => {
   if (typeof window !== "undefined") {
     // If running Next.js dev server (port 3000) locally or via LAN (Live Reload)
@@ -300,6 +296,19 @@ export type PlatformAccountResponse = {
   is_active: boolean;
 };
 
+export type NotificationPreferencesUpdate = {
+  daily_reminder_enabled: boolean;
+  daily_reminder_time: string;
+  weekly_summary_enabled: boolean;
+  monthly_summary_enabled: boolean;
+  budget_alert_enabled: boolean;
+  timezone: "Asia/Jakarta" | "Asia/Makassar" | "Asia/Jayapura";
+};
+
+export type NotificationPreferencesResponse = NotificationPreferencesUpdate & {
+  active_channels: ("whatsapp" | "telegram")[];
+};
+
 type ApiRequestOptions = RequestInit & {
   token?: string;
   query?: Record<string, string | number | boolean | undefined | null>;
@@ -410,6 +419,17 @@ export const apiClient = {
       apiRequest<void>(`/budgets/${categoryId}`, {
         method: "DELETE",
         token,
+      }),
+  },
+
+  notifications: {
+    preferences: (token: string) =>
+      apiRequest<NotificationPreferencesResponse>("/notifications/preferences", { token }),
+    updatePreferences: (token: string, payload: NotificationPreferencesUpdate) =>
+      apiRequest<NotificationPreferencesResponse>("/notifications/preferences", {
+        method: "PUT",
+        token,
+        body: JSON.stringify(payload),
       }),
   },
 

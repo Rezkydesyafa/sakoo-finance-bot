@@ -104,6 +104,25 @@ services:
       redis:
         condition: service_healthy
 
+  celery_beat:
+    image: ghcr.io/rezkydesyafa/sakoo-backend:latest
+    restart: unless-stopped
+    command: celery -A app.workers.celery_app.celery_app beat --loglevel=info --schedule=/tmp/celerybeat-schedule
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    env_file:
+      - ../../.env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
   waha:
     image: devlikeapro/waha:latest
     restart: unless-stopped
