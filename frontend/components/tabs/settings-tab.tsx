@@ -66,31 +66,14 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setPasswordError("");
-    if (newPassword !== confirmPassword) {
-      setPasswordError("Konfirmasi password tidak cocok dengan password baru.");
-      return;
-    }
-    if (newPassword.length < 8) {
-      setPasswordError("Password baru harus minimal 8 karakter.");
-      return;
-    }
-    // Simulate API Call
-    alert("Password berhasil diubah!");
-    setOldPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
+    setPasswordError("Perubahan password belum tersedia.");
   };
 
   const handleConfirmAction = () => {
     if (modalOpen === "logout") {
-      window.location.href = "/login";
-    } else if (modalOpen === "deactivate") {
-      alert("Akun telah dinonaktifkan sementara.");
-      setModalOpen("none");
-    } else if (modalOpen === "delete") {
-      alert("Akun akan dihapus secara permanen dalam 30 hari.");
-      window.location.href = "/login";
+      clearAuthToken();
+      router.replace("/login");
+      router.refresh();
     }
   };
 
@@ -109,7 +92,7 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
       localStorage.setItem("sakoo_profile_image", profileImage);
       window.dispatchEvent(new Event("profile_image_updated"));
     }
-    alert("Profil dan foto berhasil disimpan!");
+    alert("Foto profil disimpan di perangkat ini.");
   };
 
   const handleSaveNotifications = async () => {
@@ -169,7 +152,7 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
               )}
             </div>
           </div>
-          <input 
+                  <input
             type="file" 
             ref={fileInputRef} 
             onChange={handleFileChange} 
@@ -237,11 +220,11 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-[#6F6F6F] mb-1.5">Nama Lengkap</label>
-                  <input type="text" defaultValue={userName} className="w-full bg-[#F1F2F0] border-none rounded-xl py-3 px-4 text-sm font-medium text-[#1a1c1b] focus:ring-1 focus:ring-[#c7ff00]" />
+                  <input type="text" defaultValue={userName} disabled className="w-full bg-[#F1F2F0] opacity-70 border-none rounded-xl py-3 px-4 text-sm font-medium text-[#1a1c1b] cursor-not-allowed" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-[#6F6F6F] mb-1.5">Nomor Telepon</label>
-                  <input type="tel" defaultValue={userPhone} className="w-full bg-[#F1F2F0] border-none rounded-xl py-3 px-4 text-sm font-medium text-[#1a1c1b] focus:ring-1 focus:ring-[#c7ff00]" />
+                  <input type="tel" defaultValue={userPhone} disabled className="w-full bg-[#F1F2F0] opacity-70 border-none rounded-xl py-3 px-4 text-sm font-medium text-[#1a1c1b] cursor-not-allowed" />
                 </div>
               </div>
               <div>
@@ -252,7 +235,7 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
                 </div>
               </div>
               <button onClick={handleSaveProfile} className="bg-[#4e6700] hover:bg-[#3a4d00] text-white px-6 py-2.5 rounded-full text-xs font-semibold transition-colors border-none cursor-pointer mt-2">
-                Simpan Perubahan
+                Simpan Foto di Perangkat
               </button>
             </div>
           </section>
@@ -275,14 +258,14 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
               <div>
                 <label className="block text-xs font-semibold text-[#6F6F6F] mb-1.5">Password Lama</label>
                 <div className="relative">
-                  <input 
-                    type={showOldPassword ? "text" : "password"}
-                    value={oldPassword}
-                    onChange={(e) => setOldPassword(e.target.value)}
-                    required
-                    className="w-full bg-[#F1F2F0] border-none rounded-xl py-3 pl-4 pr-12 text-sm font-medium text-[#1a1c1b] focus:ring-1 focus:ring-[#c7ff00]" 
+                   <input
+                     type={showOldPassword ? "text" : "password"}
+                     value={oldPassword}
+                     onChange={(e) => setOldPassword(e.target.value)}
+                     disabled
+                     className="w-full bg-[#F1F2F0] opacity-70 border-none rounded-xl py-3 pl-4 pr-12 text-sm font-medium text-[#1a1c1b] cursor-not-allowed"
                   />
-                  <button type="button" onClick={() => setShowOldPassword(!showOldPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6F6F6F] hover:text-[#1a1c1b]">
+                  <button type="button" disabled onClick={() => setShowOldPassword(!showOldPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6F6F6F] cursor-not-allowed">
                     <span className="material-symbols-outlined text-[20px]">{showOldPassword ? 'visibility' : 'visibility_off'}</span>
                   </button>
                 </div>
@@ -294,12 +277,12 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
                   <div className="relative">
                     <input 
                       type={showNewPassword ? "text" : "password"}
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      required
-                      className="w-full bg-[#F1F2F0] border-none rounded-xl py-3 pl-4 pr-12 text-sm font-medium text-[#1a1c1b] focus:ring-1 focus:ring-[#c7ff00]" 
+                     value={newPassword}
+                     onChange={(e) => setNewPassword(e.target.value)}
+                     disabled
+                     className="w-full bg-[#F1F2F0] opacity-70 border-none rounded-xl py-3 pl-4 pr-12 text-sm font-medium text-[#1a1c1b] cursor-not-allowed"
                     />
-                    <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6F6F6F] hover:text-[#1a1c1b]">
+                    <button type="button" disabled onClick={() => setShowNewPassword(!showNewPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6F6F6F] cursor-not-allowed">
                       <span className="material-symbols-outlined text-[20px]">{showNewPassword ? 'visibility' : 'visibility_off'}</span>
                     </button>
                   </div>
@@ -309,12 +292,12 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
                   <div className="relative">
                     <input 
                       type={showConfirmPassword ? "text" : "password"}
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      required
-                      className="w-full bg-[#F1F2F0] border-none rounded-xl py-3 pl-4 pr-12 text-sm font-medium text-[#1a1c1b] focus:ring-1 focus:ring-[#c7ff00]" 
+                     value={confirmPassword}
+                     onChange={(e) => setConfirmPassword(e.target.value)}
+                     disabled
+                     className="w-full bg-[#F1F2F0] opacity-70 border-none rounded-xl py-3 pl-4 pr-12 text-sm font-medium text-[#1a1c1b] cursor-not-allowed"
                     />
-                    <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6F6F6F] hover:text-[#1a1c1b]">
+                    <button type="button" disabled onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6F6F6F] cursor-not-allowed">
                       <span className="material-symbols-outlined text-[20px]">{showConfirmPassword ? 'visibility' : 'visibility_off'}</span>
                     </button>
                   </div>
@@ -325,8 +308,8 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
                 <p className="text-red-500 text-xs font-semibold">{passwordError}</p>
               )}
 
-              <button type="submit" className="bg-[#4e6700] hover:bg-[#3a4d00] text-white px-6 py-2.5 rounded-full text-xs font-semibold transition-colors border-none cursor-pointer mt-2">
-                Ubah Password
+              <button type="submit" disabled className="bg-[#4e6700] opacity-50 text-white px-6 py-2.5 rounded-full text-xs font-semibold border-none cursor-not-allowed mt-2">
+                Belum Tersedia
               </button>
             </form>
           </section>
@@ -434,7 +417,7 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
                   <div className="text-xs text-[#6F6F6F]">Ganti tema aplikasi menjadi gelap.</div>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" className="sr-only peer" />
+                  <input type="checkbox" disabled className="sr-only peer" />
                   <div className="w-11 h-6 bg-[#E8E8E8] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#5FCF6A]"></div>
                 </label>
               </div>
@@ -443,7 +426,7 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
                   <div className="text-sm font-bold text-[#1a1c1b] mb-1">Mata Uang Default</div>
                   <div className="text-xs text-[#6F6F6F]">Pilih mata uang yang digunakan untuk laporan.</div>
                 </div>
-                <select className="bg-[#F1F2F0] border-none rounded-xl py-2 px-4 text-xs font-semibold text-[#1a1c1b] focus:ring-1 focus:ring-[#c7ff00] cursor-pointer">
+                <select disabled className="bg-[#F1F2F0] opacity-70 border-none rounded-xl py-2 px-4 text-xs font-semibold text-[#1a1c1b] cursor-not-allowed">
                   <option>IDR (Rupiah)</option>
                   <option>USD (Dollar)</option>
                 </select>
@@ -461,9 +444,7 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
               <p className="text-xs text-[#6F6F6F] leading-relaxed mb-4">
                 Data keuangan Anda dienkripsi secara aman. Kami tidak menjual data Anda kepada pihak ketiga.
               </p>
-              <button className="text-xs font-semibold text-[#4e6700] hover:underline bg-transparent border-none p-0 cursor-pointer">
-                Baca Kebijakan Privasi
-              </button>
+              <span className="text-xs font-semibold text-[#6F6F6F]">Dokumen privasi belum dipublikasikan.</span>
             </section>
 
             <section id="help" className="bg-white rounded-[28px] p-6 card-shadow scroll-mt-24">
@@ -474,9 +455,7 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
               <p className="text-xs text-[#6F6F6F] leading-relaxed mb-4">
                 Ada kendala atau pertanyaan? Tim support kami siap membantu Anda 24/7.
               </p>
-              <button className="text-xs font-semibold text-[#4e6700] hover:underline bg-transparent border-none p-0 cursor-pointer">
-                Hubungi Support
-              </button>
+              <span className="text-xs font-semibold text-[#6F6F6F]">Kanal support belum tersedia.</span>
             </section>
           </div>
 
@@ -506,8 +485,8 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
                   <div className="text-sm font-bold text-[#1a1c1b]">Nonaktifkan Akun</div>
                   <div className="text-xs text-[#6F6F6F]">Sembunyikan akun Anda untuk sementara waktu.</div>
                 </div>
-                <button onClick={() => setModalOpen("deactivate")} className="bg-white border border-orange-200 hover:bg-orange-50 text-orange-600 px-5 py-2 rounded-full text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap">
-                  Nonaktifkan Akun
+                <button disabled className="bg-white opacity-60 border border-orange-200 text-orange-600 px-5 py-2 rounded-full text-xs font-semibold cursor-not-allowed whitespace-nowrap">
+                  Belum Tersedia
                 </button>
               </div>
 
@@ -516,8 +495,8 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
                   <div className="text-sm font-bold text-red-600">Hapus Akun Permanen</div>
                   <div className="text-xs text-[#6F6F6F]">Hapus seluruh data transaksi dan akun selamanya.</div>
                 </div>
-                <button onClick={() => setModalOpen("delete")} className="bg-red-600 hover:bg-red-700 text-white px-5 py-2 rounded-full text-xs font-semibold transition-colors border-none cursor-pointer whitespace-nowrap">
-                  Hapus Akun
+                <button disabled className="bg-red-600 opacity-60 text-white px-5 py-2 rounded-full text-xs font-semibold border-none cursor-not-allowed whitespace-nowrap">
+                  Belum Tersedia
                 </button>
               </div>
             </div>

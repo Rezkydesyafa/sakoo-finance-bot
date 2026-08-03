@@ -87,7 +87,7 @@ export function ReceiptScanTab({
                 <button type="button" className="bg-[#c7ff00] text-[#151f00] text-xs font-semibold px-8 py-3 rounded-full hover:opacity-90 transition-opacity border-none cursor-pointer">
                   Select File
                 </button>
-                <p className="text-[10px] text-[#6F6F6F] mt-6 text-center">Supported formats: JPEG, PNG, PDF (Max 5MB)</p>
+                <p className="text-[10px] text-[#6F6F6F] mt-6 text-center">Supported formats: JPEG, PNG (Max 5MB)</p>
               </div>
             </div>
           </div>
@@ -268,10 +268,11 @@ export function ReceiptScanTab({
             </div>
 
             <div className="flex justify-end">
-              <button 
-                onClick={() => alert("Flash features are only available in native mobile apps.")}
+              <button
+                disabled
+                title="Flash belum didukung"
                 type="button" 
-                className="w-10 h-10 flex items-center justify-center rounded-full bg-white/20 border-none cursor-pointer hover:bg-white/30"
+                className="w-10 h-10 flex items-center justify-center rounded-full bg-white/20 opacity-60 border-none cursor-not-allowed"
               >
                 <span className="material-symbols-outlined text-white text-[20px]">flash_on</span>
               </button>

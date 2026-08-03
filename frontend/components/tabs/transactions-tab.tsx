@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import type { Transaction } from "@/app/(dashboard)/types";
 import { apiClient, BudgetListResponse } from "@/lib/api";
 import { getStoredAuthToken } from "@/lib/auth-storage";
+import { downloadCsv } from "@/lib/frontend-utils";
 
 type TransactionsTabProps = {
   transactions: Transaction[];
@@ -18,6 +20,9 @@ type TransactionsTabProps = {
   handleDownloadPDF: () => void;
   isExporting: boolean;
   totalBalance: number;
+  hasNext: boolean;
+  isLoadingMore: boolean;
+  handleLoadMore: () => void;
 };
 
 const CategoryIcon = ({ name }: { name: string }) => {
@@ -47,6 +52,9 @@ export function TransactionsTab({
   handleDownloadPDF,
   isExporting,
   totalBalance,
+  hasNext,
+  isLoadingMore,
+  handleLoadMore,
 }: TransactionsTabProps) {
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   const [openDropdownId, setOpenDropdownId] = useState<number | null>(null);
@@ -88,7 +96,13 @@ export function TransactionsTab({
   };
 
   const thisMonthSpending = transactions
-    .filter(t => t.type === "expense")
+    .filter((transaction) => {
+      const date = new Date(transaction.transaction_date);
+      const now = new Date();
+      return transaction.type === "expense"
+        && date.getMonth() === now.getMonth()
+        && date.getFullYear() === now.getFullYear();
+    })
     .reduce((sum, t) => sum + t.amount, 0);
 
   const totalSavings = totalBalance;
@@ -180,7 +194,7 @@ export function TransactionsTab({
                 onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
                 className="flex items-center gap-1 bg-[#F1F2F0] border-none rounded-full py-2 pl-4 pr-3 text-xs font-semibold text-[#1a1c1b] focus:ring-1 focus:ring-[#c7ff00] cursor-pointer"
               >
-                {expenseFilterType === "all" ? "This Month" : expenseFilterType === "income" ? "Income" : "Expense"}
+                {expenseFilterType === "all" ? "Semua" : expenseFilterType === "income" ? "Income" : "Expense"}
                 <span className={`material-symbols-outlined text-[16px] text-[#6F6F6F] transition-transform ${isFilterDropdownOpen ? 'rotate-180' : ''}`}>
                   expand_more
                 </span>
@@ -189,7 +203,7 @@ export function TransactionsTab({
               {isFilterDropdownOpen && (
                 <div className="absolute right-0 top-full mt-2 w-32 bg-white rounded-[24px] shadow-lg border border-[#E8E8E8] py-2 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                   {[
-                    { value: "all", label: "This Month" },
+                    { value: "all", label: "Semua" },
                     { value: "income", label: "Income" },
                     { value: "expense", label: "Expense" }
                   ].map((opt) => (
@@ -207,11 +221,6 @@ export function TransactionsTab({
                 </div>
               )}
             </div>
-            
-            <button className="flex flex-none items-center gap-1 bg-[#F1F2F0] py-2 px-4 rounded-full text-xs font-semibold text-[#1a1c1b] hover:bg-[#E8E8E8] transition-colors border-none cursor-pointer">
-              <span className="material-symbols-outlined text-[16px]">filter_list</span>
-              <span className="hidden sm:inline">Filter</span>
-            </button>
           </div>
         </div>
 
@@ -277,11 +286,13 @@ export function TransactionsTab({
             <div className="p-8 text-center text-[#6F6F6F]">No transactions recorded.</div>
           )}
 
-          <div className="p-4 border-t border-[#E8E8E8] text-center">
-            <button className="text-[13px] font-semibold text-[#4e6700] hover:text-[#587300] transition-colors py-2 px-6 rounded-full hover:bg-[#c7ff00]/10 border-none cursor-pointer">
-              Load More Transactions
-            </button>
-          </div>
+          {hasNext && (
+            <div className="p-4 border-t border-[#E8E8E8] text-center">
+              <button onClick={handleLoadMore} disabled={isLoadingMore} className="text-[13px] font-semibold text-[#4e6700] disabled:opacity-50 hover:text-[#587300] transition-colors py-2 px-6 rounded-full hover:bg-[#c7ff00]/10 border-none cursor-pointer">
+                {isLoadingMore ? "Memuat..." : "Load More Transactions"}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -304,7 +315,7 @@ export function TransactionsTab({
             </div>
           )}
           <div className="text-center">
-            <span className="text-xs text-[#6F6F6F]">Or send a message via <a className="text-[#4e6700] hover:underline" href="#">Telegram</a></span>
+            <span className="text-xs text-[#6F6F6F]">Or send a message via <Link className="text-[#4e6700] hover:underline" href="/?tab=integrations">Telegram</Link></span>
           </div>
         </div>
 
@@ -312,9 +323,9 @@ export function TransactionsTab({
         <div className="bg-white p-6 rounded-[24px] card-shadow">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-base font-bold text-[#1a1c1b]">Budget Progress</h3>
-            <button className="w-8 h-8 rounded-full hover:bg-[#F1F2F0] flex items-center justify-center transition-colors border-none cursor-pointer">
+            <Link aria-label="Kelola budget" href="/?tab=budgets" className="w-8 h-8 rounded-full hover:bg-[#F1F2F0] flex items-center justify-center transition-colors">
               <span className="material-symbols-outlined text-[#5f5e5e] text-[20px]">more_horiz</span>
-            </button>
+            </Link>
           </div>
           <div className="space-y-6">
             {isLoadingBudgets ? (
@@ -356,7 +367,17 @@ export function TransactionsTab({
             <button onClick={handleDownloadPDF} disabled={isExporting} className="flex-1 border border-[#E8E8E8] text-[#1a1c1b] py-2 rounded-xl text-[13px] font-semibold flex items-center justify-center gap-2 hover:bg-[#F1F2F0] transition-colors border-solid bg-transparent cursor-pointer">
               <span className="material-symbols-outlined text-[18px]">picture_as_pdf</span> {isExporting ? "PDF..." : "PDF"}
             </button>
-            <button onClick={() => alert("CSV export is coming soon.")} className="flex-1 border border-[#E8E8E8] text-[#1a1c1b] py-2 rounded-xl text-[13px] font-semibold flex items-center justify-center gap-2 hover:bg-[#F1F2F0] transition-colors border-solid bg-transparent cursor-pointer">
+            <button onClick={() => downloadCsv(
+              "sakoo-transactions.csv",
+              ["Tanggal", "Tipe", "Deskripsi", "Kategori", "Jumlah"],
+              filteredTransactions.map((transaction) => [
+                transaction.transaction_date,
+                transaction.type,
+                transaction.description,
+                transaction.category_name,
+                transaction.amount,
+              ]),
+            )} className="flex-1 border border-[#E8E8E8] text-[#1a1c1b] py-2 rounded-xl text-[13px] font-semibold flex items-center justify-center gap-2 hover:bg-[#F1F2F0] transition-colors border-solid bg-transparent cursor-pointer">
               <span className="material-symbols-outlined text-[18px]">table_view</span> CSV
             </button>
           </div>

@@ -1,11 +1,13 @@
+import { resolveBrowserApiBaseUrl } from "@/lib/frontend-utils";
+
 const getBrowserApiBaseUrl = () => {
   if (typeof window !== "undefined") {
-    // If running Next.js dev server (port 3000) locally or via LAN (Live Reload)
-    if (window.location.port === "3000" || window.location.port === "3001") {
-      return `http://${window.location.hostname}:8000/api`;
-    }
+    return resolveBrowserApiBaseUrl(
+      process.env.NEXT_PUBLIC_API_BASE_URL,
+      window.location,
+    );
   }
-  return "https://sakoo.lab-sigma.web.id/api";
+  return process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api";
 };
 
 const BROWSER_API_BASE_URL = normalizeBaseUrl(getBrowserApiBaseUrl());
