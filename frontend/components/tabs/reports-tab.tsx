@@ -1,5 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Transaction } from "@/app/(dashboard)/types";
+import {
+  apiClient,
+  type ReportCategoryResponse,
+  type ReportSummaryResponse,
+} from "@/lib/api";
+import { getStoredAuthToken } from "@/lib/auth-storage";
+import { downloadCsv, REPORT_PERIOD_OPTIONS } from "@/lib/frontend-utils";
 
 type ReportsTabProps = {
   transactions: Transaction[];
@@ -23,31 +30,115 @@ export function ReportsTab({
   isExporting,
 }: ReportsTabProps) {
   const [isTimeDropdownOpen, setIsTimeDropdownOpen] = useState(false);
-  const [selectedTime, setSelectedTime] = useState("Bulan Ini");
-  const timeOptions = ["Hari Ini", "Minggu Ini", "Bulan Ini", "Custom"];
+  const [selectedPeriod, setSelectedPeriod] = useState<"day" | "week" | "month">("month");
+  const [summary, setSummary] = useState<ReportSummaryResponse | null>(null);
+  const [categoryReport, setCategoryReport] = useState<ReportCategoryResponse | null>(null);
+  const [reportError, setReportError] = useState("");
+  const [isReportLoading, setIsReportLoading] = useState(true);
+  const [showAllCategories, setShowAllCategories] = useState(false);
+  const timeOptions = REPORT_PERIOD_OPTIONS;
+  const selectedTime = timeOptions.find((option) => option.value === selectedPeriod)?.label;
 
-  const displayIncome = totalIncome;
-  const displayExpense = totalExpense;
-  const displayBalance = totalBalance;
+  useEffect(() => {
+    const token = getStoredAuthToken();
+    if (!token) return;
+    let cancelled = false;
+    setIsReportLoading(true);
+    setReportError("");
+    Promise.all([
+      apiClient.reports.summary(token, { period: selectedPeriod, limit: 500 }),
+      apiClient.reports.category(token, { period: selectedPeriod, type: "expense" }),
+    ])
+      .then(([nextSummary, nextCategories]) => {
+        if (cancelled) return;
+        setSummary(nextSummary);
+        setCategoryReport(nextCategories);
+      })
+      .catch(() => {
+        if (!cancelled) setReportError("Laporan terbaru belum dapat dimuat.");
+      })
+      .finally(() => {
+        if (!cancelled) setIsReportLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedPeriod]);
 
-  const savingRate = totalIncome > 0 ? Math.round((totalBalance / totalIncome) * 100) : 0;
+  const displayIncome = summary ? Number(summary.total_income) : totalIncome;
+  const displayExpense = summary ? Number(summary.total_expense) : totalExpense;
+  const displayBalance = summary ? Number(summary.net_balance) : totalBalance;
+  const incomeCount = summary?.income_count ?? transactions.filter((item) => item.type === "income").length;
+  const expenseCount = summary?.expense_count ?? transactions.filter((item) => item.type === "expense").length;
+  const savingRate = displayIncome > 0 ? Math.round((displayBalance / displayIncome) * 100) : 0;
   const savingRateClamped = Math.max(0, Math.min(100, savingRate));
   const strokeDash = `${(savingRateClamped / 100) * 100} 100`;
 
-  const weeklyData = buildWeeklyData(transactions, formatCurrency);
+  const reportTransactions = summary
+    ? summary.transactions.map((transaction) => ({
+        transaction_date: transaction.transaction_date,
+        type: transaction.type as "income" | "expense",
+        amount: Number(transaction.amount),
+      }))
+    : transactions;
+  const weeklyData = buildWeeklyData(reportTransactions, formatCurrency);
+  const chartMax = Math.max(
+    ...weeklyData.map((item) => Math.max(item.incomeValue, item.expenseValue)),
+    0,
+  );
+  const chartAxisLabels = [1, 0.75, 0.5, 0.25, 0].map((ratio) =>
+    formatCompactIdr(chartMax * ratio),
+  );
 
-  const categoryReportsList = transactions.length > 0 && categoryStats.length > 0
-    ? categoryStats.map((c, i) => {
-        const maxVal = Math.max(...categoryStats.map(x => x.value), 1);
+  const reportCategories = categoryReport
+    ? categoryReport.items.map((item) => ({
+        name: item.category_name,
+        value: Number(item.total_amount),
+        percentage: Number(item.percentage),
+      }))
+    : categoryStats.map((item) => ({ ...item, percentage: 0 }));
+  const categoryReportsList = reportCategories.length > 0
+    ? reportCategories.map((c, i) => {
+        const maxVal = Math.max(...reportCategories.map(x => x.value), 1);
         return {
           name: c.name,
           displayValue: formatCurrency(c.value),
-          widthPercent: Math.round((c.value / maxVal) * 100),
+          widthPercent: c.percentage || Math.round((c.value / maxVal) * 100),
           icon: c.name.toLowerCase() === "makanan" ? "restaurant" : c.name.toLowerCase() === "transportasi" ? "commute" : c.name.toLowerCase() === "tagihan" ? "receipt" : "shopping_bag",
           colorClass: i === 0 ? "bg-[#c7ff00]" : i === 1 ? "bg-[#2A2A2A]" : "bg-neutral-300"
         };
       })
     : [];
+  const visibleCategories = showAllCategories ? categoryReportsList : categoryReportsList.slice(0, 4);
+
+  const handleExportCsv = () => {
+    const rows = summary?.transactions ?? [];
+    downloadCsv(
+      `sakoo-report-${selectedPeriod}.csv`,
+      ["Tanggal", "Tipe", "Deskripsi", "Kategori", "Jumlah"],
+      rows.map((transaction) => [
+        transaction.transaction_date,
+        transaction.type,
+        transaction.description,
+        transaction.category_name,
+        transaction.amount,
+      ]),
+    );
+  };
+
+  const handleShare = async () => {
+    const text = `Laporan Sakoo ${selectedTime}: pemasukan ${formatCurrency(displayIncome)}, pengeluaran ${formatCurrency(displayExpense)}, saldo ${formatCurrency(displayBalance)}.`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Laporan Sakoo", text });
+        return;
+      }
+      await navigator.clipboard.writeText(text);
+      alert("Ringkasan laporan disalin.");
+    } catch {
+      alert("Laporan belum dapat dibagikan.");
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -68,20 +159,25 @@ export function ReportsTab({
             <div className="absolute right-0 top-full mt-2 w-36 bg-white rounded-2xl shadow-lg border border-[#E8E8E8] py-2 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
               {timeOptions.map((opt) => (
                 <button
-                  key={opt}
+                  key={opt.value}
                   onClick={() => {
-                    setSelectedTime(opt);
+                    setSelectedPeriod(opt.value);
                     setIsTimeDropdownOpen(false);
                   }}
-                  className={`w-full text-left px-4 py-2.5 text-xs font-semibold hover:bg-[#F1F2F0] transition-colors cursor-pointer border-none bg-transparent ${selectedTime === opt ? 'text-[#4e6700]' : 'text-[#1a1c1b]'}`}
+                  className={`w-full text-left px-4 py-2.5 text-xs font-semibold hover:bg-[#F1F2F0] transition-colors cursor-pointer border-none bg-transparent ${selectedPeriod === opt.value ? 'text-[#4e6700]' : 'text-[#1a1c1b]'}`}
                 >
-                  {opt}
+                  {opt.label}
                 </button>
               ))}
             </div>
           )}
         </div>
       </div>
+      {(isReportLoading || reportError) && (
+        <p className={`text-xs font-semibold ${reportError ? "text-red-600" : "text-[#6F6F6F]"}`}>
+          {reportError || "Memuat laporan..."}
+        </p>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-8 space-y-6">
@@ -95,7 +191,7 @@ export function ReportsTab({
               </div>
               <div className="text-[15px] sm:text-2xl font-bold text-[#1a1c1b] mb-2 truncate">{formatCurrency(displayIncome)}</div>
               <div className="inline-flex items-center gap-1 bg-[#5FCF6A]/10 text-[#5FCF6A] px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold w-fit">
-                <span className="material-symbols-outlined text-[11px] sm:text-[13px]">trending_up</span> +12%
+                <span className="material-symbols-outlined text-[11px] sm:text-[13px]">receipt_long</span> {incomeCount} transaksi
               </div>
             </div>
 
@@ -107,8 +203,8 @@ export function ReportsTab({
                 <span className="text-[11px] sm:text-sm font-semibold text-[#6F6F6F] leading-tight">Total Pengeluaran</span>
               </div>
               <div className="text-[15px] sm:text-2xl font-bold text-[#1a1c1b] mb-2 truncate">{formatCurrency(displayExpense)}</div>
-              <div className="inline-flex items-center gap-1 bg-[#5FCF6A]/10 text-[#5FCF6A] px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold w-fit">
-                <span className="material-symbols-outlined text-[11px] sm:text-[13px]">trending_down</span> -5%
+              <div className="inline-flex items-center gap-1 bg-[#EF6B6B]/10 text-[#EF6B6B] px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold w-fit">
+                <span className="material-symbols-outlined text-[11px] sm:text-[13px]">receipt_long</span> {expenseCount} transaksi
               </div>
             </div>
 
@@ -144,11 +240,7 @@ export function ReportsTab({
 
             <div className="h-60 flex items-end justify-between px-2 gap-2 mt-4 border-b border-[#E8E8E8] pb-2 relative">
               <div className="absolute left-0 top-0 h-full flex flex-col justify-between text-[10px] text-[#6F6F6F] opacity-50 pb-2 pointer-events-none">
-                <span>20M</span>
-                <span>15M</span>
-                <span>10M</span>
-                <span>5M</span>
-                <span>0</span>
+                {chartAxisLabels.map((label, index) => <span key={index}>{label}</span>)}
               </div>
 
               <div className="w-full h-full flex items-end justify-around ml-8">
@@ -184,8 +276,8 @@ export function ReportsTab({
               <div>
                 <h4 className="text-sm font-bold text-[#1a1c1b] mb-1">Sakoo Insight</h4>
                 <p className="text-xs text-[#6F6F6F] leading-relaxed">
-                  {categoryStats[0]
-                    ? <>Kategori pengeluaran terbesar: <strong className="text-[#1a1c1b]">{categoryStats[0].name}</strong>.</>
+                  {reportCategories[0]
+                    ? <>Kategori pengeluaran terbesar: <strong className="text-[#1a1c1b]">{reportCategories[0].name}</strong>.</>
                     : "Belum ada transaksi untuk dibuat insight."}
                 </p>
               </div>
@@ -198,7 +290,7 @@ export function ReportsTab({
                 <h3 className="text-[15px] font-semibold text-[#1a1c1b]">Spending by Category</h3>
               </div>
               <div className="divide-y divide-[#E8E8E8]/50">
-                {categoryReportsList.map((c, i) => (
+                {visibleCategories.map((c, i) => (
                   <div key={i} className="px-6 py-4 hover:bg-[#F1F2F0]/30 transition-colors group">
                     <div className="flex justify-between items-center mb-3">
                       <div className="flex items-center gap-4">
@@ -225,11 +317,13 @@ export function ReportsTab({
               </div>
             </div>
 
-            <div className="p-6 pt-2">
-              <button className="w-full py-2.5 border border-[#E8E8E8] text-[#1a1c1b] text-xs font-semibold rounded-full hover:bg-[#F1F2F0] transition-colors border-solid bg-transparent cursor-pointer">
-                View All Categories
-              </button>
-            </div>
+            {categoryReportsList.length > 4 && (
+              <div className="p-6 pt-2">
+                <button onClick={() => setShowAllCategories((value) => !value)} className="w-full py-2.5 border border-[#E8E8E8] text-[#1a1c1b] text-xs font-semibold rounded-full hover:bg-[#F1F2F0] transition-colors border-solid bg-transparent cursor-pointer">
+                  {showAllCategories ? "Tampilkan Lebih Sedikit" : "View All Categories"}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -241,11 +335,11 @@ export function ReportsTab({
             <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>
             {isExporting ? "Export PDF..." : "Export PDF"}
           </button>
-          <button onClick={() => alert("CSV export is coming soon.")} className="bg-white border border-[#E8E8E8] text-[#1a1c1b] px-5 py-2.5 rounded-full text-xs font-semibold flex items-center gap-1.5 hover:bg-[#F1F2F0] transition-colors border-solid bg-transparent cursor-pointer">
+          <button onClick={handleExportCsv} disabled={!summary?.transactions.length} className="bg-white disabled:opacity-50 border border-[#E8E8E8] text-[#1a1c1b] px-5 py-2.5 rounded-full text-xs font-semibold flex items-center gap-1.5 hover:bg-[#F1F2F0] transition-colors border-solid bg-transparent cursor-pointer">
             <span className="material-symbols-outlined text-[16px]">download</span>
             CSV
           </button>
-          <button onClick={() => alert("Share option coming soon.")} className="bg-[#c7ff00] text-[#151f00] px-5 py-2.5 rounded-full text-xs font-semibold flex items-center gap-1.5 hover:opacity-95 transition-opacity border-none cursor-pointer">
+          <button onClick={() => void handleShare()} className="bg-[#c7ff00] text-[#151f00] px-5 py-2.5 rounded-full text-xs font-semibold flex items-center gap-1.5 hover:opacity-95 transition-opacity border-none cursor-pointer">
             <span className="material-symbols-outlined text-[16px]">share</span>
             Share
           </button>
@@ -256,7 +350,7 @@ export function ReportsTab({
 }
 
 function buildWeeklyData(
-  transactions: Transaction[],
+  transactions: Pick<Transaction, "transaction_date" | "type" | "amount">[],
   formatCurrency: (val: number) => string,
 ) {
   const weeks = Array.from({ length: 4 }, (_, index) => ({
@@ -289,11 +383,21 @@ function buildWeeklyData(
 
   return weeks.map((week) => ({
     label: week.label,
+    incomeValue: week.incomeValue,
+    expenseValue: week.expenseValue,
     income: formatCurrency(week.incomeValue),
     expense: formatCurrency(week.expenseValue),
     incomeHeight: barHeight(week.incomeValue, max),
     expenseHeight: barHeight(week.expenseValue, max),
   }));
+}
+
+function formatCompactIdr(value: number): string {
+  if (value <= 0) return "0";
+  return new Intl.NumberFormat("id-ID", {
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(value);
 }
 
 function barHeight(value: number, max: number): number {

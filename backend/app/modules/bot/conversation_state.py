@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session
 from app.models import BotLog, Receipt
 from app.modules.parser.service import ParsedMessage
 
-
 CONVERSATION_MESSAGE_TYPE = "conversation_state"
 PENDING_TRANSACTION_STATUS = "pending_transaction"
 CONFIRMED_TRANSACTION_STATUS = "confirmed_transaction"

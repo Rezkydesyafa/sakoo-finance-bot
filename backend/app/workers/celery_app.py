@@ -2,14 +2,13 @@ from celery import Celery
 
 from app.config import get_settings
 
-
 settings = get_settings()
 
 celery_app = Celery(
     "sakoo_finance_bot",
     broker=settings.resolved_celery_broker_url,
     backend=settings.resolved_celery_result_backend,
-    include=["app.workers.tasks"],
+    include=["app.workers.tasks", "app.modules.notifications.tasks"],
 )
 
 celery_app.conf.update(
@@ -20,4 +19,10 @@ celery_app.conf.update(
     worker_prefetch_multiplier=1,
     timezone="Asia/Jakarta",
     enable_utc=False,
+    beat_schedule={
+        "dispatch-due-notifications": {
+            "task": "app.notifications.dispatch_due",
+            "schedule": 300.0,
+        },
+    },
 )

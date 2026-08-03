@@ -16,3 +16,8 @@ services:
     build:
       context: ../../backend
     image: sakoo-backend:dev
+
+  celery_beat:
+    build:
+      context: ../../backend
+    image: sakoo-backend:dev

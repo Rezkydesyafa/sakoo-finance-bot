@@ -28,7 +28,6 @@ from app.modules.parser.schemas import (
     IntentMatch,
 )
 
-
 HELP_KEYWORDS = {"bantuan", "help", "menu", "panduan", "mulai", "start"}
 BALANCE_PHRASES = (
     "saldo",

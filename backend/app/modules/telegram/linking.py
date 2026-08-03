@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session
 from app.models import AccountLinkingCode, UserPlatformAccount
 from app.modules.telegram.parser import ParsedTelegramMessage
 
-
 LINKING_COMMAND_RE = re.compile(r"^\s*hubungkan\s+([A-Za-z0-9_-]{4,32})\s*$", re.IGNORECASE)
 
 LINKING_INSTRUCTION_MESSAGE = (

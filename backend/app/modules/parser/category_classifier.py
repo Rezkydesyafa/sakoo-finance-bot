@@ -7,7 +7,6 @@ from typing import Any
 
 import joblib
 
-
 PARSER_DIR = Path(__file__).resolve().parent
 DEFAULT_MODEL_PATH = PARSER_DIR / "models" / "category_classifier.joblib"
 

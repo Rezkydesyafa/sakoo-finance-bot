@@ -17,7 +17,6 @@ from app.modules.media.service import (
     save_media_bytes,
 )
 
-
 router = APIRouter(prefix="/media", tags=["media"])
 
 

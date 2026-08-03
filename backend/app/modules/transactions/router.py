@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Category, Transaction, User
 from app.modules.auth.dependencies import get_current_user
+from app.modules.notifications.enqueue import enqueue_budget_notification_check
 from app.modules.transactions.query import (
     TransactionQueryFilters,
     TransactionQueryResult,
@@ -22,7 +23,6 @@ from app.modules.transactions.schemas import (
     TransactionUpdateRequest,
 )
 from app.modules.transactions.service import handle_text_transaction
-
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
@@ -51,6 +51,7 @@ def create_transaction(
     db.add(transaction)
     db.commit()
     db.refresh(transaction)
+    enqueue_budget_notification_check(transaction.id)
     return transaction
 
 
@@ -190,6 +191,7 @@ def update_transaction(
 
     db.commit()
     db.refresh(transaction)
+    enqueue_budget_notification_check(transaction.id)
     return transaction
 
 

@@ -1,7 +1,35 @@
+import re
 from functools import lru_cache
+from typing import Self
 
-from pydantic import Field
+from pydantic import AnyHttpUrl, BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+CUSTOM_PROVIDER_NAME_RE = re.compile(r"[a-z0-9][a-z0-9_-]*")
+LLM_PROVIDER_SPLIT_RE = re.compile(r"[\s,;|+>]+")
+
+
+class CustomLlmProviderSettings(BaseModel):
+    base_url: AnyHttpUrl
+    api_key: str
+    model: str
+
+    @field_validator("base_url")
+    @classmethod
+    def validate_base_url(cls, value: AnyHttpUrl) -> AnyHttpUrl:
+        if value.query or value.fragment:
+            raise ValueError("must not contain a query string or fragment")
+        if value.path.rstrip("/").endswith("/chat/completions"):
+            raise ValueError("must be a base URL, not a chat completions endpoint")
+        return value
+
+    @field_validator("api_key", "model", mode="before")
+    @classmethod
+    def validate_required_text(cls, value: object) -> str:
+        normalized = str(value or "").strip()
+        if not normalized:
+            raise ValueError("must not be empty")
+        return normalized
 
 
 class Settings(BaseSettings):
@@ -61,6 +89,10 @@ class Settings(BaseSettings):
     openrouter_model: str = Field(..., description="OpenRouter fallback model name")
     deepseek_api_key: str = ""
     deepseek_model: str = Field(..., description="DeepSeek model name")
+    custom_llm_providers: dict[str, CustomLlmProviderSettings] = Field(
+        default_factory=dict,
+        description="Named OpenAI-compatible LLM providers",
+    )
     llm_timeout_seconds: float = 15.0
     llm_max_request_per_user_per_day: int = 20
     bot_reply_style: str = "friendly"
@@ -70,6 +102,35 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    @model_validator(mode="after")
+    def validate_custom_llm_provider_references(self) -> Self:
+        for name in self.custom_llm_providers:
+            if not CUSTOM_PROVIDER_NAME_RE.fullmatch(name):
+                raise ValueError(
+                    f"invalid custom LLM provider name: {name!r}; "
+                    "use lowercase letters, numbers, '_' or '-'"
+                )
+
+        provider_names = [
+            item
+            for item in LLM_PROVIDER_SPLIT_RE.split(self.llm_provider.strip().lower())
+            if item
+        ]
+        for provider_name in provider_names:
+            if provider_name == "custom":
+                raise ValueError("custom LLM provider must use custom:<name>")
+            if not provider_name.startswith("custom:"):
+                continue
+            custom_name = provider_name.removeprefix("custom:")
+            if (
+                not CUSTOM_PROVIDER_NAME_RE.fullmatch(custom_name)
+                or custom_name not in self.custom_llm_providers
+            ):
+                raise ValueError(
+                    f"custom LLM provider {provider_name!r} is not configured"
+                )
+        return self
 
     @property
     def resolved_celery_broker_url(self) -> str:

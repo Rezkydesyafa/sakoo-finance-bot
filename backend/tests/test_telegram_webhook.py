@@ -31,8 +31,8 @@ from app.models import (
     UserPlatformAccount,
 )
 from app.modules.jobs.service import get_receipt_ocr_enqueue, get_report_pdf_enqueue
-from app.modules.telegram.commands import BOT_COMMANDS, register_bot_commands
 from app.modules.telegram.client import DownloadedTelegramFile, get_telegram_client
+from app.modules.telegram.commands import BOT_COMMANDS, register_bot_commands
 
 
 class FakeTelegramClient:

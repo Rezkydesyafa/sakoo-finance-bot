@@ -24,7 +24,6 @@ from app.modules.categories.service import (
     update_category,
 )
 
-
 router = APIRouter(prefix="/categories", tags=["categories"])
 
 

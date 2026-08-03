@@ -16,12 +16,12 @@ from app.modules.llm.base import (
     LlmProviderConfig,
     LlmProviderError,
 )
+from app.modules.llm.custom_provider import CustomLlmProvider
 from app.modules.llm.deepseek_provider import DeepSeekProvider
 from app.modules.llm.gemini_provider import GeminiProvider
 from app.modules.llm.glm_provider import GlmProvider
 from app.modules.llm.ollama_provider import OllamaProvider
 from app.modules.llm.openrouter_provider import OpenRouterProvider
-
 
 LLM_MESSAGE_TYPE = "llm_chat"
 LLM_USAGE_STATUS = "llm_usage"
@@ -115,11 +115,6 @@ def answer_finance_question_with_llm(
     raise LlmProviderError(f"llm_all_providers_failed:{detail}")
 
 
-def get_llm_provider(settings: Settings | None = None) -> BaseLlmProvider | None:
-    providers = get_llm_providers(settings)
-    return providers[0] if providers else None
-
-
 def get_llm_providers(settings: Settings | None = None) -> list[BaseLlmProvider]:
     active_settings = settings or get_settings()
     provider_names = _resolve_provider_names(active_settings)
@@ -128,6 +123,21 @@ def get_llm_providers(settings: Settings | None = None) -> list[BaseLlmProvider]
     providers: list[BaseLlmProvider] = []
     for provider_name in provider_names:
         if provider_name in {"", "none", "off", "disabled"}:
+            continue
+        if provider_name.startswith("custom:"):
+            custom_name = provider_name.removeprefix("custom:")
+            custom_settings = active_settings.custom_llm_providers[custom_name]
+            providers.append(
+                CustomLlmProvider(
+                    LlmProviderConfig(
+                        api_key=custom_settings.api_key,
+                        timeout_seconds=timeout,
+                        model=custom_settings.model,
+                    ),
+                    name=custom_name,
+                    base_url=str(custom_settings.base_url),
+                )
+            )
             continue
         if provider_name == "gemini":
             gemini_keys = _gemini_api_keys(active_settings)

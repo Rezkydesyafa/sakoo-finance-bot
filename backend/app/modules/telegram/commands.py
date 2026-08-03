@@ -3,7 +3,6 @@ from typing import Any
 from app.config import get_settings
 from app.modules.telegram.client import TelegramClient
 
-
 BOT_COMMANDS: list[dict[str, str]] = [
     {"command": "start", "description": "Mulai Sakoo"},
     {"command": "help", "description": "Panduan penggunaan"},

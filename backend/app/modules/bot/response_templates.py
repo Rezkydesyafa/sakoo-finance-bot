@@ -37,9 +37,13 @@ def format_help_response() -> str:
         "• cara mengatur keuangan\n"
         "• bulan ini aku boros gak?\n\n"
         "⚡ *Command:*\n"
+        "• /start\n"
         "• /saldo\n"
+        "• /pengeluaran\n"
+        "• /pemasukan\n"
         "• /laporan\n"
         "• /export\n"
+        "• /riwayat\n"
         "• /help\n\n"
         "Yuk mulai catat keuanganmu! 🚀"
     )

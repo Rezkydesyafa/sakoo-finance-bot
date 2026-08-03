@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import re
 
-
 CATEGORY_KEYWORD_ALIASES: tuple[tuple[str, str], ...] = (
     ("grabcar", "grab transportasi"),
     ("grab bike", "grab ojek"),

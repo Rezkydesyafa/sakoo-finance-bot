@@ -34,7 +34,7 @@ const compressImage = async (file: File, maxWidth = 1024): Promise<File> => {
         if (blob) {
           try {
             resolve(new File([blob], file.name || "image.jpg", { type: "image/jpeg", lastModified: Date.now() }));
-          } catch (e) {
+          } catch {
             // Fallback for older browsers
             resolve(file);
           }
@@ -74,7 +74,7 @@ export function ChatTab({ onTransactionAdded }: ChatTabProps) {
     if (saved) {
       try {
         setChatMessages(JSON.parse(saved));
-      } catch (e) {}
+      } catch {}
     }
   }, []);
 
@@ -272,7 +272,7 @@ export function ChatTab({ onTransactionAdded }: ChatTabProps) {
       timerRef.current = setInterval(() => {
         setRecordingTime(prev => prev + 1);
       }, 1000);
-    } catch (err) {
+    } catch {
       alert("Tidak dapat mengakses mikrofon. Pastikan izin telah diberikan.");
     }
   };

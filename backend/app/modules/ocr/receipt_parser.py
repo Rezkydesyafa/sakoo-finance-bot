@@ -1,8 +1,7 @@
 import re
 from dataclasses import dataclass
 from datetime import date
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
-
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 TOTAL_CONFIDENCE_THRESHOLD = 0.75
 CONFIDENCE_QUANT = Decimal("0.0001")

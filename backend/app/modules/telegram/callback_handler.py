@@ -54,7 +54,6 @@ from app.modules.transactions.service import (
     build_transaction_list_response,
 )
 
-
 WAITING_EXPENSE_INPUT = "WAITING_EXPENSE_INPUT"
 WAITING_INCOME_INPUT = "WAITING_INCOME_INPUT"
 WAITING_RECEIPT_CAPTION = "WAITING_RECEIPT_CAPTION"

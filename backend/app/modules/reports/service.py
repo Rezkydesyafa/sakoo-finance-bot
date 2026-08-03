@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 
-from sqlalchemy import Select, case, func, select
+from sqlalchemy import Select, case, func
 from sqlalchemy.orm import Session
 
 from app.models import Category, Transaction
@@ -20,7 +20,6 @@ from app.modules.transactions.query import (
     build_transactions_query,
     query_transactions,
 )
-
 
 ZERO = Decimal("0.00")
 

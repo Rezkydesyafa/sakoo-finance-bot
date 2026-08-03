@@ -6,7 +6,6 @@ from datetime import date, timedelta
 
 from fastapi import status
 
-
 SUPPORTED_REPORT_PERIODS = {"day", "week", "month", "custom"}
 
 

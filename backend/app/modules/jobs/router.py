@@ -9,7 +9,6 @@ from app.modules.auth.dependencies import get_current_user
 from app.modules.jobs.schemas import JobResponse
 from app.modules.jobs.service import get_user_job
 
-
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 

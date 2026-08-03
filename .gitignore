@@ -20,10 +20,14 @@ env/
 node_modules/
 .next/
 out/
+*.tsbuildinfo
+*.bak
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+/package-lock.json
+/frontend/stitch_*.html
 
 # Capacitor / Android
 frontend/android/
@@ -53,6 +57,7 @@ storage/user_*/
 !storage/voice_notes/.gitkeep
 !storage/reports/.gitkeep
 !storage/temp/.gitkeep
+/output/pdf/
 
 create_github_issues.py
 github_issues.json

@@ -19,10 +19,10 @@ from app.modules.jobs.service import (
     queue_receipt_ocr_job,
 )
 from app.modules.media.service import MediaStorageError, save_media_bytes
+from app.modules.notifications.enqueue import enqueue_budget_notification_check
 from app.modules.ocr.receipt_chat import (
     CANCEL_CONFIRMATION_RE,
     PENDING_RECEIPT_STATUSES,
-    ReceiptOcrFlowResult as TelegramReceiptOcrFlowResult,
     YES_CONFIRMATION_RE,
     apply_caption_amount_if_possible,
     apply_receipt_correction,
@@ -34,13 +34,15 @@ from app.modules.ocr.receipt_chat import (
     receipt_category_name,
     receipt_description,
 )
+from app.modules.ocr.receipt_chat import (
+    ReceiptOcrFlowResult as TelegramReceiptOcrFlowResult,
+)
 from app.modules.telegram.callback_handler import (
     WAITING_RECEIPT_CAPTION,
     consume_waiting_input_state_payload,
     set_waiting_input_state,
 )
-from app.modules.telegram.client import TelegramClient, TelegramClientError
-from app.modules.telegram.client import DownloadedTelegramFile
+from app.modules.telegram.client import DownloadedTelegramFile, TelegramClient, TelegramClientError
 from app.modules.telegram.parser import ParsedTelegramMessage
 from app.modules.transactions.repository import find_category
 
@@ -420,6 +422,7 @@ def _confirm_receipt_transaction(
     db.commit()
     db.refresh(transaction)
     db.refresh(receipt)
+    enqueue_budget_notification_check(transaction.id)
 
     return TelegramReceiptOcrFlowResult(
         status="saved",

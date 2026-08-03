@@ -1,9 +1,9 @@
 from pathlib import Path
 
-from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine, inspect
 
+from alembic import command
 from app.config import get_settings
 
 
@@ -27,6 +27,18 @@ def test_alembic_upgrade_head_creates_budget_and_idempotency_tables(
         assert "category_budgets" in inspector.get_table_names()
         bot_log_columns = {column["name"] for column in inspector.get_columns("bot_logs")}
         assert "external_event_id" in bot_log_columns
+        preference_columns = {
+            column["name"] for column in inspector.get_columns("user_preferences")
+        }
+        assert {
+            "reply_style",
+            "daily_reminder_enabled",
+            "daily_reminder_time",
+            "weekly_summary_enabled",
+            "monthly_summary_enabled",
+            "budget_alert_enabled",
+            "timezone",
+        } <= preference_columns
         assert "transactions" in inspector.get_table_names()
     finally:
         engine.dispose()

@@ -23,7 +23,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
             </h1>
           </Link>
           <div className="flex items-center">
-            <button className="hover:opacity-80 active:scale-95 flex items-center justify-center p-2 rounded-full text-secondary hover:bg-surface-muted transition-colors">
+            <button disabled title="Pusat bantuan belum tersedia" className="opacity-50 flex items-center justify-center p-2 rounded-full text-secondary cursor-not-allowed">
               <span className="material-symbols-outlined">help_outline</span>
             </button>
           </div>
@@ -42,9 +42,9 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
             © 2024 Sakoo Finance Bot. Securely encrypted.
           </div>
           <div className="flex flex-wrap justify-center gap-6">
-            <a className="font-label-muted text-label-muted text-text-muted hover:text-primary transition-colors opacity-100 hover:opacity-80" href="#">Privacy Policy</a>
-            <a className="font-label-muted text-label-muted text-text-muted hover:text-primary transition-colors opacity-100 hover:opacity-80" href="#">Terms of Service</a>
-            <a className="font-label-muted text-label-muted text-text-muted hover:text-primary transition-colors opacity-100 hover:opacity-80" href="#">Security</a>
+            <span className="font-label-muted text-label-muted text-text-muted opacity-60">Privacy Policy</span>
+            <span className="font-label-muted text-label-muted text-text-muted opacity-60">Terms of Service</span>
+            <span className="font-label-muted text-label-muted text-text-muted opacity-60">Security</span>
           </div>
           <div className="font-label-button text-label-button text-text-primary opacity-50 flex items-center gap-1 mt-4 md:mt-0">
             <span className="material-symbols-outlined text-[16px]">finance_chip</span>

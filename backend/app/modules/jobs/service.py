@@ -22,7 +22,6 @@ from app.modules.stt.service import (
     validate_voice_note_duration,
 )
 
-
 JOB_STATUS_QUEUED = "queued"
 JOB_STATUS_PROCESSING = "processing"
 JOB_STATUS_COMPLETED = "completed"

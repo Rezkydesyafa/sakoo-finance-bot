@@ -5,7 +5,6 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
-
 SOURCE_WHATSAPP_TEXT = "whatsapp_text"
 CONFIRMATION_THRESHOLD = 0.85
 
@@ -13,7 +12,6 @@ INTENT_ADD_TRANSACTION = "add_transaction"
 INTENT_GET_BALANCE = "get_balance"
 INTENT_LIST_EXPENSE = "list_expense"
 INTENT_LIST_INCOME = "list_income"
-INTENT_EXPENSE_SUMMARY = "expense_summary"
 INTENT_SORTED_EXPENSE = "sorted_expense"
 INTENT_CATEGORY_DETAIL = "category_detail"
 INTENT_GET_REPORT = "get_report"
@@ -22,9 +20,6 @@ INTENT_HELP = "help"
 INTENT_LINK_ACCOUNT = "link_account"
 INTENT_FINANCE_CHAT = "finance_chat"
 INTENT_CREATE_CATEGORY = "create_category"
-INTENT_UPDATE_CATEGORY = "update_category"
-INTENT_DELETE_CATEGORY = "delete_category"
-INTENT_CHANGE_TRANSACTION_CATEGORY = "change_transaction_category"
 INTENT_UNKNOWN = "unknown"
 
 # Existing public intent kept for backward compatibility with earlier tests/flows.
@@ -36,7 +31,6 @@ VALID_INTENTS = {
     INTENT_GET_BALANCE,
     INTENT_LIST_EXPENSE,
     INTENT_LIST_INCOME,
-    INTENT_EXPENSE_SUMMARY,
     INTENT_SORTED_EXPENSE,
     INTENT_CATEGORY_DETAIL,
     INTENT_GET_REPORT,
@@ -45,9 +39,6 @@ VALID_INTENTS = {
     INTENT_LINK_ACCOUNT,
     INTENT_FINANCE_CHAT,
     INTENT_CREATE_CATEGORY,
-    INTENT_UPDATE_CATEGORY,
-    INTENT_DELETE_CATEGORY,
-    INTENT_CHANGE_TRANSACTION_CATEGORY,
     INTENT_UNKNOWN,
     INTENT_RECENT_TRANSACTIONS,
     INTENT_DELETE_LAST_TRANSACTION,

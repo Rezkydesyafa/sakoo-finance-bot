@@ -26,7 +26,6 @@ from app.modules.reports.service import (
     build_report_summary,
 )
 
-
 router = APIRouter(prefix="/reports", tags=["reports"])
 
 

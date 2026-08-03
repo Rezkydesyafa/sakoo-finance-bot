@@ -4,7 +4,12 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense, useEffect, useState, useMemo } from "react";
 import { clearAuthToken, getStoredAuthToken } from "@/lib/auth-storage";
 import { ApiError, apiClient } from "@/lib/api";
-import type { Transaction as ApiTransaction, TransactionType } from "@/lib/api";
+import type {
+  ReportCategoryResponse,
+  ReportSummaryResponse,
+  Transaction as ApiTransaction,
+  TransactionType,
+} from "@/lib/api";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { LandingPage } from "@/components/landing-page";
 import { OverviewTab } from "@/components/tabs/overview-tab";
@@ -12,10 +17,10 @@ import { TransactionsTab } from "@/components/tabs/transactions-tab";
 import { ReportsTab } from "@/components/tabs/reports-tab";
 import { ReceiptScanTab } from "@/components/tabs/receipt-scan-tab";
 import { BudgetsTab } from "@/components/tabs/budgets-tab";
-import { SettingsTab } from "@/components/tabs/settings-tab";
 import { IntegrationsTab } from "@/components/tabs/integrations-tab";
 import { TransactionModal } from "@/components/add-transaction-modal";
 import { ChatTab } from "@/components/tabs/chat-tab";
+import { findCategoryId, mergeById } from "@/lib/frontend-utils";
 import type { Transaction } from "./types";
 
 export default function Home() {
@@ -35,6 +40,10 @@ function HomeContent() {
   const [userName, setUserName] = useState("User");
   const [authState, setAuthState] = useState<"checking" | "guest" | "authenticated">("checking");
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactionHasNext, setTransactionHasNext] = useState(false);
+  const [transactionLoadingMore, setTransactionLoadingMore] = useState(false);
+  const [financialSummary, setFinancialSummary] = useState<ReportSummaryResponse | null>(null);
+  const [financialCategories, setFinancialCategories] = useState<ReportCategoryResponse | null>(null);
   const searchTerm = searchParams.get("q") || "";
   const [expenseFilterType, setExpenseFilterType] = useState<"all" | "income" | "expense">("all");
   const [quickActionLoading, setQuickActionLoading] = useState<TransactionType | null>(null);
@@ -50,12 +59,6 @@ function HomeContent() {
   const [exitWarningShowing, setExitWarningShowing] = useState(false);
 
 
-
-  const [healthStatus, setHealthStatus] = useState({
-    db: "checking",
-    waha: "checking",
-    backend: "checking",
-  });
 
   // Receipt Scanner states (Desktop)
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
@@ -75,7 +78,7 @@ function HomeContent() {
       import("@capacitor/core").then(({ Capacitor }) => {
         if (Capacitor.isNativePlatform()) {
           import("@capacitor/app").then(({ App: CapacitorApp }) => {
-            CapacitorApp.addListener("backButton", ({ canGoBack }) => {
+            CapacitorApp.addListener("backButton", () => {
               if (isAddTxModalOpen) {
                 setIsAddTxModalOpen(false);
                 return;
@@ -113,22 +116,10 @@ function HomeContent() {
     return () => {
       if (listener) listener.remove();
     };
-  }, [exitWarningShowing, isAddTxModalOpen, editTxId, deleteTxId]);
+  }, [exitWarningShowing, isAddTxModalOpen, editTxId, deleteTxId, router]);
 
   useEffect(() => {
     const token = getStoredAuthToken();
-
-    apiClient.health()
-      .then(() => setHealthStatus(prev => ({ ...prev, backend: "online" })))
-      .catch(() => setHealthStatus(prev => ({ ...prev, backend: "offline" })));
-
-    apiClient.databaseHealth()
-      .then(() => setHealthStatus(prev => ({ ...prev, db: "online" })))
-      .catch(() => setHealthStatus(prev => ({ ...prev, db: "offline" })));
-
-    apiClient.wahaHealth()
-      .then(() => setHealthStatus(prev => ({ ...prev, waha: "online" })))
-      .catch(() => setHealthStatus(prev => ({ ...prev, waha: "offline" })));
 
     if (!token) {
       setAuthState("guest");
@@ -157,15 +148,17 @@ function HomeContent() {
       });
   }, []);
 
-  const totalIncome = useMemo(() => {
+  const loadedIncome = useMemo(() => {
     return transactions.filter(t => t.type === "income").reduce((sum, t) => sum + t.amount, 0);
   }, [transactions]);
 
-  const totalExpense = useMemo(() => {
+  const loadedExpense = useMemo(() => {
     return transactions.filter(t => t.type === "expense").reduce((sum, t) => sum + t.amount, 0);
   }, [transactions]);
 
-  const totalBalance = useMemo(() => totalIncome - totalExpense, [totalIncome, totalExpense]);
+  const totalIncome = financialSummary ? Number(financialSummary.total_income) : loadedIncome;
+  const totalExpense = financialSummary ? Number(financialSummary.total_expense) : loadedExpense;
+  const totalBalance = financialSummary ? Number(financialSummary.net_balance) : totalIncome - totalExpense;
 
   const filteredTransactions = useMemo(() => {
     let result = transactions;
@@ -178,6 +171,14 @@ function HomeContent() {
   }, [transactions, searchTerm, expenseFilterType]);
 
   const categoryStats = useMemo(() => {
+    if (financialCategories) {
+      const colors = ["#9BE634", "#84cc16", "#4d7c0f", "#bef264"];
+      return financialCategories.items.slice(0, 4).map((item, index) => ({
+        name: item.category_name,
+        value: Number(item.total_amount),
+        color: colors[index] ?? "#bef264",
+      }));
+    }
     const cats: Record<string, number> = {};
     transactions.forEach(t => {
       if (t.type === "expense") {
@@ -193,7 +194,7 @@ function HomeContent() {
       value,
       color: colors[index] ?? "#bef264",
     }));
-  }, [transactions]);
+  }, [financialCategories, transactions]);
 
   function formatCurrency(val: number) {
     return new Intl.NumberFormat("id-ID", {
@@ -212,7 +213,7 @@ function HomeContent() {
     try {
       await apiClient.transactions.delete(token, deleteTxId);
       await refreshTransactions(token);
-    } catch (error) {
+    } catch {
       alert("Gagal menghapus transaksi.");
     } finally {
       setDeleteTxId(null);
@@ -253,14 +254,51 @@ function HomeContent() {
         category_id: data.category_id,
       });
       await refreshTransactions(token);
-    } catch (error) {
+    } catch {
       alert("Gagal mengubah transaksi.");
     }
   }
 
   async function refreshTransactions(token: string) {
-    const res = await apiClient.transactions.list(token);
+    const today = formatLocalDate(new Date());
+    const [res, summary, categories] = await Promise.all([
+      apiClient.transactions.list(token, { limit: 50, offset: 0 }),
+      apiClient.reports.summary(token, {
+        period: "custom",
+        start_date: "1970-01-01",
+        end_date: today,
+        limit: 1,
+      }).catch(() => null),
+      apiClient.reports.category(token, {
+        period: "custom",
+        start_date: "1970-01-01",
+        end_date: today,
+        type: "expense",
+      }).catch(() => null),
+    ]);
     setTransactions(res.items.map(item => toDashboardTransaction(item)));
+    setTransactionHasNext(res.has_next);
+    if (summary) setFinancialSummary(summary);
+    if (categories) setFinancialCategories(categories);
+  }
+
+  async function handleLoadMoreTransactions() {
+    const token = getStoredAuthToken();
+    if (!token || transactionLoadingMore || !transactionHasNext) return;
+    setTransactionLoadingMore(true);
+    try {
+      const res = await apiClient.transactions.list(token, {
+        limit: 50,
+        offset: transactions.length,
+      });
+      const next = res.items.map((item) => toDashboardTransaction(item));
+      setTransactions((current) => mergeById(current, next));
+      setTransactionHasNext(res.has_next);
+    } catch {
+      alert("Gagal memuat transaksi berikutnya.");
+    } finally {
+      setTransactionLoadingMore(false);
+    }
   }
 
 
@@ -414,21 +452,25 @@ function HomeContent() {
     });
   };
 
-  const handleConfirmReceipt = () => {
+  const handleConfirmReceipt = async () => {
     if (scanStatus !== "completed") return;
     const token = getStoredAuthToken();
     if (token) {
-      apiClient.transactions.create(token, {
-        type: "expense",
-        amount: scannedData.amount,
-        description: scannedData.merchant,
-        transaction_date: scannedData.date,
-      }).then(async () => {
+      try {
+        const categories = await apiClient.categories.list(token);
+        const categoryId = findCategoryId(categories.items, scannedData.category, "expense");
+        await apiClient.transactions.create(token, {
+          type: "expense",
+          amount: scannedData.amount,
+          category_id: categoryId,
+          description: scannedData.merchant,
+          transaction_date: scannedData.date,
+        });
         handleCancelReceipt();
         await refreshTransactions(token);
-      }).catch(() => {
+      } catch {
         alert("Failed to save transaction.");
-      });
+      }
     } else {
       alert("Please login first.");
     }
@@ -477,6 +519,9 @@ function HomeContent() {
             handleDownloadPDF={handleDownloadPDF}
             isExporting={isExporting}
             totalBalance={totalBalance}
+            hasNext={transactionHasNext}
+            isLoadingMore={transactionLoadingMore}
+            handleLoadMore={handleLoadMoreTransactions}
           />
         )}
 

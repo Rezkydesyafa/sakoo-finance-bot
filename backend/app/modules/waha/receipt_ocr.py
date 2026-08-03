@@ -16,11 +16,12 @@ from app.modules.jobs.service import (
     queue_receipt_ocr_job,
 )
 from app.modules.media.service import MediaStorageError, save_media_bytes
+from app.modules.notifications.enqueue import enqueue_budget_notification_check
 from app.modules.ocr.receipt_chat import (
     CANCEL_CONFIRMATION_RE,
     PENDING_RECEIPT_STATUSES,
-    ReceiptOcrFlowResult,
     YES_CONFIRMATION_RE,
+    ReceiptOcrFlowResult,
     apply_caption_amount_if_possible,
     apply_receipt_correction,
     find_duplicate_receipt_transaction,
@@ -294,6 +295,7 @@ def _confirm_receipt_transaction(
     db.commit()
     db.refresh(transaction)
     db.refresh(receipt)
+    enqueue_budget_notification_check(transaction.id)
 
     return ReceiptOcrFlowResult(
         status="saved",

@@ -12,7 +12,6 @@ from app.modules.parser.transaction_text import (
     parse_transaction_text,
 )
 
-
 AUTO_SAVE_CONFIDENCE = 0.85
 CATEGORY_MODEL_MIN_CONFIDENCE = 0.25
 

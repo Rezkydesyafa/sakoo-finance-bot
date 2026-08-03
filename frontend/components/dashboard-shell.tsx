@@ -6,8 +6,9 @@ import type { ReactNode } from "react";
 import { Suspense, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { LogoutButton } from "@/components/logout-button";
-import { apiClient, ApiError } from "@/lib/api";
+import { apiClient } from "@/lib/api";
 import { getStoredAuthToken, clearAuthToken } from "@/lib/auth-storage";
+import { findCategoryId } from "@/lib/frontend-utils";
 import { SettingsTab } from "@/components/tabs/settings-tab";
 
 const navigationItems = [
@@ -99,7 +100,7 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
       window.removeEventListener("profile_image_updated", loadProfileImage);
       window.removeEventListener("open_mobile_scan", handleOpenScan);
     };
-  }, []);
+  }, [router]);
 
   if (isAuthChecking) {
     return (
@@ -169,21 +170,25 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
     router.push("/?tab=overview");
   };
 
-  const handleConfirmReceipt = () => {
+  const handleConfirmReceipt = async () => {
     if (scanStatus !== "completed") return;
     const token = getStoredAuthToken();
     if (token) {
-      apiClient.transactions.create(token, {
-        type: "expense",
-        amount: scannedData.amount,
-        description: scannedData.merchant,
-        transaction_date: scannedData.date,
-      }).then(() => {
+      try {
+        const categories = await apiClient.categories.list(token);
+        const categoryId = findCategoryId(categories.items, scannedData.category, "expense");
+        await apiClient.transactions.create(token, {
+          type: "expense",
+          amount: scannedData.amount,
+          category_id: categoryId,
+          description: scannedData.merchant,
+          transaction_date: scannedData.date,
+        });
         handleCancelReceipt();
         window.location.reload();
-      }).catch(() => {
+      } catch {
         alert("Failed to save transaction.");
-      });
+      }
     } else {
       alert("Please login first.");
     }
@@ -498,10 +503,11 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
                 </div>
 
                 <div className="flex justify-end">
-                  <button 
-                    onClick={() => alert("Flash features are only available in native mobile apps.")}
+                  <button
+                    disabled
+                    title="Flash belum didukung"
                     type="button" 
-                    className="w-8 h-8 flex items-center justify-center rounded-full bg-white/20 border-none cursor-pointer hover:bg-white/30"
+                    className="w-8 h-8 flex items-center justify-center rounded-full bg-white/20 opacity-60 border-none cursor-not-allowed"
                   >
                     <span className="material-symbols-outlined text-white text-[20px]">flash_on</span>
                   </button>

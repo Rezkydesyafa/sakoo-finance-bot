@@ -117,21 +117,6 @@ def list_transactions(
     return list(db.scalars(query.order_by(*order_by).limit(limit)))
 
 
-def count_user_category_transactions(
-    db: Session,
-    user_id: int,
-    category_id: int,
-) -> int:
-    value = db.scalar(
-        select(func.count(Transaction.id)).where(
-            Transaction.user_id == user_id,
-            Transaction.category_id == category_id,
-            Transaction.status == CONFIRMED_TRANSACTION_STATUS,
-        )
-    )
-    return int(value or 0)
-
-
 def top_expense_category(
     db: Session,
     user_id: int,

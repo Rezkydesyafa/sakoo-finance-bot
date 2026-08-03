@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 from decimal import Decimal, InvalidOperation
 
-
 _SPACES_RE = re.compile(r"\s+")
 _AMOUNT_NORMALIZATION_RE = re.compile(
     r"(?<![\w/-])(?P<prefix>rp\.?\s*)?"
@@ -37,12 +36,6 @@ def normalize_text(text: str | None) -> str:
     normalized = _AMOUNT_NORMALIZATION_RE.sub(_normalize_amount_match, normalized)
     normalized = _SPACES_RE.sub(" ", normalized).strip()
     return normalized
-
-
-def normalize_for_matching(text: str | None) -> str:
-    normalized = normalize_text(text)
-    normalized = re.sub(r"[^a-zA-Z0-9\u00c0-\u024f\s/-]", " ", normalized)
-    return _SPACES_RE.sub(" ", normalized).strip()
 
 
 def _normalize_amount_match(match: re.Match[str]) -> str:

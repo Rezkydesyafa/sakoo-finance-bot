@@ -13,5 +13,4 @@ weasyprint
 python-multipart
 scikit-learn
 joblib
-pytest
 httpx

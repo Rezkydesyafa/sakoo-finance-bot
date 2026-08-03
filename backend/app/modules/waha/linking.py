@@ -9,7 +9,6 @@ from app.config import get_settings
 from app.models import AccountLinkingCode, UserPlatformAccount
 from app.modules.waha.parser import ParsedWahaMessage
 
-
 LINKING_COMMAND_RE = re.compile(r"^\s*hubungkan\s+([A-Za-z0-9_-]{4,32})\s*$", re.IGNORECASE)
 
 @dataclass(frozen=True)

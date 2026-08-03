@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.database import get_db
 from app.models import BotLog, UserPlatformAccount
+from app.modules.bot.channel_flow import run_channel_flow
+from app.modules.bot.response_templates import format_help_response
 from app.modules.jobs.service import (
     JobQueueError,
     ReceiptOcrEnqueue,
@@ -23,18 +25,17 @@ from app.modules.jobs.service import (
 )
 from app.modules.reports.bot_pdf import ReportPdfFlowResult, handle_report_pdf_command
 from app.modules.stt.flow import VoiceSttFlowResult
-from app.modules.telegram.client import (
-    TelegramClient,
-    TelegramClientError,
-    get_telegram_client,
-)
-from app.modules.bot.response_templates import format_help_response
 from app.modules.telegram.callback_handler import (
     WAITING_EXPENSE_INPUT,
     WAITING_INCOME_INPUT,
     build_welcome_text,
     consume_waiting_input_state,
     handle_callback_query,
+)
+from app.modules.telegram.client import (
+    TelegramClient,
+    TelegramClientError,
+    get_telegram_client,
 )
 from app.modules.telegram.linking import handle_telegram_account_linking
 from app.modules.telegram.menu import build_link_menu, build_main_menu, dashboard_url
@@ -56,7 +57,6 @@ from app.modules.transactions.service import (
     build_transaction_list_response,
     handle_telegram_text_transaction,
 )
-
 
 router = APIRouter(prefix="/webhook", tags=["webhook"])
 
@@ -223,49 +223,50 @@ async def receive_telegram_webhook(
         current_user_id=user_id,
     )
     linked_user_id = linking_result.user_id or user_id
-    voice_result = _handle_voice_stt_if_needed(
-        db=db,
-        parsed=parsed,
-        linking_action=linking_result.action,
-        linked_user_id=linked_user_id,
-        telegram_client=telegram_client,
-        enqueue=stt_enqueue,
-    )
-    receipt_result = None
-    if voice_result is None:
-        receipt_result = _handle_receipt_ocr_if_needed(
+    flow = run_channel_flow(
+        voice=lambda: _handle_voice_stt_if_needed(
             db=db,
             parsed=parsed,
             linking_action=linking_result.action,
             linked_user_id=linked_user_id,
             telegram_client=telegram_client,
-            enqueue=receipt_enqueue,
-        )
-    if voice_result is None and receipt_result is None:
-        receipt_result = _handle_receipt_text_if_needed(
-            db=db,
-            parsed=parsed,
-            linking_action=linking_result.action,
-            linked_user_id=linked_user_id,
-        )
-    report_pdf_result = None
-    if voice_result is None and receipt_result is None:
-        report_pdf_result = _handle_report_pdf_if_needed(
+            enqueue=stt_enqueue,
+        ),
+        receipts=(
+            lambda: _handle_receipt_ocr_if_needed(
+                db=db,
+                parsed=parsed,
+                linking_action=linking_result.action,
+                linked_user_id=linked_user_id,
+                telegram_client=telegram_client,
+                enqueue=receipt_enqueue,
+            ),
+            lambda: _handle_receipt_text_if_needed(
+                db=db,
+                parsed=parsed,
+                linking_action=linking_result.action,
+                linked_user_id=linked_user_id,
+            ),
+        ),
+        report_pdf=lambda: _handle_report_pdf_if_needed(
             db=db,
             parsed=parsed,
             linking_action=linking_result.action,
             linked_user_id=linked_user_id,
             enqueue=pdf_enqueue,
-        )
-    transaction_result = None
-    if voice_result is None and receipt_result is None and report_pdf_result is None:
-        transaction_result = _handle_text_transaction_if_needed(
+        ),
+        transaction=lambda: _handle_text_transaction_if_needed(
             db=db,
             parsed_message_type=parsed.message_type,
             parsed_text=parsed.text,
             linking_action=linking_result.action,
             linked_user_id=linked_user_id,
-        )
+        ),
+    )
+    voice_result = flow.voice
+    receipt_result = flow.receipt
+    report_pdf_result = flow.report_pdf
+    transaction_result = flow.transaction
     reply_text = _resolve_reply_text(
         voice_result=voice_result,
         receipt_result=receipt_result,

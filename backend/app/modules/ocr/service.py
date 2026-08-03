@@ -20,7 +20,6 @@ from app.modules.ocr.rate_limit import (
 from app.modules.ocr.receipt_parser import parse_receipt_text
 from app.modules.parser.transaction_text import parse_transaction_text
 
-
 SUPPORTED_RECEIPT_OCR_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 

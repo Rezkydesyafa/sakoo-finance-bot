@@ -91,7 +91,6 @@ export function LandingPage() {
               ["Dashboard", "#dashboard"],
               ["Bot", "#bot"],
               ["Reports", "#reports"],
-              ["Pricing", "#pricing"],
             ].map(([label, href]) => (
               <a key={label} href={href} className="text-sm font-semibold text-[#6f6f6f] transition-colors hover:text-[#191919]">
                 {label}
@@ -221,6 +220,8 @@ export function LandingPage() {
                 />
                 <button
                   aria-label="Send message"
+                  disabled
+                  title="Contoh tampilan chat"
                   className="absolute right-0 top-1/2 flex -translate-y-1/2 items-center justify-center rounded-xl bg-[#c7ff00] p-2 text-[#202020]"
                   type="button"
                 >
@@ -350,16 +351,18 @@ export function LandingPage() {
                 The easiest way to track expenses and manage personal finances through conversational AI.
               </p>
             </div>
-            <FooterLinks title="Product" items={["Features", "Integrations", "Pricing", "Changelog"]} />
-            <FooterLinks title="Legal" items={["Privacy Policy", "Terms of Service", "Cookie Policy"]} />
+            <FooterLinks title="Product" items={[
+              ["Features", "#features"],
+              ["Integrations", "#bot"],
+              ["Reports", "#reports"],
+            ]} />
+            <div>
+              <h3 className="mb-4 text-sm font-extrabold">Legal</h3>
+              <p className="text-sm text-[#6f6f6f]">Dokumen legal sedang disiapkan.</p>
+            </div>
           </div>
           <div className="flex flex-col items-center justify-between gap-4 border-t border-[#e8e8e8] pt-8 text-sm text-[#6f6f6f] md:flex-row">
             <p>(c) 2026 Sakoo Finance Bot. All rights reserved.</p>
-            <div className="flex gap-4">
-              <a href="#" className="transition-colors hover:text-[#202020]">Twitter</a>
-              <a href="#" className="transition-colors hover:text-[#202020]">LinkedIn</a>
-              <a href="#" className="transition-colors hover:text-[#202020]">Instagram</a>
-            </div>
           </div>
         </div>
       </footer>
@@ -496,14 +499,14 @@ function Bubble({ children, side }: { children: string; side: "left" | "right" |
   );
 }
 
-function FooterLinks({ title, items }: { title: string; items: string[] }) {
+function FooterLinks({ title, items }: { title: string; items: [string, string][] }) {
   return (
     <div>
       <h3 className="mb-4 text-sm font-extrabold">{title}</h3>
       <ul className="space-y-3 text-sm text-[#6f6f6f]">
-        {items.map((item) => (
-          <li key={item}>
-            <a href="#" className="transition-colors hover:text-[#202020]">{item}</a>
+        {items.map(([label, href]) => (
+          <li key={label}>
+            <a href={href} className="transition-colors hover:text-[#202020]">{label}</a>
           </li>
         ))}
       </ul>

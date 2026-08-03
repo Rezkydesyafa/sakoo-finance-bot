@@ -1,172 +1,109 @@
-"""Ollama-based AI transaction parser.
-
-Uses a local Ollama instance with the model configured in settings.
-to parse natural-language messages into structured transaction data.  This
-module acts as a **fallback** when the rule-based parser produces a low
-confidence score.
-"""
+"""Shared prompt and validation helpers for LLM transaction parsing."""
 
 from __future__ import annotations
 
 import json
 import logging
-import re
+from collections.abc import Sequence
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-import httpx
-
-from app.config import Settings, get_settings
 from app.modules.parser.service import ParsedMessage
 
 logger = logging.getLogger(__name__)
 
-# Valid categories that the model can choose from.
-VALID_CATEGORIES = [
-    "Makanan",
-    "Transportasi",
-    "Tagihan",
-    "Belanja",
-    "Hiburan",
-    "Kesehatan",
-    "Pendidikan",
-    "Gaji",
-    "Tabungan",
-    "Lainnya",
-]
+TRANSACTION_PARSE_SYSTEM_PROMPT = """Kamu adalah interpreter pesan untuk aplikasi keuangan Sakoo.
+Keluarkan tepat satu object JSON tanpa markdown atau penjelasan."""
 
-TRANSACTION_PARSE_PROMPT_TEMPLATE = """Kamu adalah parser transaksi keuangan. Ubah pesan pengguna menjadi JSON transaksi.
+TRANSACTION_PARSE_PROMPT_TEMPLATE = """Ubah pesan pengguna menjadi JSON terstruktur.
 
 ATURAN:
-1. Tentukan "intent": salah satu dari "add_transaction", "get_report", "export_pdf", "get_balance", "recent_transactions", "delete_last_transaction", "list_expense", "list_income", "sorted_expense", "category_detail", "create_category", "help", "unknown"
+1. Tentukan "intent": salah satu dari "add_transaction", "get_report", "export_pdf", "get_balance", "recent_transactions", "delete_last_transaction", "list_expense", "list_income", "sorted_expense", "category_detail", "create_category", "help", "finance_chat", "unknown"
 2. Jika intent adalah "add_transaction":
    - "type": "expense" untuk pengeluaran, "income" untuk pemasukan
    - "amount": angka bulat dalam Rupiah (contoh: "20 ribu" = 20000, "2 juta" = 2000000, "30rb" = 30000)
-   - "category": salah satu dari {categories}
+   - "category": nama dari daftar kategori valid yang tipenya sesuai transaksi
    - "description": deskripsi singkat transaksi
    - "transaction_date": tanggal dalam format YYYY-MM-DD. Hari ini: {today}. Jika "kemarin" kurangi 1 hari. Jika tidak disebutkan, gunakan hari ini.
 3. Jika intent "list_expense" atau "list_income": isi "period" (day/week/month/yesterday) dan "limit" (angka jika disebutkan)
-4. Jika intent "sorted_expense": isi "period" dan "sort_order" (desc/asc)
-5. Jika intent "category_detail": isi "category" dengan nama kategori yang ditanya
+4. Jika intent "sorted_expense": isi "period" dan "sort_order" (desc/asc/date_desc/date_asc)
+5. Jika intent "category_detail": isi "category_filter" dengan nama kategori valid yang ditanya
 6. Jika intent "create_category": isi "category" dengan nama kategori baru
-7. Jika intent lainnya, isi field lain dengan null
+7. Jika intent lainnya, isi field yang tidak relevan dengan null
 
-FORMAT OUTPUT (HANYA JSON, TANPA PENJELASAN):
-{{"intent":"...","type":"...","amount":angka,"category":"...","description":"...","transaction_date":"YYYY-MM-DD","period":"...","limit":angka,"sort_order":"..."}}
+KATEGORI VALID (JSON):
+{categories}
 
-PESAN: "{message}"
+FORMAT OUTPUT:
+{{"intent":"...","type":"...","amount":angka,"category":"...","description":"...","transaction_date":"YYYY-MM-DD","period":"...","limit":angka,"sort_order":"...","category_filter":"..."}}
+
+PESAN PENGGUNA (JSON): {message}
 """
 
+SUPPORTED_INTENTS = {
+    "add_transaction",
+    "get_report",
+    "export_pdf",
+    "get_balance",
+    "recent_transactions",
+    "delete_last_transaction",
+    "list_expense",
+    "list_income",
+    "sorted_expense",
+    "category_detail",
+    "create_category",
+    "help",
+    "finance_chat",
+    "unknown",
+}
+VALID_PERIODS = {"day", "week", "month", "yesterday"}
+VALID_SORT_ORDERS = {"desc", "asc", "date_desc", "date_asc"}
 
-def ollama_available(settings: Settings | None = None) -> bool:
-    """Check whether the Ollama server is reachable."""
-    active_settings = settings or get_settings()
-    if not active_settings.ollama_base_url.strip():
-        return False
-    try:
-        response = httpx.get(
-            f"{active_settings.ollama_base_url.rstrip('/')}/api/tags",
-            timeout=5.0,
-        )
-        return response.status_code == 200
-    except httpx.HTTPError:
-        return False
 
-
-def parse_with_ollama(
+def build_transaction_parse_prompt(
     text: str,
-    source: str,
     *,
-    today: date | None = None,
-    settings: Settings | None = None,
-) -> ParsedMessage | None:
-    """Parse a natural-language message into a ``ParsedMessage`` using Ollama.
-
-    Returns ``None`` when the Ollama server is unreachable, the model fails to
-    produce valid JSON, or the result cannot be mapped to a ``ParsedMessage``.
-    """
-    active_settings = settings or get_settings()
-    base_url = active_settings.ollama_base_url.rstrip("/")
-    model = active_settings.ollama_model
-    timeout = active_settings.ollama_timeout_seconds
-
-    if not base_url:
-        return None
-
-    today_date = today or date.today()
-    prompt = TRANSACTION_PARSE_PROMPT_TEMPLATE.format(
-        categories=", ".join(VALID_CATEGORIES),
-        today=today_date.isoformat(),
-        message=text.strip()[:500],
+    today: date,
+    category_options: Sequence[tuple[str, str]],
+) -> str:
+    categories = [
+        {"name": name, "type": transaction_type}
+        for name, transaction_type in category_options
+    ]
+    return TRANSACTION_PARSE_PROMPT_TEMPLATE.format(
+        categories=json.dumps(categories, ensure_ascii=False),
+        today=today.isoformat(),
+        message=json.dumps(text.strip()[:500], ensure_ascii=False),
     )
 
-    try:
-        response = httpx.post(
-            f"{base_url}/v1/chat/completions",
-            json={
-                "model": model,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.1,
-                "max_tokens": 256,
-            },
-            timeout=timeout,
-        )
-        response.raise_for_status()
-        data = response.json()
-    except httpx.HTTPError as exc:
-        logger.warning("Ollama AI parser request failed: %s", exc)
-        return None
-    except ValueError:
-        logger.warning("Ollama AI parser returned invalid JSON response")
-        return None
 
-    # Extract text from OpenAI-compatible response format.
-    try:
-        raw_text = str(data["choices"][0]["message"]["content"]).strip()
-    except (KeyError, IndexError, TypeError):
-        logger.warning("Ollama AI parser response missing text content")
-        return None
-
-    return _parse_ollama_response(raw_text, source=source, today=today_date)
-
-
-def _parse_ollama_response(
+def parse_transaction_response(
     raw_text: str,
     *,
     source: str,
     today: date,
+    category_options: Sequence[tuple[str, str]],
+    provider_name: str,
 ) -> ParsedMessage | None:
-    """Extract and validate the JSON from the model output."""
+    """Extract and validate a provider's structured transaction JSON."""
 
-    # Try to find JSON in the response (model may include extra text).
-    json_match = re.search(r"\{[^{}]+\}", raw_text)
-    if not json_match:
-        logger.warning("Ollama AI parser: no JSON object found in response")
+    json_start = raw_text.find("{")
+    if json_start < 0:
+        logger.warning("%s LLM parser: no JSON object found", provider_name)
         return None
 
     try:
-        parsed: dict[str, Any] = json.loads(json_match.group())
+        decoded, _end = json.JSONDecoder().raw_decode(raw_text[json_start:])
     except json.JSONDecodeError:
-        logger.warning("Ollama AI parser: failed to decode JSON")
+        logger.warning("%s LLM parser: failed to decode JSON", provider_name)
         return None
+    if not isinstance(decoded, dict):
+        return None
+    parsed: dict[str, Any] = decoded
 
     intent = str(parsed.get("intent", "unknown")).strip()
-    if intent not in {
-        "add_transaction",
-        "get_report",
-        "export_pdf",
-        "get_balance",
-        "recent_transactions",
-        "delete_last_transaction",
-        "list_expense",
-        "list_income",
-        "sorted_expense",
-        "category_detail",
-        "create_category",
-        "help",
-        "unknown",
-    }:
+    if intent not in SUPPORTED_INTENTS:
         intent = "unknown"
 
     txn_type = parsed.get("type")
@@ -174,9 +111,13 @@ def _parse_ollama_response(
         txn_type = None
 
     amount = _safe_decimal(parsed.get("amount"))
-    category = parsed.get("category")
-    if category not in VALID_CATEGORIES:
-        category = "Lainnya" if intent == "add_transaction" else None
+    category = _match_category(
+        parsed.get("category"),
+        transaction_type=txn_type,
+        category_options=category_options,
+    )
+    if intent == "add_transaction" and category is None:
+        category = "Lainnya"
 
     description = parsed.get("description")
     if description is not None:
@@ -192,12 +133,30 @@ def _parse_ollama_response(
         category=category,
         description=description,
     )
-    need_confirmation = confidence < 0.85 or amount is None or txn_type is None
+    need_confirmation = (
+        confidence < 0.85
+        or amount is None
+        or txn_type is None
+        or category == "Lainnya"
+    )
+    period = _safe_choice(parsed.get("period"), VALID_PERIODS)
+    sort_order = _safe_choice(parsed.get("sort_order"), VALID_SORT_ORDERS)
+    limit = _safe_limit(parsed.get("limit"))
+    category_filter = _match_category(
+        parsed.get("category_filter")
+        or (parsed.get("category") if intent == "category_detail" else None),
+        transaction_type=None,
+        category_options=category_options,
+    )
 
-    period: str | None = None
-    if intent in ("get_report", "export_pdf"):
-        period = parsed.get("period")
-
+    parser_reason = (
+        "ai_ollama_parser"
+        if provider_name == "ollama"
+        else f"llm_{provider_name}_parser"
+    )
+    category_source = (
+        "ai_ollama" if provider_name == "ollama" else f"llm_{provider_name}"
+    )
     return ParsedMessage(
         intent=intent,
         type=txn_type,
@@ -208,10 +167,13 @@ def _parse_ollama_response(
         source=source,
         confidence=confidence,
         need_confirmation=need_confirmation,
-        reasons=["ai_ollama_parser"],
+        reasons=[parser_reason],
         period=period,
         category_confidence=confidence if category else None,
-        category_source="ai_ollama" if category else None,
+        category_source=category_source if category else None,
+        limit=limit,
+        sort_order=sort_order,
+        category_filter=category_filter,
     )
 
 
@@ -232,6 +194,37 @@ def _safe_date(value: Any, *, fallback: date) -> date:
         return datetime.strptime(str(value), "%Y-%m-%d").date()
     except (ValueError, TypeError):
         return fallback
+
+
+def _match_category(
+    value: Any,
+    *,
+    transaction_type: str | None,
+    category_options: Sequence[tuple[str, str]],
+) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip().casefold()
+    for name, category_type in category_options:
+        if name.casefold() == normalized and (
+            transaction_type is None
+            or category_type in {transaction_type, "both"}
+        ):
+            return name
+    return None
+
+
+def _safe_choice(value: Any, choices: set[str]) -> str | None:
+    normalized = str(value or "").strip().lower()
+    return normalized if normalized in choices else None
+
+
+def _safe_limit(value: Any) -> int | None:
+    try:
+        limit = int(value)
+    except (TypeError, ValueError):
+        return None
+    return min(limit, 50) if limit > 0 else None
 
 
 def _calculate_ai_confidence(

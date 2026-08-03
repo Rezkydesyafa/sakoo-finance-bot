@@ -1,13 +1,15 @@
 {
   "name": "sakoo-finance-bot-frontend",
   "private": true,
+  "type": "module",
   "version": "0.1.0",
   "scripts": {
     "dev": "next dev --hostname 0.0.0.0 --port 3000",
     "build": "next build",
     "build:android": "cross-env BUILD_TARGET=android next build",
     "start": "next start --hostname 0.0.0.0 --port 3000",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "node --test --experimental-strip-types tests/frontend-integration.test.ts"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.1",

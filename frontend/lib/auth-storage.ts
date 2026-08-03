@@ -3,6 +3,7 @@ import {
   AUTH_TOKEN_MAX_AGE_SECONDS,
   AUTH_TOKEN_STORAGE_KEY,
 } from "@/lib/auth-constants";
+import { clearAuthSession } from "@/lib/frontend-utils";
 
 export function saveAuthToken(token: string): void {
   localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token);
@@ -16,8 +17,7 @@ export function getStoredAuthToken(): string | null {
 }
 
 export function clearAuthToken(): void {
-  localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
-  document.cookie = `${AUTH_TOKEN_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`;
+  clearAuthSession(localStorage, document, AUTH_TOKEN_STORAGE_KEY, AUTH_TOKEN_COOKIE);
 }
 
 function getCookieAuthToken(): string | null {

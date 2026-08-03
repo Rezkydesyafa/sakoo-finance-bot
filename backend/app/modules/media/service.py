@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.models import MediaFile
 
-
 ALLOWED_FILE_TYPES = {"receipt", "audio", "pdf"}
 ALLOWED_RECEIPT_MIME_TYPES = {
     "application/pdf",

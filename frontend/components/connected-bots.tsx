@@ -12,22 +12,16 @@ const channels: Array<{
   name: BotChannel;
   platform: Platform;
   label: string;
-  icon: string;
-  iconClassName: string;
 }> = [
   {
     name: "Telegram",
     platform: "telegram",
     label: "Telegram Bot",
-    icon: "send",
-    iconClassName: "text-blue-500",
   },
   {
     name: "WhatsApp",
     platform: "whatsapp",
     label: "WhatsApp Bot",
-    icon: "chat",
-    iconClassName: "text-green-500",
   },
 ];
 
@@ -161,8 +155,6 @@ export function ConnectedBots({ displayMode = "all" }: { displayMode?: "all" | "
               key={channel.platform}
               name={channel.label}
               detail={formatAccountDetail(account)}
-              icon={channel.icon}
-              iconClassName={channel.iconClassName}
               isLinked={Boolean(account?.is_active)}
               isLoading={loadingTarget === channel.name}
               onConnect={() => createLinkingCode(channel.name)}
@@ -362,8 +354,8 @@ function BotChannelsGrid({
               <h2 className="text-[20px] font-bold text-[#1a1c1b]">Command Settings</h2>
               <p className="text-[14px] text-[#6F6F6F] mt-1">Configure global bot behavior across all active channels.</p>
             </div>
-            <button className="px-4 py-2 rounded-full border border-[#E8E8E8] bg-transparent text-[#1a1c1b] font-semibold text-[13px] hover:bg-[#F1F2F0] transition-colors whitespace-nowrap cursor-pointer">
-              Reset to Default
+            <button disabled title="Pengaturan bot belum tersedia" className="px-4 py-2 rounded-full border border-[#E8E8E8] bg-transparent text-[#6F6F6F] font-semibold text-[13px] whitespace-nowrap cursor-not-allowed opacity-60">
+              Belum Tersedia
             </button>
           </div>
 
@@ -375,7 +367,7 @@ function BotChannelsGrid({
                 <span className="text-[12px] text-[#6F6F6F] max-w-sm">Automatically assign categories to transactions parsed from chat messages.</span>
               </div>
               <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-2 sm:mt-0">
-                <input defaultChecked type="checkbox" className="sr-only peer" />
+                <input disabled type="checkbox" className="sr-only peer" />
                 <div className="w-11 h-6 bg-[#E8E8E8] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#c7ff00]"></div>
               </label>
             </div>
@@ -387,7 +379,7 @@ function BotChannelsGrid({
                 <span className="text-[12px] text-[#6F6F6F] max-w-sm">Receive a concise financial summary every morning at 08:00 AM.</span>
               </div>
               <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-2 sm:mt-0">
-                <input defaultChecked type="checkbox" className="sr-only peer" />
+                <input disabled type="checkbox" className="sr-only peer" />
                 <div className="w-11 h-6 bg-[#E8E8E8] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#c7ff00]"></div>
               </label>
             </div>
@@ -399,7 +391,7 @@ function BotChannelsGrid({
                 <span className="text-[12px] text-[#6F6F6F] max-w-sm">Allow the bot to read and extract data from receipt images sent in chat.</span>
               </div>
               <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-2 sm:mt-0">
-                <input type="checkbox" className="sr-only peer" />
+                <input disabled type="checkbox" className="sr-only peer" />
                 <div className="w-11 h-6 bg-[#E8E8E8] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#c7ff00]"></div>
               </label>
             </div>
@@ -413,8 +405,6 @@ function BotChannelsGrid({
 type BotRowProps = {
   name: string;
   detail: string;
-  icon: string;
-  iconClassName: string;
   isLinked: boolean;
   isLoading: boolean;
   onConnect: () => void;
@@ -424,8 +414,6 @@ type BotRowProps = {
 function BotRow({
   name,
   detail,
-  icon,
-  iconClassName,
   isLinked,
   isLoading,
   onConnect,
@@ -618,7 +606,7 @@ function BotChannelsMobileList({
               <span className="text-[12px] text-[#6F6F6F]">AI labels new expenses</span>
             </div>
             <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
-              <input defaultChecked type="checkbox" className="sr-only peer" />
+              <input disabled type="checkbox" className="sr-only peer" />
               <div className="w-10 h-[22px] bg-[#E8E8E8] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-[18px] peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-[18px] after:w-[18px] after:transition-all peer-checked:bg-[#c7ff00]"></div>
             </label>
           </div>
@@ -629,7 +617,7 @@ function BotChannelsMobileList({
               <span className="text-[12px] text-[#6F6F6F]">Receive a morning brief</span>
             </div>
             <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
-              <input defaultChecked type="checkbox" className="sr-only peer" />
+              <input disabled type="checkbox" className="sr-only peer" />
               <div className="w-10 h-[22px] bg-[#E8E8E8] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-[18px] peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-[18px] after:w-[18px] after:transition-all peer-checked:bg-[#c7ff00]"></div>
             </label>
           </div>
@@ -640,7 +628,7 @@ function BotChannelsMobileList({
               <span className="text-[12px] text-[#6F6F6F]">Notify on large transfers</span>
             </div>
             <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
-              <input type="checkbox" className="sr-only peer" />
+              <input disabled type="checkbox" className="sr-only peer" />
               <div className="w-10 h-[22px] bg-[#E8E8E8] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-[18px] peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-[18px] after:w-[18px] after:transition-all peer-checked:bg-[#c7ff00]"></div>
             </label>
           </div>

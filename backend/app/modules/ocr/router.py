@@ -14,7 +14,6 @@ from app.modules.jobs.service import (
 )
 from app.modules.ocr.schemas import ReceiptOcrJobResponse, ReceiptOcrResponse
 
-
 router = APIRouter(prefix="/ocr", tags=["ocr"])
 
 
