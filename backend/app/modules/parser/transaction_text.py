@@ -24,7 +24,6 @@ from app.modules.parser.schemas import (
 )
 from app.modules.parser.transaction_parser import parse_transaction_text
 
-
 __all__ = [
     "CONFIRMATION_THRESHOLD",
     "INTENT_ADD_TRANSACTION",

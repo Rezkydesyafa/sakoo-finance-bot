@@ -5,7 +5,6 @@ from typing import Self
 from pydantic import AnyHttpUrl, BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
 CUSTOM_PROVIDER_NAME_RE = re.compile(r"[a-z0-9][a-z0-9_-]*")
 LLM_PROVIDER_SPLIT_RE = re.compile(r"[\s,;|+>]+")
 

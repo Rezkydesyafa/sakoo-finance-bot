@@ -8,7 +8,6 @@ from app.database import get_db
 from app.models import User
 from app.modules.auth.security import decode_access_token
 
-
 bearer_scheme = HTTPBearer(auto_error=True)
 
 

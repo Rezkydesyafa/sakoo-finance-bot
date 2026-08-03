@@ -5,7 +5,6 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
-
 SOURCE_WHATSAPP_TEXT = "whatsapp_text"
 CONFIRMATION_THRESHOLD = 0.85
 

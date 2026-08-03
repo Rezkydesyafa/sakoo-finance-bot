@@ -11,12 +11,13 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.database import get_db
 from app.models import BotLog, UserPlatformAccount
+from app.modules.bot.channel_flow import run_channel_flow
 from app.modules.jobs.service import (
     ReceiptOcrEnqueue,
     ReportPdfEnqueue,
     VoiceSttEnqueue,
-    get_report_pdf_enqueue,
     get_receipt_ocr_enqueue,
+    get_report_pdf_enqueue,
     get_voice_stt_enqueue,
 )
 from app.modules.reports.bot_pdf import ReportPdfFlowResult, handle_report_pdf_command
@@ -34,7 +35,6 @@ from app.modules.waha.receipt_ocr import (
     handle_whatsapp_receipt_image,
 )
 from app.modules.waha.voice_stt import handle_whatsapp_voice_note
-
 
 router = APIRouter(prefix="/webhook", tags=["webhook"])
 
@@ -119,42 +119,44 @@ async def receive_waha_webhook(
         current_user_id=user_id,
     )
     linked_user_id = linking_result.user_id or user_id
-    voice_result = _handle_voice_stt_if_needed(
-        db=db,
-        parsed=parsed,
-        linking_action=linking_result.action,
-        linked_user_id=linked_user_id,
-        waha_client=waha_client,
-        enqueue=stt_enqueue,
-    )
-    receipt_result = None
-    if voice_result is None:
-        receipt_result = _handle_receipt_ocr_if_needed(
+    flow = run_channel_flow(
+        voice=lambda: _handle_voice_stt_if_needed(
             db=db,
             parsed=parsed,
             linking_action=linking_result.action,
             linked_user_id=linked_user_id,
             waha_client=waha_client,
-            enqueue=enqueue,
-        )
-    report_pdf_result = None
-    if receipt_result is None and voice_result is None:
-        report_pdf_result = _handle_report_pdf_if_needed(
+            enqueue=stt_enqueue,
+        ),
+        receipts=(
+            lambda: _handle_receipt_ocr_if_needed(
+                db=db,
+                parsed=parsed,
+                linking_action=linking_result.action,
+                linked_user_id=linked_user_id,
+                waha_client=waha_client,
+                enqueue=enqueue,
+            ),
+        ),
+        report_pdf=lambda: _handle_report_pdf_if_needed(
             db=db,
             parsed=parsed,
             linking_action=linking_result.action,
             linked_user_id=linked_user_id,
             enqueue=pdf_enqueue,
-        )
-    transaction_result = None
-    if receipt_result is None and voice_result is None and report_pdf_result is None:
-        transaction_result = _handle_text_transaction_if_needed(
+        ),
+        transaction=lambda: _handle_text_transaction_if_needed(
             db=db,
             parsed_message_type=parsed.message_type,
             parsed_text=parsed.text,
             linking_action=linking_result.action,
             linked_user_id=linked_user_id,
-        )
+        ),
+    )
+    voice_result = flow.voice
+    receipt_result = flow.receipt
+    report_pdf_result = flow.report_pdf
+    transaction_result = flow.transaction
     reply_text = _resolve_reply_text(
         receipt_result=receipt_result,
         voice_result=voice_result,

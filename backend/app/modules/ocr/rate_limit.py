@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session
 
 from app.models import BotLog
 
-
 OCR_MESSAGE_TYPE = "receipt_ocr"
 OCR_USAGE_STATUS = "ocr_usage"
 OCR_LIMIT_REACHED_STATUS = "ocr_limit_reached"

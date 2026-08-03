@@ -18,7 +18,6 @@ from app.database import Base
 from app.models import Category, Transaction, User
 from app.modules.transactions.service import handle_text_transaction
 
-
 YOUTH_MESSAGES = [
     (1, "beli kopi 18 ribu"),
     (2, "gw beli es jeruk 5k"),

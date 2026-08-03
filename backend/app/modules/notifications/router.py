@@ -12,7 +12,6 @@ from app.modules.notifications.schemas import (
 )
 from app.modules.notifications.service import get_preferences, update_preferences
 
-
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
 

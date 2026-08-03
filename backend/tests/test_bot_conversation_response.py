@@ -4,8 +4,8 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 import pytest
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import create_engine, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -15,7 +15,16 @@ os.environ["LLM_PROVIDER"] = "none"
 
 from app.config import get_settings
 from app.database import Base
-from app.models import BotLog, Category, CategoryBudget, MediaFile, Receipt, Transaction, User, UserPreference
+from app.models import (
+    BotLog,
+    Category,
+    CategoryBudget,
+    MediaFile,
+    Receipt,
+    Transaction,
+    User,
+    UserPreference,
+)
 from app.modules.transactions.service import (
     handle_telegram_text_transaction,
     handle_text_transaction,

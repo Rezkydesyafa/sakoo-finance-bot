@@ -5,7 +5,6 @@ from datetime import date, timedelta
 
 from app.modules.parser.schemas import DateMatch
 
-
 DATE_PATTERNS: tuple[tuple[re.Pattern[str], int, str], ...] = (
     (re.compile(r"\b(kemarin|yesterday)\b", re.IGNORECASE), -1, "yesterday"),
     (re.compile(r"\b(hari ini|today)\b", re.IGNORECASE), 0, "today"),

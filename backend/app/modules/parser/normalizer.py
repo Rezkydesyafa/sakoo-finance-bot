@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 from decimal import Decimal, InvalidOperation
 
-
 _SPACES_RE = re.compile(r"\s+")
 _AMOUNT_NORMALIZATION_RE = re.compile(
     r"(?<![\w/-])(?P<prefix>rp\.?\s*)?"

@@ -2,7 +2,6 @@ from typing import Any
 
 from app.config import get_settings
 
-
 MENU_BALANCE = "MENU_BALANCE"
 MENU_ADD = "MENU_ADD"
 MENU_REPORT = "MENU_REPORT"

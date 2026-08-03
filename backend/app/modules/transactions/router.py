@@ -24,7 +24,6 @@ from app.modules.transactions.schemas import (
 )
 from app.modules.transactions.service import handle_text_transaction
 
-
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
 

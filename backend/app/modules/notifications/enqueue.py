@@ -6,7 +6,6 @@ from redis import Redis, RedisError
 from app.config import get_settings
 from app.workers.celery_app import celery_app
 
-
 logger = logging.getLogger(__name__)
 
 

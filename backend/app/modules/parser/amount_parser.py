@@ -5,7 +5,6 @@ from decimal import Decimal, InvalidOperation
 
 from app.modules.parser.schemas import AmountMatch
 
-
 AMOUNT_RE = re.compile(
     r"(?<!\w)(?P<prefix>rp\.?\s*)?"
     r"(?P<number>\d+(?:[.,]\d{3})*(?:[.,]\d+)?)"

@@ -11,7 +11,6 @@ from app.modules.reports.router import router as reports_router
 from app.modules.stt.router import router as stt_router
 from app.modules.transactions.router import router as transactions_router
 
-
 router = APIRouter()
 router.include_router(auth_router)
 router.include_router(budgets_router)

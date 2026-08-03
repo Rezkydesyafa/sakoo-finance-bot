@@ -20,8 +20,8 @@ from app.modules.notifications.enqueue import enqueue_budget_notification_check
 from app.modules.ocr.receipt_chat import (
     CANCEL_CONFIRMATION_RE,
     PENDING_RECEIPT_STATUSES,
-    ReceiptOcrFlowResult,
     YES_CONFIRMATION_RE,
+    ReceiptOcrFlowResult,
     apply_caption_amount_if_possible,
     apply_receipt_correction,
     find_duplicate_receipt_transaction,

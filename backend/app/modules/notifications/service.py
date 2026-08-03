@@ -21,7 +21,6 @@ from app.modules.reports.service import ReportFilters, build_report_category, bu
 from app.modules.telegram.client import TelegramClient, get_telegram_client
 from app.modules.waha.client import WahaClient, get_waha_client
 
-
 DEFAULT_TIME = time(20, 0)
 DEFAULT_TIMEZONE = "Asia/Jakarta"
 SUMMARY_TIME = time(8, 0)

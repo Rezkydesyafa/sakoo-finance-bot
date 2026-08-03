@@ -10,7 +10,6 @@ from app.modules.reports.schemas import (
     ReportTransactionItem,
 )
 
-
 MONTH_LABELS = {
     1: "Jan",
     2: "Feb",

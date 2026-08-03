@@ -6,7 +6,6 @@ from typing import Any
 
 import httpx
 
-
 # ── System prompt (persona, rules, capabilities) ──────────────────────
 FINANCE_CHAT_SYSTEM_PROMPT = (
     "Kamu adalah Sakoo 🐱, asisten keuangan pribadi yang ramah dan seru via chat. "

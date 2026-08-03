@@ -14,7 +14,6 @@ from app.modules.jobs.service import (
 )
 from app.modules.stt.schemas import VoiceSttJobResponse, VoiceSttRequest
 
-
 router = APIRouter(prefix="/stt", tags=["stt"])
 
 

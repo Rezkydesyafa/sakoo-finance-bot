@@ -23,7 +23,6 @@ from app.modules.llm.glm_provider import GlmProvider
 from app.modules.llm.ollama_provider import OllamaProvider
 from app.modules.llm.openrouter_provider import OpenRouterProvider
 
-
 LLM_MESSAGE_TYPE = "llm_chat"
 LLM_USAGE_STATUS = "llm_usage"
 LLM_LIMIT_REACHED_STATUS = "llm_limit_reached"

@@ -7,7 +7,6 @@ from app.modules.llm.base import (
     LlmProviderConfig,
     LlmProviderError,
     build_finance_chat_messages,
-    compact_error_detail,
     request_openai_chat_completion,
 )
 

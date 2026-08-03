@@ -12,7 +12,6 @@ from app.modules.ocr.receipt_parser import extract_receipt_item_names
 from app.modules.parser.date_parser import parse_transaction_date
 from app.modules.parser.transaction_text import parse_transaction_text
 
-
 YES_CONFIRMATION_RE = re.compile(
     r"^\s*(?:ya|iya|y|yes|ok|oke|benar|setuju|simpan)\s*$",
     re.IGNORECASE,

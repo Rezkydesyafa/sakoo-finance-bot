@@ -3,7 +3,6 @@ from typing import Literal
 
 from pydantic import BaseModel, field_validator
 
-
 TimezoneName = Literal["Asia/Jakarta", "Asia/Makassar", "Asia/Jayapura"]
 ChannelName = Literal["whatsapp", "telegram"]
 

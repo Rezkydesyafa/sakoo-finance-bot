@@ -4,7 +4,6 @@ from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.models import Category
 
-
 DEFAULT_CATEGORIES: tuple[dict[str, object], ...] = (
     {
         "name": "Makanan",

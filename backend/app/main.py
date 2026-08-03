@@ -1,4 +1,6 @@
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,13 +12,22 @@ from app.database import check_database_connection
 from app.modules.telegram.client import TelegramClientError
 from app.modules.telegram.commands import register_bot_commands
 
-
 settings = get_settings()
 logger = logging.getLogger(__name__)
 
 
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    if settings.telegram_register_commands_on_startup:
+        try:
+            register_bot_commands()
+        except TelegramClientError as exc:
+            logger.warning("Failed to register Telegram bot commands: %s", exc)
+    yield
+
+
 def create_app() -> FastAPI:
-    app = FastAPI(title=settings.app_name, debug=settings.debug)
+    app = FastAPI(title=settings.app_name, debug=settings.debug, lifespan=lifespan)
 
     app.add_middleware(
         CORSMiddleware,
@@ -28,15 +39,6 @@ def create_app() -> FastAPI:
 
     app.include_router(api_router, prefix=settings.api_prefix)
     app.include_router(webhook_router)
-
-    if settings.telegram_register_commands_on_startup:
-
-        @app.on_event("startup")
-        def register_telegram_command_menu() -> None:
-            try:
-                register_bot_commands()
-            except TelegramClientError as exc:
-                logger.warning("Failed to register Telegram bot commands: %s", exc)
 
     @app.get("/")
     def read_root() -> dict[str, str]:
@@ -53,8 +55,8 @@ def create_app() -> FastAPI:
 
     @app.get("/health/ollama", tags=["health"])
     def ollama_health_check() -> dict[str, object]:
-        from app.modules.llm.ollama_provider import OllamaProvider
         from app.modules.llm.base import LlmProviderConfig
+        from app.modules.llm.ollama_provider import OllamaProvider
 
         provider = OllamaProvider(
             LlmProviderConfig(

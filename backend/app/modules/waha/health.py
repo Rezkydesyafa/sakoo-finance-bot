@@ -12,7 +12,6 @@ from app.database import get_db
 from app.models import BotLog
 from app.modules.waha.client import WahaClient, WahaClientError, get_waha_client
 
-
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["health"])
 WAHA_HEALTHY_STATUS = "WORKING"
