@@ -90,7 +90,7 @@ jobs:
 
       - name: Build and restart containers
         shell: bash
-        run: docker compose -f "$COMPOSE_FILE" up -d --build --remove-orphans
+        run: docker compose --env-file .env -f "$COMPOSE_FILE" up -d --build --remove-orphans
 
       - name: Wait for app health
         shell: bash
@@ -102,8 +102,8 @@ jobs:
 
           until curl -fsS "$health_url" >/dev/null; do
             if [ "$SECONDS" -ge "$deadline" ]; then
-              docker compose -f "$COMPOSE_FILE" ps
-              docker compose -f "$COMPOSE_FILE" logs --tail=80 backend
+              docker compose --env-file .env -f "$COMPOSE_FILE" ps
+              docker compose --env-file .env -f "$COMPOSE_FILE" logs --tail=80 backend
               echo "Health check gagal: ${health_url} tidak mengembalikan HTTP 200."
               exit 1
             fi
@@ -114,4 +114,4 @@ jobs:
 
       - name: Show service status
         shell: bash
-        run: docker compose -f "$COMPOSE_FILE" ps
+        run: docker compose --env-file .env -f "$COMPOSE_FILE" ps
