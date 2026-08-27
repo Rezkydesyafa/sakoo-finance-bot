@@ -28,7 +28,7 @@ jobs:
     timeout-minutes: 30
     env:
       COMPOSE_FILE: infra/docker/docker-compose.yml
-      COMPOSE_PROJECT_NAME: sakoo-finance-bot
+      COMPOSE_PROJECT_NAME: docker
       NEXT_TELEMETRY_DISABLED: "1"
 
     steps:
