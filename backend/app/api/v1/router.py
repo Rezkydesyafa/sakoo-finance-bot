@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from app.modules.admin_llm_providers import router as admin_llm_providers_router
 from app.modules.auth.router import router as auth_router
 from app.modules.budgets.router import router as budgets_router
 from app.modules.categories.router import router as categories_router
@@ -16,6 +17,7 @@ router.include_router(auth_router)
 router.include_router(budgets_router)
 router.include_router(categories_router)
 router.include_router(jobs_router)
+router.include_router(admin_llm_providers_router)
 router.include_router(media_router)
 router.include_router(notifications_router)
 router.include_router(ocr_router)

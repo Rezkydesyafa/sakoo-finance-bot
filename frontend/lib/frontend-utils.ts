@@ -55,6 +55,13 @@ export function findCategoryId(
 
 export type CsvCell = string | number | null | undefined;
 
+export function buildLlmProviderUpdatePayload<T extends { api_key?: string }>(
+  payload: T,
+): Omit<T, "api_key"> & { api_key?: string } {
+  const { api_key, ...updates } = payload;
+  return api_key?.trim() ? { ...updates, api_key: api_key.trim() } : updates;
+}
+
 export function toCsv(headers: string[], rows: CsvCell[][]): string {
   return [headers, ...rows]
     .map((row) => row.map(escapeCsvCell).join(","))

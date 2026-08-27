@@ -14,3 +14,4 @@ python-multipart
 scikit-learn
 joblib
 httpx
+cryptography

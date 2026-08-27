@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildLlmProviderUpdatePayload,
   clearAuthSession,
   findCategoryId,
   mergeById,
@@ -61,4 +62,15 @@ test("browser API URL prefers env configuration and CSV escapes values", () => {
     "http://localhost:8000/api",
   );
   assert.equal(toCsv(["Nama"], [['Warung "Enak", Jakarta']]), 'Nama\r\n"Warung ""Enak"", Jakarta"');
+});
+
+test("LLM provider updates omit a blank API key", () => {
+  assert.deepEqual(
+    buildLlmProviderUpdatePayload({ name: "Primary", api_key: "" }),
+    { name: "Primary" },
+  );
+  assert.deepEqual(
+    buildLlmProviderUpdatePayload({ api_key: "new-secret" }),
+    { api_key: "new-secret" },
+  );
 });

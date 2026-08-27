@@ -29,7 +29,7 @@ def parse_bot_text_message(
     """Interpret with configured LLM providers, then fall back to rules."""
     fallback_errors: list[str] = []
     try:
-        providers = get_llm_providers()
+        providers = get_llm_providers(db=db) if isinstance(db, Session) else get_llm_providers()
         if providers:
             category_options = [
                 (category.name, category.type)

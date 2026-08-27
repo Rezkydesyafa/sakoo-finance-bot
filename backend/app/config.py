@@ -50,6 +50,8 @@ class Settings(BaseSettings):
     media_default_max_bytes: int = 10 * 1024 * 1024
 
     jwt_secret: str = ""
+    admin_emails: str = ""
+    llm_provider_encryption_key: str = ""
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
     account_linking_code_ttl_minutes: int = 10

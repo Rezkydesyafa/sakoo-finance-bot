@@ -40,6 +40,9 @@ def test_alembic_upgrade_head_creates_budget_and_idempotency_tables(
             "timezone",
         } <= preference_columns
         assert "transactions" in inspector.get_table_names()
+        assert "llm_providers" in inspector.get_table_names()
+        provider_columns = {column["name"] for column in inspector.get_columns("llm_providers")}
+        assert {"name", "base_url", "api_key_encrypted", "model", "enabled", "priority"} <= provider_columns
     finally:
         engine.dispose()
         get_settings.cache_clear()
