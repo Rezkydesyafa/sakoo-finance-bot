@@ -1,4 +1,7 @@
-import { resolveBrowserApiBaseUrl } from "@/lib/frontend-utils";
+import {
+  buildLlmProviderUpdatePayload,
+  resolveBrowserApiBaseUrl,
+} from "@/lib/frontend-utils";
 
 const getBrowserApiBaseUrl = () => {
   if (typeof window !== "undefined") {
@@ -311,6 +314,26 @@ export type NotificationPreferencesResponse = NotificationPreferencesUpdate & {
   active_channels: ("whatsapp" | "telegram")[];
 };
 
+export type LlmProvider = {
+  id: number;
+  name: string;
+  base_url: string;
+  model: string;
+  enabled: boolean;
+  priority: number;
+  api_key_masked: string;
+};
+
+export type LlmProviderCreateRequest = Omit<LlmProvider, "id" | "api_key_masked"> & {
+  api_key: string;
+};
+
+export type LlmProviderUpdateRequest = Partial<LlmProviderCreateRequest>;
+
+export type LlmProviderListResponse = {
+  items: LlmProvider[];
+};
+
 type ApiRequestOptions = RequestInit & {
   token?: string;
   query?: Record<string, string | number | boolean | undefined | null>;
@@ -433,6 +456,25 @@ export const apiClient = {
         token,
         body: JSON.stringify(payload),
       }),
+  },
+
+  llmProviders: {
+    list: (token: string) =>
+      apiRequest<LlmProviderListResponse>("/admin/llm-providers", { token }),
+    create: (token: string, payload: LlmProviderCreateRequest) =>
+      apiRequest<LlmProvider>("/admin/llm-providers", {
+        method: "POST",
+        token,
+        body: JSON.stringify(payload),
+      }),
+    update: (token: string, id: number, payload: LlmProviderUpdateRequest) =>
+      apiRequest<LlmProvider>(`/admin/llm-providers/${id}`, {
+        method: "PATCH",
+        token,
+        body: JSON.stringify(buildLlmProviderUpdatePayload(payload)),
+      }),
+    delete: (token: string, id: number) =>
+      apiRequest<void>(`/admin/llm-providers/${id}`, { method: "DELETE", token }),
   },
 
   reports: {

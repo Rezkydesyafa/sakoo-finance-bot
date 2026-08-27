@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session
 
 from app.config import Settings, get_settings
 from app.models import BotLog
+from app.models import LlmProvider as DatabaseLlmProvider
+from app.modules.admin_llm_providers import _fernet
 from app.modules.llm.base import (
     BaseLlmProvider,
     LlmProviderConfig,
@@ -68,7 +70,11 @@ def answer_finance_question_with_llm(
     settings: Settings | None = None,
 ) -> str:
     active_settings = settings or get_settings()
-    providers = get_llm_providers(active_settings)
+    providers = (
+        get_llm_providers(active_settings, db=db)
+        if db is not None
+        else get_llm_providers(active_settings)
+    )
     if not providers:
         raise LlmProviderUnavailable("llm_provider_disabled")
 
@@ -115,11 +121,36 @@ def answer_finance_question_with_llm(
     raise LlmProviderError(f"llm_all_providers_failed:{detail}")
 
 
-def get_llm_providers(settings: Settings | None = None) -> list[BaseLlmProvider]:
+def get_llm_providers(
+    settings: Settings | None = None, *, db: Session | None = None
+) -> list[BaseLlmProvider]:
     active_settings = settings or get_settings()
-    provider_names = _resolve_provider_names(active_settings)
     timeout = active_settings.llm_timeout_seconds
 
+    if db is not None:
+        database_providers = list(
+            db.scalars(
+                select(DatabaseLlmProvider)
+                .where(DatabaseLlmProvider.enabled)
+                .order_by(DatabaseLlmProvider.priority, DatabaseLlmProvider.name)
+            )
+        )
+        if database_providers:
+            fernet = _fernet()
+            return [
+                CustomLlmProvider(
+                    LlmProviderConfig(
+                        api_key=fernet.decrypt(provider.api_key_encrypted.encode()).decode(),
+                        timeout_seconds=timeout,
+                        model=provider.model,
+                    ),
+                    name=provider.name,
+                    base_url=provider.base_url,
+                )
+                for provider in database_providers
+            ]
+
+    provider_names = _resolve_provider_names(active_settings)
     providers: list[BaseLlmProvider] = []
     for provider_name in provider_names:
         if provider_name in {"", "none", "off", "disabled"}:
