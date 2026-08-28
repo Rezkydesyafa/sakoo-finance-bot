@@ -104,6 +104,10 @@ jobs:
         shell: bash
         run: docker compose --env-file .env -f "$COMPOSE_FILE" up -d --remove-orphans
 
+      - name: Refresh nginx upstream DNS
+        shell: bash
+        run: docker compose --env-file .env -f "$COMPOSE_FILE" restart nginx
+
       - name: Wait for app health
         shell: bash
         run: |
