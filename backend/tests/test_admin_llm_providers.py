@@ -102,6 +102,30 @@ def test_non_admin_is_forbidden_from_listing_providers(
     assert response.status_code == 403
 
 
+def test_login_and_profile_expose_backend_verified_admin_status(
+    test_client: tuple[TestClient, sessionmaker[Session]], monkeypatch
+) -> None:
+    monkeypatch.setenv("ADMIN_EMAILS", " admin@example.com , second@example.com ")
+    get_settings.cache_clear()
+    client, _ = test_client
+
+    admin_token = _register_and_login(client, "ADMIN@example.com")
+    admin_login = client.post(
+        "/api/auth/login",
+        json={"email": "admin@example.com", "password": "safe-password-123"},
+    )
+    assert admin_login.status_code == 200
+    assert admin_login.json()["is_admin"] is True
+    admin_profile = client.get("/api/auth/me", headers=_auth_headers(admin_token))
+    assert admin_profile.status_code == 200
+    assert admin_profile.json()["is_admin"] is True
+
+    user_token = _register_and_login(client, "user@example.com")
+    user_profile = client.get("/api/auth/me", headers=_auth_headers(user_token))
+    assert user_profile.status_code == 200
+    assert user_profile.json()["is_admin"] is False
+
+
 def test_admin_can_update_and_delete_provider(
     test_client: tuple[TestClient, sessionmaker[Session]], monkeypatch
 ) -> None:

@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.database import get_db
 from app.models import LlmProvider, User
+from app.modules.auth.admin import is_admin_email
 from app.modules.auth.dependencies import get_current_user
 
 router = APIRouter(prefix="/admin/llm-providers", tags=["admin-llm-providers"])
@@ -50,8 +51,7 @@ class ProviderListResponse(BaseModel):
 
 
 def require_admin(user: Annotated[User, Depends(get_current_user)]) -> User:
-    allowed = {email.strip().lower() for email in get_settings().admin_emails.split(",") if email.strip()}
-    if not allowed or user.email.lower() not in allowed:
+    if not is_admin_email(user.email):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
     return user
 

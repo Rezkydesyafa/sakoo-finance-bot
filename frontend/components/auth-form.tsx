@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState, useEffect } from "react";
 import { ApiError, apiClient, buildApiUrl } from "@/lib/api";
 import { saveAuthToken, getStoredAuthToken } from "@/lib/auth-storage";
+import { resolvePostLoginPath } from "@/lib/frontend-utils";
 
 type AuthMode = "login" | "register";
 
@@ -55,7 +56,7 @@ export function AuthForm({ mode }: AuthFormProps) {
 
       const token = await apiClient.login({ email, password });
       saveAuthToken(token.access_token);
-      window.location.href = getNextPath();
+      window.location.href = resolvePostLoginPath(token.is_admin, getNextPath());
     } catch (submitError) {
       setError(getAuthErrorMessage(submitError));
     } finally {

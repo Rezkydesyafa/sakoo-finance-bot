@@ -19,6 +19,7 @@ import { ReceiptScanTab } from "@/components/tabs/receipt-scan-tab";
 import { BudgetsTab } from "@/components/tabs/budgets-tab";
 import { IntegrationsTab } from "@/components/tabs/integrations-tab";
 import { LlmProvidersTab } from "@/components/tabs/llm-providers-tab";
+import { AdminOverviewTab } from "@/components/tabs/admin-overview-tab";
 import { TransactionModal } from "@/components/add-transaction-modal";
 import { ChatTab } from "@/components/tabs/chat-tab";
 import { findCategoryId, mergeById } from "@/lib/frontend-utils";
@@ -557,6 +558,8 @@ function HomeContent() {
         {activeTab === "integrations" && <IntegrationsTab />}
 
         {activeTab === "llm-providers" && <LlmProvidersTab />}
+
+        {activeTab === "admin" && <AdminOverviewTab />}
       </div>
 
         {activeTab === "chat" && (

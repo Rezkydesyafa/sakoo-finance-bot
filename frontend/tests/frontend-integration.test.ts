@@ -7,6 +7,7 @@ import {
   mergeById,
   REPORT_PERIOD_OPTIONS,
   resolveBrowserApiBaseUrl,
+  resolvePostLoginPath,
   toCsv,
 } from "../lib/frontend-utils.ts";
 
@@ -73,4 +74,10 @@ test("LLM provider updates omit a blank API key", () => {
     buildLlmProviderUpdatePayload({ api_key: "new-secret" }),
     { api_key: "new-secret" },
   );
+});
+
+test("admin login opens admin dashboard while users keep their destination", () => {
+  assert.equal(resolvePostLoginPath(true, "/"), "/?tab=admin");
+  assert.equal(resolvePostLoginPath(false, "/"), "/");
+  assert.equal(resolvePostLoginPath(true, "/?tab=llm-providers"), "/?tab=llm-providers");
 });
