@@ -31,6 +31,10 @@ export function resolveBrowserApiBaseUrl(
   return `${location.origin}/api`;
 }
 
+export function resolvePostLoginPath(isAdmin: boolean, requestedPath: string): string {
+  return isAdmin && requestedPath === "/" ? "/?tab=admin" : requestedPath;
+}
+
 export function mergeById<T extends { id: number }>(
   current: T[],
   next: T[],

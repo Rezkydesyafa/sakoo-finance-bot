@@ -11,7 +11,15 @@ import { getStoredAuthToken, clearAuthToken } from "@/lib/auth-storage";
 import { findCategoryId } from "@/lib/frontend-utils";
 import { SettingsTab } from "@/components/tabs/settings-tab";
 
-const navigationItems = [
+type NavigationItem = {
+  label: string;
+  icon: string;
+  href: string;
+  id: string;
+  isAi?: boolean;
+};
+
+const navigationItems: NavigationItem[] = [
   { label: "Overview", icon: "dashboard", href: "/?tab=overview", id: "overview" },
   { label: "Transactions", icon: "receipt_long", href: "/?tab=transactions", id: "transactions" },
   { label: "Chat AI", icon: "smart_toy", href: "/?tab=chat", id: "chat", isAi: true },
@@ -20,12 +28,17 @@ const navigationItems = [
   { label: "Budgets", icon: "account_balance_wallet", href: "/?tab=budgets", id: "budgets" },
 ];
 
-const mobileNavigationItems = [
+const mobileNavigationItems: NavigationItem[] = [
   { label: "Overview", icon: "dashboard", href: "/?tab=overview", id: "overview" },
   { label: "Transactions", icon: "receipt_long", href: "/?tab=transactions", id: "transactions" },
   { label: "Chat AI", icon: "smart_toy", href: "/?tab=chat", id: "chat", isAi: true },
   { label: "Budgets", icon: "account_balance_wallet", href: "/?tab=budgets", id: "budgets" },
   { label: "Reports", icon: "bar_chart", href: "/?tab=reports", id: "reports" },
+];
+
+const adminNavigationItems: NavigationItem[] = [
+  { label: "Admin Dashboard", icon: "admin_panel_settings", href: "/?tab=admin", id: "admin" },
+  { label: "LLM Providers", icon: "neurology", href: "/?tab=llm-providers", id: "llm-providers" },
 ];
 
 function DashboardShellContent({ children }: { children: ReactNode }) {
@@ -52,6 +65,7 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     if (currentTab === "settings") {
@@ -78,6 +92,7 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
       if (user.name) setUserName(user.name);
       if (user.email) setUserEmail(user.email);
       if (user.phone_number) setUserPhone(user.phone_number);
+      setIsAdmin(Boolean(user.is_admin));
       setIsAuthChecking(false);
     }).catch(() => {
       // If fetching user fails, might be an expired token
@@ -101,6 +116,17 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
       window.removeEventListener("open_mobile_scan", handleOpenScan);
     };
   }, [router]);
+
+  useEffect(() => {
+    if (isAuthChecking) return;
+    if (isAdmin && currentTab === "overview") {
+      router.replace("/?tab=admin");
+      return;
+    }
+    if (!isAdmin && (currentTab === "admin" || currentTab === "llm-providers")) {
+      router.replace("/?tab=overview");
+    }
+  }, [currentTab, isAdmin, isAuthChecking, router]);
 
   if (isAuthChecking) {
     return (
@@ -203,6 +229,8 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
   }
 
   const isFullScreen = ["chat", "integrations"].includes(currentTab);
+  const visibleNavigationItems = isAdmin ? adminNavigationItems : navigationItems;
+  const visibleMobileNavigationItems = isAdmin ? adminNavigationItems : mobileNavigationItems;
 
   return (
     <div className="text-sm text-[#1a1c1b] antialiased bg-[#f9f9f7] h-[100dvh] overflow-hidden">
@@ -212,11 +240,11 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
       <nav className="hidden md:flex fixed left-0 top-0 h-screen w-[240px] bg-white flex-col py-8 border-r border-[#E8E8E8] z-50">
         <div className="px-8 mb-8">
           <h1 className="text-xl font-bold text-[#1a1c1b]">Sakoo</h1>
-          <p className="text-xs text-[#6F6F6F] mt-1">Finance Bot</p>
+          <p className="text-xs text-[#6F6F6F] mt-1">{isAdmin ? "Admin Console" : "Finance Bot"}</p>
         </div>
         
         <div className="flex-1 flex flex-col gap-2 overflow-y-auto no-scrollbar">
-          {navigationItems.map((item) => {
+          {visibleNavigationItems.map((item) => {
             const isActive = currentTab === item.id;
             
             if (item.id === "settings") {
@@ -362,7 +390,7 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
       
       {/* Mobile Navigation */}
       <nav className={`items-center justify-between border-t border-[#E8E8E8] bg-white fixed bottom-0 left-0 right-0 z-50 py-1 px-2 md:hidden no-scrollbar shadow-[0_-4px_12px_rgba(0,0,0,0.04)] rounded-t-[24px] animate-fade-in ${isFullScreen ? "hidden" : "flex"}`}>
-        {mobileNavigationItems.map((item) => {
+        {visibleMobileNavigationItems.map((item) => {
           const isActive = currentTab === item.id;
           if (item.isAi) {
             return (

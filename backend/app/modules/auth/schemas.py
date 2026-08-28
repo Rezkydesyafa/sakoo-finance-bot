@@ -62,6 +62,11 @@ class UserResponse(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    is_admin: bool = False
+
+
+class CurrentUserResponse(UserResponse):
+    is_admin: bool
 
 
 class AccountLinkingCodeResponse(BaseModel):

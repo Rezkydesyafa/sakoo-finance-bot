@@ -14,9 +14,11 @@ from sqlalchemy.orm import Session
 from app.config import Settings, get_settings
 from app.database import get_db
 from app.models import AccountLinkingCode, User, UserPlatformAccount
+from app.modules.auth.admin import is_admin_email
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.schemas import (
     AccountLinkingCodeResponse,
+    CurrentUserResponse,
     PlatformAccountResponse,
     TokenResponse,
     UserLoginRequest,
@@ -86,7 +88,10 @@ def login_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    return TokenResponse(access_token=create_access_token(subject=str(user.id)))
+    return TokenResponse(
+        access_token=create_access_token(subject=str(user.id)),
+        is_admin=is_admin_email(user.email),
+    )
 
 
 @router.get("/google/start")
@@ -175,11 +180,14 @@ def finish_google_login(
     return response
 
 
-@router.get("/me", response_model=UserResponse)
+@router.get("/me", response_model=CurrentUserResponse)
 def get_current_user_profile(
     current_user: Annotated[User, Depends(get_current_user)],
-) -> User:
-    return current_user
+) -> CurrentUserResponse:
+    return CurrentUserResponse(
+        **UserResponse.model_validate(current_user).model_dump(),
+        is_admin=is_admin_email(current_user.email),
+    )
 
 
 @router.get("/platform-accounts", response_model=list[PlatformAccountResponse])

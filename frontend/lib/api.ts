@@ -33,6 +33,7 @@ export type HealthResponse = {
 export type AuthTokenResponse = {
   access_token: string;
   token_type: string;
+  is_admin: boolean;
 };
 
 export type RegisterRequest = {
@@ -49,6 +50,7 @@ export type UserResponse = {
   phone_number: string | null;
   created_at: string;
   updated_at: string;
+  is_admin?: boolean;
 };
 
 export type TransactionType = "income" | "expense";
