@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   buildLlmProviderUpdatePayload,
+  chooseFetchedModel,
   clearAuthSession,
   findCategoryId,
   mergeById,
@@ -80,4 +81,10 @@ test("admin login opens admin dashboard while users keep their destination", () 
   assert.equal(resolvePostLoginPath(true, "/"), "/?tab=admin");
   assert.equal(resolvePostLoginPath(false, "/"), "/");
   assert.equal(resolvePostLoginPath(true, "/?tab=llm-providers"), "/?tab=llm-providers");
+});
+
+test("fetched provider models preserve a valid selection or choose the first", () => {
+  assert.equal(chooseFetchedModel("model-b", ["model-a", "model-b"]), "model-b");
+  assert.equal(chooseFetchedModel("missing", ["model-a", "model-b"]), "model-a");
+  assert.equal(chooseFetchedModel("manual", []), "manual");
 });

@@ -35,6 +35,11 @@ export function resolvePostLoginPath(isAdmin: boolean, requestedPath: string): s
   return isAdmin && requestedPath === "/" ? "/?tab=admin" : requestedPath;
 }
 
+export function chooseFetchedModel(currentModel: string, models: string[]): string {
+  if (models.length === 0 || models.includes(currentModel)) return currentModel;
+  return models[0];
+}
+
 export function mergeById<T extends { id: number }>(
   current: T[],
   next: T[],

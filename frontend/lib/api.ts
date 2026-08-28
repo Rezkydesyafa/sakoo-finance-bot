@@ -336,6 +336,17 @@ export type LlmProviderListResponse = {
   items: LlmProvider[];
 };
 
+export type LlmProviderModelsResponse = {
+  models: string[];
+  total: number;
+};
+
+export type LlmProviderCheckResponse = {
+  ok: boolean;
+  latency_ms: number;
+  model_count: number;
+};
+
 type ApiRequestOptions = RequestInit & {
   token?: string;
   query?: Record<string, string | number | boolean | undefined | null>;
@@ -477,6 +488,13 @@ export const apiClient = {
       }),
     delete: (token: string, id: number) =>
       apiRequest<void>(`/admin/llm-providers/${id}`, { method: "DELETE", token }),
+    models: (token: string, id: number) =>
+      apiRequest<LlmProviderModelsResponse>(`/admin/llm-providers/${id}/models`, { token }),
+    check: (token: string, id: number) =>
+      apiRequest<LlmProviderCheckResponse>(`/admin/llm-providers/${id}/check`, {
+        method: "POST",
+        token,
+      }),
   },
 
   reports: {
