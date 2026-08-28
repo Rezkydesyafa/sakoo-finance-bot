@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import asyncio
+from time import perf_counter
 from typing import Annotated
 
+import httpx
 from cryptography.fernet import Fernet
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import AnyHttpUrl, BaseModel, Field
+from pydantic import AnyHttpUrl, BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -25,6 +28,11 @@ class ProviderCreate(BaseModel):
     enabled: bool = True
     priority: int = Field(default=100, ge=0)
 
+    @field_validator("base_url")
+    @classmethod
+    def validate_base_url(cls, value: AnyHttpUrl) -> AnyHttpUrl:
+        return _validate_provider_base_url(value)
+
 
 class ProviderUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=80, pattern=r"^[a-z0-9][a-z0-9_-]*$")
@@ -33,6 +41,11 @@ class ProviderUpdate(BaseModel):
     model: str | None = Field(default=None, min_length=1, max_length=255)
     enabled: bool | None = None
     priority: int | None = Field(default=None, ge=0)
+
+    @field_validator("base_url")
+    @classmethod
+    def validate_base_url(cls, value: AnyHttpUrl | None) -> AnyHttpUrl | None:
+        return _validate_provider_base_url(value) if value is not None else None
 
 
 class ProviderResponse(BaseModel):
@@ -48,6 +61,17 @@ class ProviderResponse(BaseModel):
 class ProviderListResponse(BaseModel):
     items: list[ProviderResponse]
     total: int
+
+
+class ProviderModelsResponse(BaseModel):
+    models: list[str]
+    total: int
+
+
+class ProviderCheckResponse(BaseModel):
+    ok: bool
+    latency_ms: int
+    model_count: int
 
 
 def require_admin(user: Annotated[User, Depends(get_current_user)]) -> User:
@@ -91,6 +115,84 @@ def get_provider(provider_id: int, _: Annotated[User, Depends(require_admin)], d
     if provider is None:
         raise HTTPException(status_code=404, detail="Provider not found")
     return _response(provider, _fernet())
+
+
+def _validate_provider_base_url(value: AnyHttpUrl) -> AnyHttpUrl:
+    if value.query or value.fragment or value.username or value.password:
+        raise ValueError("Provider base URL cannot contain credentials, query, or fragment")
+    return value
+
+
+async def _request_provider_models(url: str, api_key: str) -> object:
+    async with asyncio.timeout(10):
+        async with httpx.AsyncClient(timeout=httpx.Timeout(10.0)) as client:
+            response = await client.get(
+                url,
+                headers={"Authorization": f"Bearer {api_key}"},
+            )
+            response.raise_for_status()
+            return response.json()
+
+
+async def _fetch_provider_models(provider: LlmProvider) -> list[str]:
+    api_key = _fernet().decrypt(provider.api_key_encrypted.encode()).decode()
+    try:
+        payload = await _request_provider_models(
+            f"{provider.base_url.rstrip('/')}/models", api_key
+        )
+    except (httpx.HTTPError, ValueError, TimeoutError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Provider connection failed",
+        ) from exc
+
+    data = payload.get("data") if isinstance(payload, dict) else None
+    if not isinstance(data, list):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Provider returned an invalid models response",
+        )
+    return sorted(
+        {
+            model_id.strip()
+            for item in data
+            if isinstance(item, dict)
+            and isinstance((model_id := item.get("id")), str)
+            and model_id.strip()
+        }
+    )
+
+
+@router.get("/{provider_id}/models", response_model=ProviderModelsResponse)
+async def fetch_provider_models(
+    provider_id: int,
+    _: Annotated[User, Depends(require_admin)],
+    db: Annotated[Session, Depends(get_db)],
+) -> ProviderModelsResponse:
+    provider = db.get(LlmProvider, provider_id)
+    if provider is None:
+        raise HTTPException(status_code=404, detail="Provider not found")
+    models = await _fetch_provider_models(provider)
+    return ProviderModelsResponse(models=models, total=len(models))
+
+
+@router.post("/{provider_id}/check", response_model=ProviderCheckResponse)
+async def check_provider_connection(
+    provider_id: int,
+    _: Annotated[User, Depends(require_admin)],
+    db: Annotated[Session, Depends(get_db)],
+) -> ProviderCheckResponse:
+    provider = db.get(LlmProvider, provider_id)
+    if provider is None:
+        raise HTTPException(status_code=404, detail="Provider not found")
+    started_at = perf_counter()
+    models = await _fetch_provider_models(provider)
+    latency_ms = max(0, round((perf_counter() - started_at) * 1000))
+    return ProviderCheckResponse(
+        ok=True,
+        latency_ms=latency_ms,
+        model_count=len(models),
+    )
 
 
 @router.post("", response_model=ProviderResponse, status_code=201)

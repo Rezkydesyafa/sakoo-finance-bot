@@ -218,6 +218,126 @@ def test_admin_can_rename_provider_and_conflict_is_rejected(
     assert conflict.status_code == 409
 
 
+def test_admin_can_check_connection_and_fetch_provider_models(
+    test_client: tuple[TestClient, sessionmaker[Session]], monkeypatch
+) -> None:
+    monkeypatch.setenv("ADMIN_EMAILS", "admin@example.com")
+    monkeypatch.setenv(
+        "LLM_PROVIDER_ENCRYPTION_KEY", "9iIaG4ck34QLyNpGZI10M4aJ0LEoGZPmnysAzfQ7pA8="
+    )
+    get_settings.cache_clear()
+    client, _ = test_client
+    token = _register_and_login(client, "admin@example.com")
+    headers = _auth_headers(token)
+    created = client.post(
+        "/api/admin/llm-providers",
+        headers=headers,
+        json={
+            "name": "gateway",
+            "base_url": "https://llm.example.com/v1",
+            "api_key": "provider-secret",
+            "model": "model-a",
+        },
+    )
+    provider_id = created.json()["id"]
+
+    async def fake_request(url: str, api_key: str):
+        assert url == "https://llm.example.com/v1/models"
+        assert api_key == "provider-secret"
+        return {
+            "data": [
+                {"id": "model-z"},
+                {"id": "model-a"},
+                {"id": "model-z"},
+                {"name": "ignored"},
+            ]
+        }
+
+    monkeypatch.setattr(
+        "app.modules.admin_llm_providers._request_provider_models", fake_request
+    )
+
+    models = client.get(
+        f"/api/admin/llm-providers/{provider_id}/models", headers=headers
+    )
+    assert models.status_code == 200
+    assert models.json() == {"models": ["model-a", "model-z"], "total": 2}
+
+    checked = client.post(
+        f"/api/admin/llm-providers/{provider_id}/check", headers=headers
+    )
+    assert checked.status_code == 200
+    assert checked.json()["ok"] is True
+    assert checked.json()["model_count"] == 2
+    assert isinstance(checked.json()["latency_ms"], int)
+
+
+def test_provider_connection_failure_is_sanitized(
+    test_client: tuple[TestClient, sessionmaker[Session]], monkeypatch
+) -> None:
+    monkeypatch.setenv("ADMIN_EMAILS", "admin@example.com")
+    monkeypatch.setenv(
+        "LLM_PROVIDER_ENCRYPTION_KEY", "9iIaG4ck34QLyNpGZI10M4aJ0LEoGZPmnysAzfQ7pA8="
+    )
+    get_settings.cache_clear()
+    client, _ = test_client
+    token = _register_and_login(client, "admin@example.com")
+    headers = _auth_headers(token)
+    created = client.post(
+        "/api/admin/llm-providers",
+        headers=headers,
+        json={
+            "name": "offline",
+            "base_url": "https://offline.example.com/v1",
+            "api_key": "do-not-leak-this-key",
+            "model": "model-a",
+        },
+    )
+    provider_id = created.json()["id"]
+
+    async def fail_request(*_args, **_kwargs):
+        import httpx
+
+        raise httpx.ConnectError("connection failed with do-not-leak-this-key")
+
+    monkeypatch.setattr(
+        "app.modules.admin_llm_providers._request_provider_models", fail_request
+    )
+    response = client.post(
+        f"/api/admin/llm-providers/{provider_id}/check", headers=headers
+    )
+    assert response.status_code == 502
+    assert response.json()["detail"] == "Provider connection failed"
+    assert "do-not-leak" not in response.text
+
+
+def test_provider_base_url_rejects_query_fragment_and_embedded_credentials(
+    test_client: tuple[TestClient, sessionmaker[Session]], monkeypatch
+) -> None:
+    monkeypatch.setenv("ADMIN_EMAILS", "admin@example.com")
+    get_settings.cache_clear()
+    client, _ = test_client
+    token = _register_and_login(client, "admin@example.com")
+    headers = _auth_headers(token)
+
+    for base_url in (
+        "https://llm.example.com/v1?tenant=x",
+        "https://llm.example.com/v1#models",
+        "https://user:password@llm.example.com/v1",
+    ):
+        response = client.post(
+            "/api/admin/llm-providers",
+            headers=headers,
+            json={
+                "name": "invalid-url",
+                "base_url": base_url,
+                "api_key": "secret",
+                "model": "model-a",
+            },
+        )
+        assert response.status_code == 422
+
+
 def test_migration_creates_llm_providers_table() -> None:
     # Covered by the Alembic migration smoke test; this names the public schema contract.
     from app.models import LlmProvider
