@@ -132,6 +132,7 @@ def request_openai_chat_completion(
     payload = {
         "model": model,
         "messages": messages,
+        "stream": False,
         "temperature": temperature,
         "max_tokens": max_tokens,
     }
