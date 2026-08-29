@@ -334,6 +334,7 @@ def test_custom_provider_sends_openai_compatible_request(
     payload = captured["payload"]
     assert isinstance(payload, dict)
     assert payload["model"] == "premium-coding"
+    assert payload["stream"] is False
     assert payload["messages"][0]["role"] == "system"
     assert payload["messages"][1]["role"] == "user"
 
