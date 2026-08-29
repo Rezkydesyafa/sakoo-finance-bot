@@ -131,6 +131,38 @@ def test_llm_chat_falls_back_to_next_provider(monkeypatch: pytest.MonkeyPatch) -
     assert result == "Aman, pengeluaran masih di bawah saldo."
 
 
+def test_llm_chat_retries_an_incomplete_sentence(monkeypatch: pytest.MonkeyPatch) -> None:
+    class RetryProvider:
+        provider_name = "custom:9router"
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def answer_finance_question(self, _message: str, *, context: str) -> str:
+            assert "Saldo total" in context
+            self.calls += 1
+            return (
+                "Saldo total kamu saat"
+                if self.calls == 1
+                else "Saldo total kamu saat ini masih aman."
+            )
+
+    provider = RetryProvider()
+    monkeypatch.setattr(
+        "app.modules.llm.llm_router.get_llm_providers",
+        lambda _settings: [provider],
+    )
+
+    result = answer_finance_question_with_llm(
+        "jelaskan kondisi keuanganku",
+        context="Saldo total: Rp100.000 Pengeluaran bulan ini: Rp50.000",
+        settings=_settings(llm_provider="gemini"),
+    )
+
+    assert result == "Saldo total kamu saat ini masih aman."
+    assert provider.calls == 2
+
+
 @pytest.mark.parametrize(
     "custom_providers",
     [

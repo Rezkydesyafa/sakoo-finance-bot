@@ -88,34 +88,38 @@ def answer_finance_question_with_llm(
 
     errors: list[str] = []
     for provider in providers:
-        try:
-            answer = provider.answer_finance_question(message, context=context)
-        except LlmProviderError as exc:
-            errors.append(f"{provider.provider_name}:{exc.detail}")
-            continue
+        for _attempt in range(2):
+            try:
+                answer = provider.answer_finance_question(message, context=context)
+            except LlmProviderError as exc:
+                errors.append(f"{provider.provider_name}:{exc.detail}")
+                break
 
-        cleaned = _clean_answer(answer)
-        if not cleaned:
-            errors.append(f"{provider.provider_name}:empty_answer")
-            continue
+            cleaned = _clean_answer(answer)
+            if not cleaned:
+                errors.append(f"{provider.provider_name}:empty_answer")
+                break
+            if not _has_complete_sentence_ending(cleaned):
+                errors.append(f"{provider.provider_name}:incomplete_answer")
+                continue
 
-        if db is not None and user_id is not None and state is not None:
-            log_llm_usage(
-                db,
-                user_id=user_id,
-                provider=provider.provider_name,
-                result={
-                    "intent": "finance_chat",
-                    "type": None,
-                    "amount": None,
-                    "category": None,
-                    "confidence": 1,
-                    "need_confirmation": False,
-                },
-                state=state,
-            )
+            if db is not None and user_id is not None and state is not None:
+                log_llm_usage(
+                    db,
+                    user_id=user_id,
+                    provider=provider.provider_name,
+                    result={
+                        "intent": "finance_chat",
+                        "type": None,
+                        "amount": None,
+                        "category": None,
+                        "confidence": 1,
+                        "need_confirmation": False,
+                    },
+                    state=state,
+                )
 
-        return cleaned
+            return cleaned
 
     detail = ";".join(errors) if errors else "no_provider_attempted"
     raise LlmProviderError(f"llm_all_providers_failed:{detail}")
@@ -268,6 +272,11 @@ def _parse_provider_names(value: str) -> list[str]:
 def _clean_answer(value: str) -> str:
     text = re.sub(r"\s+\n", "\n", str(value or "")).strip()
     return text[:1800]
+
+
+def _has_complete_sentence_ending(value: str) -> bool:
+    """Reject model output that stops mid-sentence before it reaches Telegram."""
+    return bool(re.search(r"[.!?…](?:\W|_)*$", value.strip()))
 
 
 def _gemini_api_keys(settings: Settings) -> list[str]:
