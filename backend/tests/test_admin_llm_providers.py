@@ -311,6 +311,57 @@ def test_provider_connection_failure_is_sanitized(
     assert "do-not-leak" not in response.text
 
 
+def test_non_admin_is_forbidden_from_checking_or_fetching_models(
+    test_client: tuple[TestClient, sessionmaker[Session]], monkeypatch
+) -> None:
+    monkeypatch.setenv("ADMIN_EMAILS", "admin@example.com")
+    get_settings.cache_clear()
+    client, _ = test_client
+    user_token = _register_and_login(client, "user@example.com")
+    headers = _auth_headers(user_token)
+
+    assert client.post("/api/admin/llm-providers/999/check", headers=headers).status_code == 403
+    assert client.get("/api/admin/llm-providers/999/models", headers=headers).status_code == 403
+
+
+def test_malformed_models_response_is_rejected_without_leaking_api_key(
+    test_client: tuple[TestClient, sessionmaker[Session]], monkeypatch
+) -> None:
+    monkeypatch.setenv("ADMIN_EMAILS", "admin@example.com")
+    monkeypatch.setenv(
+        "LLM_PROVIDER_ENCRYPTION_KEY", "9iIaG4ck34QLyNpGZI10M4aJ0LEoGZPmnysAzfQ7pA8="
+    )
+    get_settings.cache_clear()
+    client, _ = test_client
+    token = _register_and_login(client, "admin@example.com")
+    headers = _auth_headers(token)
+    created = client.post(
+        "/api/admin/llm-providers",
+        headers=headers,
+        json={
+            "name": "malformed-response",
+            "base_url": "https://llm.example.com/v1",
+            "api_key": "do-not-leak-this-key",
+            "model": "model-a",
+        },
+    )
+    provider_id = created.json()["id"]
+
+    async def malformed_request(*_args, **_kwargs):
+        return {"data": {"id": "not-a-list"}}
+
+    monkeypatch.setattr(
+        "app.modules.admin_llm_providers._request_provider_models", malformed_request
+    )
+    response = client.get(
+        f"/api/admin/llm-providers/{provider_id}/models", headers=headers
+    )
+
+    assert response.status_code == 502
+    assert response.json()["detail"] == "Provider returned an invalid models response"
+    assert "do-not-leak" not in response.text
+
+
 def test_provider_base_url_rejects_query_fragment_and_embedded_credentials(
     test_client: tuple[TestClient, sessionmaker[Session]], monkeypatch
 ) -> None:
