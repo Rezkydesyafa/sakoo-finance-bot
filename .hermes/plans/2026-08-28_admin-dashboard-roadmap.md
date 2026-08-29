@@ -17,7 +17,7 @@
 - LLM Providers tersedia di `/?tab=llm-providers`.
 - API key provider dienkripsi Fernet dan tidak pernah dikembalikan mentah.
 - Provider database aktif mengoverride env fallback chain.
-- Check Connection dan Fetch Models sedang ditambahkan pada branch `feat/provider-model-discovery`.
+- Check Connection dan Fetch Models sudah delivered di production; fase berikutnya menyimpan health metrics historis per provider.
 - Deployment production memakai self-hosted runner, GHCR, dan Docker Compose project `docker`.
 
 ## Product Principles
