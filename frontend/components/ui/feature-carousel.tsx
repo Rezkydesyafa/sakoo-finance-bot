@@ -64,7 +64,6 @@ const FEATURES = [
 ];
 
 const AUTO_PLAY_INTERVAL = 3500;
-const ITEM_HEIGHT = 65;
 
 const wrap = (min: number, max: number, v: number) => {
   const rangeSize = max - min;
@@ -74,6 +73,7 @@ const wrap = (min: number, max: number, v: number) => {
 export function FeatureCarousel() {
   const [step, setStep] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  const [itemHeight, setItemHeight] = useState(65);
 
   const currentIndex =
     ((step % FEATURES.length) + FEATURES.length) % FEATURES.length;
@@ -86,6 +86,19 @@ export function FeatureCarousel() {
     const diff = (index - currentIndex + FEATURES.length) % FEATURES.length;
     if (diff > 0) setStep((s) => s + diff);
   };
+
+  useEffect(() => {
+    const updateItemHeight = () => {
+      if (window.innerWidth < 768) {
+        setItemHeight(54);
+      } else {
+        setItemHeight(65);
+      }
+    };
+    updateItemHeight();
+    window.addEventListener("resize", updateItemHeight);
+    return () => window.removeEventListener("resize", updateItemHeight);
+  }, []);
 
   useEffect(() => {
     if (isPaused) return;
@@ -111,16 +124,16 @@ export function FeatureCarousel() {
     <div className="w-full max-w-7xl mx-auto md:p-8">
       <div className="relative overflow-hidden rounded-[2.5rem] lg:rounded-[3.5rem] flex flex-col lg:flex-row min-h-[580px] lg:aspect-video border border-[#E8E8E8] shadow-sm bg-white">
         {/* Left Feature Selection Column */}
-        <div className="w-full lg:w-[42%] min-h-[350px] md:min-h-[420px] lg:h-full relative z-30 flex flex-col items-start justify-center overflow-hidden px-6 md:px-12 lg:pl-12 bg-[#202020]">
+        <div className="w-full lg:w-[42%] min-h-[360px] md:min-h-[420px] lg:h-full relative z-30 flex flex-col items-start justify-center overflow-hidden px-6 md:px-12 lg:pl-12 bg-[#202020] pt-16 md:pt-0">
           
-          {/* Static Title Header above the active scrolling list */}
-          <div className="absolute top-8 left-6 md:left-12 z-50 pointer-events-none">
+          {/* Header Title Position */}
+          <div className="absolute top-5 left-6 md:top-8 md:left-12 z-50 pointer-events-none">
             <span className="text-[#c7ff00] text-[10px] font-semibold uppercase tracking-[0.25em]">Fitur Unggulan</span>
-            <h3 className="text-white text-base font-semibold mt-1">Jelajahi Sakoo AI</h3>
+            <h3 className="text-white text-sm md:text-base font-semibold mt-0.5">Jelajahi Sakoo AI</h3>
           </div>
 
-          <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-[#202020] via-[#202020]/80 to-transparent z-40" />
-          <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#202020] via-[#202020]/80 to-transparent z-40" />
+          <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-[#202020] via-[#202020]/90 to-transparent z-40" />
+          <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#202020] via-[#202020]/90 to-transparent z-40" />
           
           <div className="relative w-full h-full flex items-center justify-center lg:justify-start z-20">
             {FEATURES.map((feature, index) => {
@@ -136,11 +149,11 @@ export function FeatureCarousel() {
                 <motion.div
                   key={feature.id}
                   style={{
-                    height: ITEM_HEIGHT,
+                    height: itemHeight,
                     width: "fit-content",
                   }}
                   animate={{
-                    y: (wrappedDistance * ITEM_HEIGHT) + 20, // offset down slightly to avoid overlapping header
+                    y: (wrappedDistance * itemHeight) + 30, // Extra vertical clearance for mobile header
                     opacity: 1 - Math.abs(wrappedDistance) * 0.28,
                   }}
                   transition={{
@@ -156,7 +169,7 @@ export function FeatureCarousel() {
                     onMouseEnter={() => setIsPaused(true)}
                     onMouseLeave={() => setIsPaused(false)}
                     className={cn(
-                      "relative flex items-center gap-3.5 px-6 md:px-8 py-3.5 rounded-full transition-all duration-500 text-left group border text-xs md:text-sm font-semibold tracking-tight",
+                      "relative flex items-center gap-2.5 md:gap-3.5 px-4 md:px-8 py-2.5 md:py-3.5 rounded-full transition-all duration-500 text-left group border text-[11px] md:text-sm font-semibold tracking-tight",
                       isActive
                         ? "bg-[#c7ff00] text-[#151f00] border-[#c7ff00] z-10 shadow-md scale-105"
                         : "bg-transparent text-white/60 border-white/10 hover:border-white/30 hover:text-white"
@@ -170,7 +183,7 @@ export function FeatureCarousel() {
                     >
                       <HugeiconsIcon
                         icon={feature.icon}
-                        size={18}
+                        size={16}
                         strokeWidth={2}
                       />
                     </div>
@@ -249,7 +262,6 @@ export function FeatureCarousel() {
                       isActive ? "opacity-100" : "opacity-0"
                     )}
                   >
-                    {/* Dot has been removed as requested */}
                     <span className="text-white/90 text-[10px] font-semibold uppercase tracking-[0.2em]">
                       Sakoo AI Feature
                     </span>
