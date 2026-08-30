@@ -365,6 +365,9 @@ export class ApiError extends Error {
 }
 
 export const apiClient = {
+  getAdminStats: (token: string) => apiRequest<{ total_users: number; active_users: number; total_transactions: number; total_llm_requests: number }>("/admin/stats", { method: "GET", token }),
+  getAdminLlmLogs: (token: string) => apiRequest<{ items: { id: number; user_id: number | null; user_name: string | null; user_email: string | null; platform: string; message_type: string; provider: string | null; intent: string | null; status: string; raw_message: string | null; created_at: string }[]; total: number }>("/admin/llm-logs", { method: "GET", token }),
+  getAdminUsers: (token: string) => apiRequest<{ items: { id: number; name: string; email: string; phone_number: string | null; created_at: string; transaction_count: number; last_active: string | null }[]; total: number }>("/admin/users", { method: "GET", token }),
   health: () => serviceRequest<HealthResponse>("/health"),
   databaseHealth: () => serviceRequest<HealthResponse>("/health/db"),
   wahaHealth: () => serviceRequest<HealthResponse>("/health/waha"),
