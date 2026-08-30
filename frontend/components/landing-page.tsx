@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { BrandMark } from "@/components/brand-mark";
 import { PricingBasic } from "@/components/blocks/pricing-demo";
+import { FeatureCarousel } from "@/components/ui/feature-carousel";
 
 const revealSelector = "[data-scroll-reveal]";
 
@@ -11,13 +12,6 @@ const stats = [
   ["2k+", "active users"],
   ["30 sec", "average logging time"],
   ["3", "chat channels"],
-];
-
-const features = [
-  ["chat", "Chat Transaction", "Record expenses in seconds using natural language."],
-  ["document_scanner", "Receipt Scanner", "Snap a receipt and let OCR extract the total."],
-  ["mic", "Voice Note Input", "Send a quick voice note when typing is too slow."],
-  ["picture_as_pdf", "PDF Reports", "Export weekly and monthly reports in one click."],
 ];
 
 const dashboardItems = [
@@ -132,7 +126,7 @@ export function LandingPage() {
         <div className="mx-auto grid min-h-[720px] max-w-[1500px] items-center gap-12 overflow-hidden rounded-[40px] bg-[#202020] p-8 text-white shadow-[0_28px_80px_rgba(0,0,0,0.22)] md:p-16 lg:grid-cols-[1fr_620px] lg:p-20">
           <div data-scroll-reveal="rise" className="scroll-reveal relative z-10">
             <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-2 pr-4 backdrop-blur-sm">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white p-1">
+              <span className="flex h-6 w-6 items-center justify-center p-0">
                 <BrandMark className="h-full w-full" />
               </span>
               <span className="text-sm font-semibold text-white/90">AI finance assistant made easy</span>
@@ -300,7 +294,7 @@ export function LandingPage() {
         </div>
       </section>
 
-      <section id="pricing" className="py-12 bg-white/40 border-y border-[#E8E8E8]">
+      <section id="pricing" className="py-12 bg-[#f9f9f7] border-y border-[#E8E8E8]">
         <PricingBasic />
       </section>
 
@@ -322,30 +316,17 @@ export function LandingPage() {
         </div>
       </section>
 
-      <section id="features" className="mx-auto max-w-[1440px] rounded-[40px] bg-[#f1f2f0] px-5 py-24 md:px-8">
-        <div data-scroll-reveal="zoom" className="scroll-reveal mb-16 text-center">
+      <section id="features" className="mx-auto max-w-[1440px] px-5 py-12 md:px-8">
+        <div data-scroll-reveal="zoom" className="scroll-reveal mb-12 text-center">
           <h2 className="mb-4 text-4xl font-semibold leading-tight tracking-[-0.03em] md:text-5xl">
-            Powerful tools, simple interface
+            Fitur Utama Sakoo Finance Bot
           </h2>
           <p className="mx-auto max-w-2xl text-base leading-7 text-[#6f6f6f]">
-            Everything you need to manage your money, powered by intelligent automation.
+            Semua yang Anda butuhkan untuk memantau pengeluaran harian secara pintar menggunakan AI, terintegrasi langsung dengan platform chat.
           </p>
         </div>
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {features.map(([icon, title, body], index) => (
-            <div
-              key={title}
-              data-scroll-reveal="rise"
-              className="scroll-reveal rounded-3xl border border-[#e8e8e8] bg-white p-8 shadow-[0_10px_30px_rgba(0,0,0,0.06)] transition-transform duration-300 hover:-translate-y-2"
-              style={{ transitionDelay: `${index * 90}ms` }}
-            >
-              <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#c7ff00]/20 text-[#202020]">
-                <span className="material-symbols-outlined text-2xl">{icon}</span>
-              </div>
-              <h3 className="mb-3 text-base font-semibold">{title}</h3>
-              <p className="text-sm leading-6 text-[#6f6f6f]">{body}</p>
-            </div>
-          ))}
+        <div data-scroll-reveal="rise" className="scroll-reveal">
+          <FeatureCarousel />
         </div>
       </section>
 

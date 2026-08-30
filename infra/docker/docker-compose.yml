@@ -1,6 +1,8 @@
 services:
   backend:
-    image: ghcr.io/rezkydesyafa/sakoo-backend:latest
+    build:
+      context: ../../backend
+    image: sakoo-backend:dev
     command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
     restart: unless-stopped
     extra_hosts:
@@ -9,6 +11,7 @@ services:
       - ../../.env
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}
+      LLM_PROVIDER_ENCRYPTION_KEY: ${LLM_PROVIDER_ENCRYPTION_KEY:-AU7vswntYIbGPVP2ckOAUuf7pbazg5VU7hyzPPFf1Uk=}
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0

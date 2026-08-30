@@ -119,10 +119,10 @@ export function Pricing({
               opacity: { duration: 0.5 },
             }}
             className={cn(
-              `rounded-2xl border p-6 bg-white text-center flex flex-col relative transition-all duration-300 shadow-sm`,
+              `rounded-2xl border p-6 bg-white text-center flex flex-col relative transition-all duration-300 hover:shadow-xl hover:-translate-y-2`,
               plan.isPopular
                 ? "border-[#c7ff00] ring-2 ring-[#c7ff00]/40 shadow-md bg-[#ffffff]"
-                : "border-[#E8E8E8]",
+                : "border-[#E8E8E8] shadow-sm",
               !plan.isPopular && "mt-0"
             )}
           >
