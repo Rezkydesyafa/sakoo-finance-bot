@@ -92,7 +92,7 @@ export function ConnectedBots({ displayMode = "all" }: { displayMode?: "all" | "
             currentParams.set("tab", "integrations");
             window.location.search = currentParams.toString();
           }}
-          className="bg-[#c7ff00] text-[#151f00] px-4 py-2 rounded-full text-xs font-bold hover:bg-[#bff500] border-none cursor-pointer"
+          className="bg-[#c7ff00] text-[#151f00] px-4 py-2 rounded-full text-xs font-semibold hover:bg-[#bff500] border-none cursor-pointer"
         >
           Hubungkan Bot
         </button>
@@ -325,13 +325,13 @@ function BotChannelsGrid({
             Untuk menghubungkan ke {target}, salin kode berikut dan kirim ke bot:
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <code className="min-w-0 flex-1 rounded-xl bg-white px-4 py-3 text-sm font-bold text-[#1a1c1b] border border-[#E8E8E8]">
+            <code className="min-w-0 flex-1 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-[#1a1c1b] border border-[#E8E8E8]">
               {command}
             </code>
             <button
               type="button"
               onClick={copyCommand}
-              className="rounded-xl bg-[#c7ff00] px-6 py-3 text-[13px] font-bold text-[#151f00] hover:bg-[#bff500] border-none cursor-pointer shadow-sm active:scale-95 transition-transform"
+              className="rounded-xl bg-[#c7ff00] px-6 py-3 text-[13px] font-semibold text-[#151f00] hover:bg-[#bff500] border-none cursor-pointer shadow-sm active:scale-95 transition-transform"
             >
               Copy Code
             </button>
@@ -351,7 +351,7 @@ function BotChannelsGrid({
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#E8E8E8]">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
             <div>
-              <h2 className="text-[20px] font-bold text-[#1a1c1b]">Command Settings</h2>
+              <h2 className="text-[20px] font-semibold text-[#1a1c1b]">Command Settings</h2>
               <p className="text-[14px] text-[#6F6F6F] mt-1">Configure global bot behavior across all active channels.</p>
             </div>
             <button disabled title="Pengaturan bot belum tersedia" className="px-4 py-2 rounded-full border border-[#E8E8E8] bg-transparent text-[#6F6F6F] font-semibold text-[13px] whitespace-nowrap cursor-not-allowed opacity-60">
@@ -432,13 +432,13 @@ function BotRow({
             </svg>
           </div>
           <div className="flex flex-col">
-            <span className="text-[15px] font-bold text-white leading-tight">Telegram</span>
+            <span className="text-[15px] font-semibold text-white leading-tight">Telegram</span>
             <span className="text-[12px] text-[#A0A29C] leading-tight mt-0.5">{detail}</span>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <span className={`w-2 h-2 rounded-full ${isLinked ? "bg-[#c7ff00]" : "bg-neutral-500"}`}></span>
-          <span className={`text-[12px] font-bold ${isLinked ? "text-[#c7ff00]" : "text-neutral-400"}`}>
+          <span className={`text-[12px] font-semibold ${isLinked ? "text-[#c7ff00]" : "text-neutral-400"}`}>
             {isLoading ? "..." : isLinked ? "Connected" : "Connect"}
           </span>
         </div>
@@ -458,7 +458,7 @@ function BotRow({
           </svg>
         </div>
         <div className="flex flex-col">
-          <span className="text-[15px] font-bold text-[#1a1c1b] leading-tight">WhatsApp</span>
+          <span className="text-[15px] font-semibold text-[#1a1c1b] leading-tight">WhatsApp</span>
           <span className="text-[12px] text-[#6F6F6F] leading-tight mt-0.5">{detail}</span>
         </div>
       </div>
@@ -519,13 +519,13 @@ function BotChannelsMobileList({
                 </svg>
               </div>
               <div className="flex flex-col">
-                <span className="text-[15px] font-bold text-white leading-tight">Telegram</span>
+                <span className="text-[15px] font-semibold text-white leading-tight">Telegram</span>
                 <span className="text-[12px] text-[#A0A29C] leading-tight mt-0.5">{telegramAcc?.platform_user_id ? `@${telegramAcc.platform_user_id}` : "@SakooFinanceBot"}</span>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <span className={`w-2 h-2 rounded-full ${telegramAcc?.is_active ? "bg-[#c7ff00]" : "bg-neutral-500"}`}></span>
-              <span className={`text-[12px] font-bold ${telegramAcc?.is_active ? "text-[#c7ff00]" : "text-neutral-400"}`}>
+              <span className={`text-[12px] font-semibold ${telegramAcc?.is_active ? "text-[#c7ff00]" : "text-neutral-400"}`}>
                 {loadingTarget === "Telegram" ? "..." : telegramAcc?.is_active ? "Connected" : "Connect"}
               </span>
             </div>
@@ -543,7 +543,7 @@ function BotChannelsMobileList({
                 </svg>
               </div>
               <div className="flex flex-col">
-                <span className="text-[15px] font-bold text-[#1a1c1b] leading-tight">WhatsApp</span>
+                <span className="text-[15px] font-semibold text-[#1a1c1b] leading-tight">WhatsApp</span>
                 <span className="text-[12px] text-[#6F6F6F] leading-tight mt-0.5">{whatsappAcc?.phone_number || "+1 (555) 012-3456"}</span>
               </div>
             </div>
@@ -564,11 +564,11 @@ function BotChannelsMobileList({
                 </svg>
               </div>
               <div className="flex flex-col">
-                <span className="text-[15px] font-bold text-[#1a1c1b] leading-tight">Discord</span>
+                <span className="text-[15px] font-semibold text-[#1a1c1b] leading-tight">Discord</span>
                 <span className="text-[12px] text-[#6F6F6F] leading-tight mt-0.5">Not linked</span>
               </div>
             </div>
-            <button disabled className="px-4 py-2 rounded-full bg-[#6F6F6F] text-white text-[12px] font-bold border-none opacity-90">
+            <button disabled className="px-4 py-2 rounded-full bg-[#6F6F6F] text-white text-[12px] font-semibold border-none opacity-90">
               Connect
             </button>
           </div>
@@ -582,12 +582,12 @@ function BotChannelsMobileList({
             Kirim kode ke {target}:
           </p>
           <div className="flex items-center gap-3">
-            <code className="flex-1 rounded-xl bg-white px-3 py-2 text-[13px] font-bold text-[#1a1c1b] border border-[#E8E8E8]">
+            <code className="flex-1 rounded-xl bg-white px-3 py-2 text-[13px] font-semibold text-[#1a1c1b] border border-[#E8E8E8]">
               {command}
             </code>
             <button
               onClick={copyCommand}
-              className="rounded-xl bg-[#c7ff00] px-4 py-2 text-[12px] font-bold text-[#151f00] border-none active:scale-95 transition-transform"
+              className="rounded-xl bg-[#c7ff00] px-4 py-2 text-[12px] font-semibold text-[#151f00] border-none active:scale-95 transition-transform"
             >
               Copy
             </button>
@@ -602,7 +602,7 @@ function BotChannelsMobileList({
           
           <div className="py-4 flex items-center justify-between">
             <div className="flex flex-col gap-0.5">
-              <span className="text-[14px] font-bold text-[#1a1c1b]">Auto-categorization</span>
+              <span className="text-[14px] font-semibold text-[#1a1c1b]">Auto-categorization</span>
               <span className="text-[12px] text-[#6F6F6F]">AI labels new expenses</span>
             </div>
             <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
@@ -613,7 +613,7 @@ function BotChannelsMobileList({
 
           <div className="py-4 flex items-center justify-between">
             <div className="flex flex-col gap-0.5">
-              <span className="text-[14px] font-bold text-[#1a1c1b]">Daily Summaries</span>
+              <span className="text-[14px] font-semibold text-[#1a1c1b]">Daily Summaries</span>
               <span className="text-[12px] text-[#6F6F6F]">Receive a morning brief</span>
             </div>
             <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
@@ -624,7 +624,7 @@ function BotChannelsMobileList({
 
           <div className="py-4 flex items-center justify-between">
             <div className="flex flex-col gap-0.5">
-              <span className="text-[14px] font-bold text-[#1a1c1b]">Alert Thresholds</span>
+              <span className="text-[14px] font-semibold text-[#1a1c1b]">Alert Thresholds</span>
               <span className="text-[12px] text-[#6F6F6F]">Notify on large transfers</span>
             </div>
             <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">

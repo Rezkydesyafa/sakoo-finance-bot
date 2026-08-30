@@ -126,7 +126,7 @@ export function BudgetsTab() {
                   </div>
                   <span className="text-sm font-semibold text-[#6F6F6F]">Total Budgeted</span>
                 </div>
-                <div className="text-2xl font-bold text-[#1a1c1b]">
+                <div className="text-2xl font-semibold text-[#1a1c1b]">
                   {formatCurrency(budgetData?.total_budgeted || 0)}
                 </div>
               </div>
@@ -140,13 +140,13 @@ export function BudgetsTab() {
                     </div>
                     <span className="text-sm font-semibold text-white opacity-80">Remaining</span>
                   </div>
-                  <div className={`text-[11px] font-bold px-3 py-1 rounded-full ${
+                  <div className={`text-[11px] font-semibold px-3 py-1 rounded-full ${
                     Number(budgetData?.total_remaining) < 0 ? 'bg-danger-red text-white' : 'bg-[#c7ff00] text-[#151f00]'
                   }`}>
                     {Number(budgetData?.total_remaining) < 0 ? 'Exceeded' : 'Healthy'}
                   </div>
                 </div>
-                <div className="text-2xl font-bold text-white relative z-10">
+                <div className="text-2xl font-semibold text-white relative z-10">
                   {formatCurrency(budgetData?.total_remaining || 0)}
                 </div>
               </div>
@@ -158,7 +158,7 @@ export function BudgetsTab() {
                   </div>
                   <span className="text-sm font-semibold text-[#6F6F6F]">Total Spent</span>
                 </div>
-                <div className="text-2xl font-bold text-[#1a1c1b]">
+                <div className="text-2xl font-semibold text-[#1a1c1b]">
                   {formatCurrency(budgetData?.total_spent || 0)}
                 </div>
               </div>
@@ -179,7 +179,7 @@ export function BudgetsTab() {
                       <div className="p-8 text-center text-[#6F6F6F]">
                         <span className="material-symbols-outlined text-4xl mb-2 opacity-50">account_balance_wallet</span>
                         <p className="text-sm font-medium mb-4">Anda belum mengatur limit budget untuk kategori apapun.</p>
-                        <button onClick={handleOpenNewBudget} className="bg-[#c7ff00] text-[#151f00] px-6 py-2 rounded-full font-bold text-sm border-none cursor-pointer">Set Budget Pertama</button>
+                        <button onClick={handleOpenNewBudget} className="bg-[#c7ff00] text-[#151f00] px-6 py-2 rounded-full font-semibold text-sm border-none cursor-pointer">Set Budget Pertama</button>
                       </div>
                     )}
                     
@@ -203,7 +203,7 @@ export function BudgetsTab() {
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="text-[15px] font-bold text-[#1a1c1b]">
+                            <div className="text-[15px] font-semibold text-[#1a1c1b]">
                               {formatCurrency(item.spent)} <span className="text-text-muted font-normal text-xs">/ {formatCurrency(item.monthly_limit)}</span>
                             </div>
                             <p className={`text-[11px] font-semibold mt-1 ${getStatusTextColor(item.status)}`}>
@@ -283,7 +283,7 @@ export function BudgetsTab() {
             {/* Header: Total Remaining */}
             <section className="text-center space-y-stack-sm relative z-10">
               <p className="font-label-muted text-label-muted text-text-muted">Total Remaining Budget</p>
-              <h2 className="font-headline-hero text-3xl font-bold text-text-primary dark:text-white tracking-tight">
+              <h2 className="font-headline-hero text-3xl font-semibold text-text-primary dark:text-white tracking-tight">
                 {formatCurrency(budgetData?.total_remaining || 0)}
               </h2>
               <div className="flex justify-center pt-4">

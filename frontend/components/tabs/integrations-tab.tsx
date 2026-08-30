@@ -15,7 +15,7 @@ export function IntegrationsTab() {
         >
           <span className="material-symbols-outlined text-[20px]">arrow_back</span>
         </button>
-        <h1 className="font-bold text-[18px] text-[#1a1c1b] tracking-tight">Bot Channels</h1>
+        <h1 className="font-semibold text-[18px] text-[#1a1c1b] tracking-tight">Bot Channels</h1>
       </header>
 
       {/* Main Content */}
@@ -23,7 +23,7 @@ export function IntegrationsTab() {
         <div className="max-w-6xl mx-auto flex flex-col gap-8 animate-fade-in">
           {/* Desktop Hero Header */}
           <section className="hidden md:flex flex-col gap-2 mb-2">
-            <h1 className="text-[32px] font-bold text-[#1a1c1b] leading-tight tracking-tight">Bot Channels</h1>
+            <h1 className="text-[32px] font-semibold text-[#1a1c1b] leading-tight tracking-tight">Bot Channels</h1>
             <p className="text-sm text-[#6F6F6F]">Manage your smart assistant integrations.</p>
           </section>
 

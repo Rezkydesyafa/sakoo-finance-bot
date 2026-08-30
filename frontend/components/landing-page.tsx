@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { BrandMark } from "@/components/brand-mark";
+import { PricingBasic } from "@/components/blocks/pricing-demo";
 
 const revealSelector = "[data-scroll-reveal]";
 
@@ -99,7 +100,7 @@ export function LandingPage() {
 
       <nav className="landing-nav fixed inset-x-0 top-0 z-50 border-b border-white/40 bg-white/70 backdrop-blur-xl transition-all duration-300">
         <div className="mx-auto flex h-20 max-w-[1440px] items-center justify-between px-5 md:px-8">
-          <Link href="/" className="flex items-center gap-2.5 text-2xl font-extrabold tracking-tight" aria-label="Sakoo home">
+          <Link href="/" className="flex items-center gap-2.5 text-2xl font-semibold tracking-tight" aria-label="Sakoo home">
             <BrandMark priority className="h-9 w-9 drop-shadow-[0_5px_10px_rgba(0,0,0,0.16)]" />
             <span>Sakoo.</span>
           </Link>
@@ -107,6 +108,7 @@ export function LandingPage() {
             {[
               ["Features", "#features"],
               ["Dashboard", "#dashboard"],
+              ["Pricing", "#pricing"],
               ["Bot", "#bot"],
               ["Reports", "#reports"],
             ].map(([label, href]) => (
@@ -116,10 +118,10 @@ export function LandingPage() {
             ))}
           </div>
           <div className="flex items-center gap-3">
-            <Link href="/login" className="hidden text-sm font-bold hover:opacity-70 md:block">
+            <Link href="/login" className="hidden text-sm font-semibold hover:opacity-70 md:block">
               Sign In
             </Link>
-            <Link href="/register" className="rounded-full bg-[#c7ff00] px-5 py-3 text-sm font-extrabold text-[#202020] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_24px_rgba(199,255,0,0.44)]">
+            <Link href="/register" className="rounded-full bg-[#c7ff00] px-5 py-3 text-sm font-semibold text-[#202020] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_24px_rgba(199,255,0,0.44)]">
               Get Started
             </Link>
           </div>
@@ -135,7 +137,7 @@ export function LandingPage() {
               </span>
               <span className="text-sm font-semibold text-white/90">AI finance assistant made easy</span>
             </div>
-            <h1 className="max-w-3xl text-5xl font-extrabold leading-[1.04] tracking-[-0.03em] md:text-7xl">
+            <h1 className="max-w-3xl text-5xl font-semibold leading-[1.04] tracking-[-0.03em] md:text-7xl">
               Manage your money <span className="text-[#c7ff00]">through chat.</span>
             </h1>
             <p className="mt-6 max-w-md text-base leading-7 text-white/70">
@@ -143,11 +145,11 @@ export function LandingPage() {
               builds reports, and updates your dashboard instantly.
             </p>
             <div className="mt-10 flex flex-col gap-4 sm:flex-row">
-              <Link href="/register" className="inline-flex items-center justify-center gap-2 rounded-full bg-[#c7ff00] px-8 py-4 text-sm font-extrabold text-[#202020] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_0_24px_rgba(199,255,0,0.44)]">
+              <Link href="/register" className="inline-flex items-center justify-center gap-2 rounded-full bg-[#c7ff00] px-8 py-4 text-sm font-semibold text-[#202020] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_0_24px_rgba(199,255,0,0.44)]">
                 Get Started
                 <span className="material-symbols-outlined text-sm">arrow_forward</span>
               </Link>
-              <a href="#bot" className="inline-flex items-center justify-center gap-2 rounded-full border border-white/20 bg-white/10 px-8 py-4 text-sm font-bold text-white transition-all duration-200 hover:bg-white/20">
+              <a href="#bot" className="inline-flex items-center justify-center gap-2 rounded-full border border-white/20 bg-white/10 px-8 py-4 text-sm font-semibold text-white transition-all duration-200 hover:bg-white/20">
                 <span className="material-symbols-outlined text-sm">play_circle</span>
                 Watch Demo
               </a>
@@ -160,7 +162,7 @@ export function LandingPage() {
                   className="scroll-reveal rounded-2xl border border-white/10 bg-white/5 p-4"
                   style={{ transitionDelay: `${index * 90}ms` }}
                 >
-                  <p className="text-2xl font-extrabold text-[#c7ff00]">{value}</p>
+                  <p className="text-2xl font-semibold text-[#c7ff00]">{value}</p>
                   <p className="mt-1 text-xs text-white/55">{label}</p>
                 </div>
               ))}
@@ -173,11 +175,11 @@ export function LandingPage() {
 
       <section className="px-5 py-20 text-center md:px-8">
         <div data-scroll-reveal="zoom" className="scroll-reveal mx-auto max-w-3xl">
-          <div className="mb-8 inline-flex items-center gap-2 rounded-full bg-[#202020] px-4 py-2 text-sm font-bold text-white">
+          <div className="mb-8 inline-flex items-center gap-2 rounded-full bg-[#202020] px-4 py-2 text-sm font-semibold text-white">
             <span className="material-symbols-outlined text-sm text-[#c7ff00]">bolt</span>
             Built for students, freelancers, and daily money tracking.
           </div>
-          <h2 className="text-4xl font-extrabold leading-tight tracking-[-0.03em] md:text-5xl">
+          <h2 className="text-4xl font-semibold leading-tight tracking-[-0.03em] md:text-5xl">
             Your personal finance assistant, always available on chat.
           </h2>
         </div>
@@ -190,8 +192,8 @@ export function LandingPage() {
               <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-[#c7ff00] text-[#202020]">
                 <span className="material-symbols-outlined">forum</span>
               </div>
-              <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-[#757575]">WhatsApp ready</p>
-              <p className="mt-2 text-sm font-bold leading-snug text-[#202020]">Log expenses from daily chat.</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#757575]">WhatsApp ready</p>
+              <p className="mt-2 text-sm font-semibold leading-snug text-[#202020]">Log expenses from daily chat.</p>
             </div>
             <div className="landing-pill-cloud mt-7 flex flex-wrap gap-2">
               {chatPills.slice(0, 3).map((pill) => (
@@ -208,8 +210,8 @@ export function LandingPage() {
               <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-white text-[#202020]">
                 <span className="material-symbols-outlined">send</span>
               </div>
-              <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-white/55">Telegram bot</p>
-              <p className="mt-2 text-sm font-bold leading-snug">Ask, track, and export reports.</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/55">Telegram bot</p>
+              <p className="mt-2 text-sm font-semibold leading-snug">Ask, track, and export reports.</p>
             </div>
             <div className="landing-pill-cloud landing-pill-cloud-late mt-7 flex flex-wrap gap-2">
               {chatPills.slice(2).map((pill) => (
@@ -250,7 +252,7 @@ export function LandingPage() {
               </div>
               <div className="mt-3 flex items-center gap-2 border-t border-[#eeeeee] pt-3 text-left">
                 <span className="landing-dot" />
-                <span className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-[#6f6f6f]">Sakoo is typing</span>
+                <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#6f6f6f]">Sakoo is typing</span>
               </div>
             </div>
             <div className="mt-5 flex flex-wrap justify-center gap-2 lg:hidden">
@@ -269,10 +271,10 @@ export function LandingPage() {
           <DashboardPreview />
         </div>
         <div data-scroll-reveal="right" className="scroll-reveal">
-          <div className="mb-6 inline-block rounded-full bg-[#202020] px-3 py-1 text-xs font-extrabold uppercase tracking-wider text-[#c7ff00]">
+          <div className="mb-6 inline-block rounded-full bg-[#202020] px-3 py-1 text-xs font-semibold uppercase tracking-wider text-[#c7ff00]">
             Smart Dashboard
           </div>
-          <h2 className="mb-6 text-4xl font-extrabold leading-tight tracking-[-0.03em] md:text-5xl">
+          <h2 className="mb-6 text-4xl font-semibold leading-tight tracking-[-0.03em] md:text-5xl">
             All your finances in one clean dashboard
           </h2>
           <ul className="mb-10 grid gap-6 sm:grid-cols-2">
@@ -283,27 +285,31 @@ export function LandingPage() {
                 className="scroll-reveal flex items-start gap-3"
                 style={{ transitionDelay: `${index * 80}ms` }}
               >
-                <span className="text-lg font-extrabold text-[#9cc900]">{number}</span>
+                <span className="text-lg font-semibold text-[#9cc900]">{number}</span>
                 <div>
-                  <h3 className="mb-1 text-base font-extrabold">{title}</h3>
+                  <h3 className="mb-1 text-base font-semibold">{title}</h3>
                   <p className="text-sm leading-6 text-[#6f6f6f]">{body}</p>
                 </div>
               </li>
             ))}
           </ul>
-          <Link href="/register" className="inline-flex items-center gap-2 rounded-full bg-[#c7ff00] px-8 py-4 text-sm font-extrabold text-[#202020] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_0_24px_rgba(199,255,0,0.44)]">
+          <Link href="/register" className="inline-flex items-center gap-2 rounded-full bg-[#c7ff00] px-8 py-4 text-sm font-semibold text-[#202020] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_0_24px_rgba(199,255,0,0.44)]">
             Open Dashboard
             <span className="material-symbols-outlined text-sm">open_in_new</span>
           </Link>
         </div>
       </section>
 
+      <section id="pricing" className="py-12 bg-white/40 border-y border-[#E8E8E8]">
+        <PricingBasic />
+      </section>
+
       <section id="bot" className="mx-auto grid max-w-[1440px] items-center gap-16 px-5 py-24 md:px-8 lg:grid-cols-2">
         <div data-scroll-reveal="left" className="scroll-reveal order-2 lg:order-1">
-          <div className="mb-6 inline-block rounded-full border border-[#202020]/20 px-3 py-1 text-xs font-extrabold uppercase tracking-wider">
+          <div className="mb-6 inline-block rounded-full border border-[#202020]/20 px-3 py-1 text-xs font-semibold uppercase tracking-wider">
             No app switching
           </div>
-          <h2 className="mb-6 text-4xl font-extrabold leading-tight tracking-[-0.03em] md:text-5xl">
+          <h2 className="mb-6 text-4xl font-semibold leading-tight tracking-[-0.03em] md:text-5xl">
             Record transactions directly from WhatsApp and Telegram
           </h2>
           <p className="max-w-md text-base leading-8 text-[#6f6f6f]">
@@ -318,7 +324,7 @@ export function LandingPage() {
 
       <section id="features" className="mx-auto max-w-[1440px] rounded-[40px] bg-[#f1f2f0] px-5 py-24 md:px-8">
         <div data-scroll-reveal="zoom" className="scroll-reveal mb-16 text-center">
-          <h2 className="mb-4 text-4xl font-extrabold leading-tight tracking-[-0.03em] md:text-5xl">
+          <h2 className="mb-4 text-4xl font-semibold leading-tight tracking-[-0.03em] md:text-5xl">
             Powerful tools, simple interface
           </h2>
           <p className="mx-auto max-w-2xl text-base leading-7 text-[#6f6f6f]">
@@ -336,7 +342,7 @@ export function LandingPage() {
               <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#c7ff00]/20 text-[#202020]">
                 <span className="material-symbols-outlined text-2xl">{icon}</span>
               </div>
-              <h3 className="mb-3 text-base font-extrabold">{title}</h3>
+              <h3 className="mb-3 text-base font-semibold">{title}</h3>
               <p className="text-sm leading-6 text-[#6f6f6f]">{body}</p>
             </div>
           ))}
@@ -345,17 +351,17 @@ export function LandingPage() {
 
       <section id="reports" className="mx-auto max-w-[1440px] px-4 py-24 md:px-8">
         <div data-scroll-reveal="zoom" className="scroll-reveal overflow-hidden rounded-[40px] bg-[#202020] p-10 text-center text-white md:p-20">
-          <h2 className="mx-auto mb-6 max-w-3xl text-4xl font-extrabold leading-tight tracking-[-0.03em] md:text-5xl">
+          <h2 className="mx-auto mb-6 max-w-3xl text-4xl font-semibold leading-tight tracking-[-0.03em] md:text-5xl">
             Start tracking your money the easy way
           </h2>
           <p className="mx-auto mb-10 max-w-xl text-base leading-7 text-white/70">
             Use Sakoo from chat, dashboard, receipt scan, or voice note.
           </p>
           <div className="flex flex-col justify-center gap-4 sm:flex-row">
-            <Link href="/register" className="rounded-full bg-[#c7ff00] px-8 py-4 text-sm font-extrabold text-[#202020] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_0_24px_rgba(199,255,0,0.44)]">
+            <Link href="/register" className="rounded-full bg-[#c7ff00] px-8 py-4 text-sm font-semibold text-[#202020] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_0_24px_rgba(199,255,0,0.44)]">
               Get Started
             </Link>
-            <Link href="/login" className="rounded-full border border-white/30 px-8 py-4 text-sm font-bold text-white transition-all duration-200 hover:bg-white/10">
+            <Link href="/login" className="rounded-full border border-white/30 px-8 py-4 text-sm font-semibold text-white transition-all duration-200 hover:bg-white/10">
               View Demo
             </Link>
           </div>
@@ -366,7 +372,7 @@ export function LandingPage() {
         <div className="mx-auto max-w-[1440px]">
           <div className="mb-12 grid gap-8 md:grid-cols-4">
             <div className="md:col-span-2">
-              <div className="mb-4 flex items-center gap-2.5 text-2xl font-extrabold">
+              <div className="mb-4 flex items-center gap-2.5 text-2xl font-semibold">
                 <BrandMark className="h-9 w-9" />
                 <span>Sakoo.</span>
               </div>
@@ -380,7 +386,7 @@ export function LandingPage() {
               ["Reports", "#reports"],
             ]} />
             <div>
-              <h3 className="mb-4 text-sm font-extrabold">Legal</h3>
+              <h3 className="mb-4 text-sm font-semibold">Legal</h3>
               <p className="text-sm text-[#6f6f6f]">Dokumen legal sedang disiapkan.</p>
             </div>
           </div>
@@ -405,7 +411,7 @@ function HeroMockup() {
             <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#c7ff00] text-[#202020]">
               <span className="material-symbols-outlined text-3xl">forum</span>
             </div>
-            <div className="mb-2 text-sm font-extrabold text-white">Sakoo Bot</div>
+            <div className="mb-2 text-sm font-semibold text-white">Sakoo Bot</div>
             <div className="mb-8 text-xs text-white/50">Online</div>
             <div className="flex w-full flex-col gap-3">
               <div className="max-w-[85%] self-end rounded-2xl rounded-tr-sm bg-[#c7ff00] px-3 py-2 text-left text-xs font-semibold text-[#202020] shadow-md">
@@ -424,15 +430,15 @@ function HeroMockup() {
           <div className="text-xs text-[#6f6f6f]">Total Balance</div>
           <span className="material-symbols-outlined text-sm text-[#6f6f6f]">more_horiz</span>
         </div>
-        <div className="mb-4 text-[28px] font-extrabold leading-none">Rp12.450k</div>
+        <div className="mb-4 text-[28px] font-semibold leading-none">Rp12.450k</div>
         <div className="flex items-center gap-2 text-xs">
-          <span className="rounded-full bg-[#5fcf6a]/10 px-2 py-1 font-bold text-[#2f9d3b]">+2.4%</span>
+          <span className="rounded-full bg-[#5fcf6a]/10 px-2 py-1 font-semibold text-[#2f9d3b]">+2.4%</span>
           <span className="text-[#6f6f6f]">vs last month</span>
         </div>
       </div>
 
       <div className="landing-float-card landing-float-card-late absolute left-1/2 top-1/2 z-10 w-[220px] translate-x-[16%] translate-y-[12%] -rotate-3 rounded-3xl border border-[#e8e8e8] bg-white p-5 text-[#202020] shadow-[0_18px_40px_rgba(0,0,0,0.18)] transition-transform duration-500 hover:rotate-0">
-        <div className="mb-4 text-sm font-extrabold">Weekly Spend</div>
+        <div className="mb-4 text-sm font-semibold">Weekly Spend</div>
         <div className="mb-2 flex h-[80px] items-end justify-between gap-1">
           {[40, 80, 30, 60, 100, 50, 20].map((height, index) => (
             <div
@@ -459,15 +465,15 @@ function DashboardPreview() {
     <div className="relative w-full max-w-[420px]">
       <div className="landing-dashboard-card relative z-20 rounded-3xl border border-[#e8e8e8] bg-white p-6 shadow-[0_18px_40px_rgba(0,0,0,0.18)]">
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-sm font-bold text-[#6f6f6f]">Total Balance</span>
+          <span className="text-sm font-semibold text-[#6f6f6f]">Total Balance</span>
           <span className="material-symbols-outlined text-[#6f6f6f]">account_balance_wallet</span>
         </div>
-        <div className="mb-4 text-3xl font-extrabold">Rp12.450.000</div>
+        <div className="mb-4 text-3xl font-semibold">Rp12.450.000</div>
       </div>
       <div className="landing-dashboard-card landing-dashboard-card-late relative z-10 ml-8 mt-6 rounded-3xl border border-[#e8e8e8] bg-white p-6 shadow-[0_18px_40px_rgba(0,0,0,0.18)]">
         <div className="mb-4 flex items-center justify-between">
-          <span className="font-extrabold">Cashflow</span>
-          <span className="rounded-md bg-[#202020] px-2 py-1 text-xs font-extrabold text-[#c7ff00]">This Month</span>
+          <span className="font-semibold">Cashflow</span>
+          <span className="rounded-md bg-[#202020] px-2 py-1 text-xs font-semibold text-[#c7ff00]">This Month</span>
         </div>
         <div className="flex h-24 items-end gap-2">
           {[50, 100, 75, 33].map((height, index) => (
@@ -491,7 +497,7 @@ function BotMockup() {
           <span className="material-symbols-outlined text-[#202020]">smart_toy</span>
         </div>
         <div>
-          <div className="text-sm font-extrabold">Sakoo Bot</div>
+          <div className="text-sm font-semibold">Sakoo Bot</div>
           <div className="flex items-center gap-1 text-xs text-[#2f9d3b]">
             <span className="h-1.5 w-1.5 rounded-full bg-[#5fcf6a]" />
             Online
@@ -525,7 +531,7 @@ function Bubble({ children, side }: { children: string; side: "left" | "right" |
 function FooterLinks({ title, items }: { title: string; items: [string, string][] }) {
   return (
     <div>
-      <h3 className="mb-4 text-sm font-extrabold">{title}</h3>
+      <h3 className="mb-4 text-sm font-semibold">{title}</h3>
       <ul className="space-y-3 text-sm text-[#6f6f6f]">
         {items.map(([label, href]) => (
           <li key={label}>

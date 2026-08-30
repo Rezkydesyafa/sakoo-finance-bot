@@ -65,7 +65,7 @@ export function OverviewTab({
         {/* Greeting Header */}
         <div className="flex justify-between items-end">
           <div>
-            <h2 className="font-bold text-3xl text-[#1a1c1b] mb-2">Hello, {userName} 👋</h2>
+            <h2 className="font-semibold text-3xl text-[#1a1c1b] mb-2">Hello, {userName} 👋</h2>
             <p className="text-sm text-[#6F6F6F]">Your financial assistant is ready to help today.</p>
           </div>
         </div>
@@ -78,7 +78,7 @@ export function OverviewTab({
             <div className="flex justify-between items-start relative z-10">
               <div>
                 <span className="block text-sm text-gray-300 mb-1">Total Balance</span>
-                <div className="font-bold text-2xl sm:text-3xl">{formatCurrency(totalBalance)}</div>
+                <div className="font-semibold text-2xl sm:text-3xl">{formatCurrency(totalBalance)}</div>
               </div>
               <span className="bg-[#c7ff00] text-[#151f00] text-[13px] font-semibold px-3 py-1 rounded-full flex items-center gap-1 shrink-0">
                 <span className="material-symbols-outlined text-[14px]">receipt_long</span> {transactions.length} tx
@@ -223,7 +223,7 @@ export function OverviewTab({
                 })}
               </div>
             </div>
-            <div className="flex justify-around mt-3 text-[9px] sm:text-[10px] font-bold text-[#6F6F6F] uppercase tracking-wider ml-6 sm:ml-8">
+            <div className="flex justify-around mt-3 text-[9px] sm:text-[10px] font-semibold text-[#6F6F6F] uppercase tracking-wider ml-6 sm:ml-8">
               {moneyFlow.map((item) => (
                 <div key={item.key} className="w-7 sm:w-10 text-center">
                   {item.label}

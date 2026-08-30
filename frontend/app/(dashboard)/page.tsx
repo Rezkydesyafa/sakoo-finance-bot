@@ -596,7 +596,7 @@ function HomeContent() {
               </span>
             </div>
             
-            <h3 className="text-lg font-bold text-center text-[#1a1c1b] mb-2">
+            <h3 className="text-lg font-semibold text-center text-[#1a1c1b] mb-2">
               Hapus Transaksi?
             </h3>
             <p className="text-sm text-center text-[#6F6F6F] mb-8">
@@ -604,10 +604,10 @@ function HomeContent() {
             </p>
             
             <div className="flex flex-col gap-3">
-              <button onClick={handleConfirmDeleteTransaction} className="w-full py-3 rounded-full text-sm font-bold border-none cursor-pointer transition-colors bg-red-600 hover:bg-red-700 text-white">
+              <button onClick={handleConfirmDeleteTransaction} className="w-full py-3 rounded-full text-sm font-semibold border-none cursor-pointer transition-colors bg-red-600 hover:bg-red-700 text-white">
                 Ya, Hapus
               </button>
-              <button onClick={() => setDeleteTxId(null)} className="w-full py-3 bg-white border border-[#E8E8E8] text-[#1a1c1b] rounded-full text-sm font-bold hover:bg-[#F1F2F0] transition-colors cursor-pointer">
+              <button onClick={() => setDeleteTxId(null)} className="w-full py-3 bg-white border border-[#E8E8E8] text-[#1a1c1b] rounded-full text-sm font-semibold hover:bg-[#F1F2F0] transition-colors cursor-pointer">
                 Batal
               </button>
             </div>
@@ -624,7 +624,7 @@ function HomeContent() {
               </span>
             </div>
             
-            <h3 className="text-lg font-bold text-center text-[#1a1c1b] mb-2">
+            <h3 className="text-lg font-semibold text-center text-[#1a1c1b] mb-2">
               Ekspor ke PDF?
             </h3>
             <p className="text-sm text-center text-[#6F6F6F] mb-8">
@@ -632,10 +632,10 @@ function HomeContent() {
             </p>
             
             <div className="flex flex-col gap-3">
-              <button onClick={executeDownloadPDF} className="w-full py-3 rounded-full text-sm font-bold border-none cursor-pointer transition-colors bg-[#c7ff00] hover:bg-[#bff500] text-[#151f00]">
+              <button onClick={executeDownloadPDF} className="w-full py-3 rounded-full text-sm font-semibold border-none cursor-pointer transition-colors bg-[#c7ff00] hover:bg-[#bff500] text-[#151f00]">
                 Ya, Ekspor
               </button>
-              <button onClick={() => setIsExportModalOpen(false)} className="w-full py-3 bg-white border border-[#E8E8E8] text-[#1a1c1b] rounded-full text-sm font-bold hover:bg-[#F1F2F0] transition-colors cursor-pointer">
+              <button onClick={() => setIsExportModalOpen(false)} className="w-full py-3 bg-white border border-[#E8E8E8] text-[#1a1c1b] rounded-full text-sm font-semibold hover:bg-[#F1F2F0] transition-colors cursor-pointer">
                 Batal
               </button>
             </div>

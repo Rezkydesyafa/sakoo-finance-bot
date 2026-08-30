@@ -337,7 +337,7 @@ export function ChatTab({ onTransactionAdded }: ChatTabProps) {
             <div className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-[#c7ff00] animate-pulse border-2 border-[#f9f9f7]"></div>
           </div>
           <div>
-            <h1 className="font-bold text-[20px] text-[#1a1c1b] tracking-tight leading-tight">Sakoo AI</h1>
+            <h1 className="font-semibold text-[20px] text-[#1a1c1b] tracking-tight leading-tight">Sakoo AI</h1>
             <p className="text-[12px] text-[#5FCF6A] flex items-center gap-1 mt-0.5 font-semibold">
               <span className="w-1.5 h-1.5 rounded-full bg-[#5FCF6A] inline-block"></span> Online
             </p>
@@ -432,7 +432,7 @@ export function ChatTab({ onTransactionAdded }: ChatTabProps) {
             <div className="flex-1 flex items-center justify-between px-4 py-2 bg-red-50 rounded-full animate-pulse border border-red-100">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
-                <span className="text-sm font-bold text-red-600">{formatTime(recordingTime)}</span>
+                <span className="text-sm font-semibold text-red-600">{formatTime(recordingTime)}</span>
               </div>
               <span className="text-xs text-red-500 font-semibold">Merekam...</span>
             </div>

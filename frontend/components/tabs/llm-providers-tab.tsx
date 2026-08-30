@@ -196,7 +196,7 @@ export function LlmProvidersTab() {
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-10">
       <div>
-        <h1 className="text-2xl font-bold text-[#1a1c1b]">LLM Providers</h1>
+        <h1 className="text-2xl font-semibold text-[#1a1c1b]">LLM Providers</h1>
         <p className="text-sm text-[#6F6F6F]">
           Kelola gateway, cek koneksi, dan ambil daftar model OpenAI-compatible.
         </p>
@@ -215,7 +215,7 @@ export function LlmProvidersTab() {
       <form onSubmit={save} className="bg-white rounded-[28px] p-6 card-shadow space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h2 className="font-bold text-[#1a1c1b]">
+            <h2 className="font-semibold text-[#1a1c1b]">
               {editing === null ? "Tambah Provider" : "Edit Provider"}
             </h2>
             {editing !== null && editingModels.length > 0 && (
@@ -291,7 +291,7 @@ export function LlmProvidersTab() {
         <div className="flex flex-wrap gap-2">
           <button
             disabled={saving}
-            className="bg-[#c7ff00] text-[#151f00] px-5 py-2.5 rounded-full text-xs font-bold disabled:opacity-50"
+            className="bg-[#c7ff00] text-[#151f00] px-5 py-2.5 rounded-full text-xs font-semibold disabled:opacity-50"
           >
             {saving ? "Menyimpan..." : editing === null ? "Tambah Provider" : "Simpan Perubahan"}
           </button>
@@ -303,7 +303,7 @@ export function LlmProvidersTab() {
                 setEditing(null);
                 setForm(emptyForm);
               }}
-              className="bg-[#F1F2F0] px-5 py-2.5 rounded-full text-xs font-bold"
+              className="bg-[#F1F2F0] px-5 py-2.5 rounded-full text-xs font-semibold"
             >
               Batal
             </button>
@@ -320,9 +320,9 @@ export function LlmProvidersTab() {
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="font-bold text-[#1a1c1b]">{provider.name}</h2>
+                    <h2 className="font-semibold text-[#1a1c1b]">{provider.name}</h2>
                     <span
-                      className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${
+                      className={`text-[10px] font-semibold uppercase px-2 py-1 rounded-full ${
                         provider.enabled
                           ? "bg-[#eaffb0] text-[#385000]"
                           : "bg-[#F1F2F0] text-[#6F6F6F]"
@@ -355,7 +355,7 @@ export function LlmProvidersTab() {
                     type="button"
                     disabled={checkingIds.has(provider.id)}
                     onClick={() => checkConnection(provider)}
-                    className="bg-[#151f00] text-white px-4 py-2 rounded-full text-xs font-bold disabled:opacity-50"
+                    className="bg-[#151f00] text-white px-4 py-2 rounded-full text-xs font-semibold disabled:opacity-50"
                   >
                     {checkingIds.has(provider.id) ? "Checking..." : "Check Connection"}
                   </button>
@@ -363,21 +363,21 @@ export function LlmProvidersTab() {
                     type="button"
                     disabled={fetchingIds.has(provider.id)}
                     onClick={() => fetchModels(provider)}
-                    className="bg-[#eaffb0] text-[#385000] px-4 py-2 rounded-full text-xs font-bold disabled:opacity-50"
+                    className="bg-[#eaffb0] text-[#385000] px-4 py-2 rounded-full text-xs font-semibold disabled:opacity-50"
                   >
                     {fetchingIds.has(provider.id) ? "Fetching..." : "Fetch Models"}
                   </button>
                   <button
                     type="button"
                     onClick={() => edit(provider)}
-                    className="bg-[#F1F2F0] px-4 py-2 rounded-full text-xs font-bold"
+                    className="bg-[#F1F2F0] px-4 py-2 rounded-full text-xs font-semibold"
                   >
                     Edit
                   </button>
                   <button
                     type="button"
                     onClick={() => remove(provider.id)}
-                    className="bg-red-50 text-red-600 px-4 py-2 rounded-full text-xs font-bold"
+                    className="bg-red-50 text-red-600 px-4 py-2 rounded-full text-xs font-semibold"
                   >
                     Hapus
                   </button>
@@ -386,7 +386,7 @@ export function LlmProvidersTab() {
 
               {models.length > 0 && (
                 <div className="border-t border-[#E8E8E8] pt-3">
-                  <p className="text-[11px] font-bold text-[#6F6F6F] mb-2">
+                  <p className="text-[11px] font-semibold text-[#6F6F6F] mb-2">
                     MODEL TERDETEKSI ({models.length})
                   </p>
                   <div className="flex flex-wrap gap-2 max-h-28 overflow-y-auto">
@@ -400,7 +400,7 @@ export function LlmProvidersTab() {
                         }}
                         className={`text-[11px] px-3 py-1.5 rounded-full border ${
                           model === provider.model
-                            ? "bg-[#c7ff00] border-[#c7ff00] text-[#151f00] font-bold"
+                            ? "bg-[#c7ff00] border-[#c7ff00] text-[#151f00] font-semibold"
                             : "bg-white border-[#E8E8E8] text-[#5f5e5e]"
                         }`}
                       >

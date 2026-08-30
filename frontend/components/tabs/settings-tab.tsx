@@ -137,7 +137,7 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
         >
           <span className="material-symbols-outlined text-[20px]">arrow_back</span>
         </button>
-        <h2 className="text-2xl font-bold text-[#1a1c1b]">Profil</h2>
+        <h2 className="text-2xl font-semibold text-[#1a1c1b]">Profil</h2>
       </div>
 
       {/* Profile Header */}
@@ -164,7 +164,7 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
           </button>
         </div>
         <div className="flex-1 text-center sm:text-left flex flex-col justify-center h-full pt-2">
-          <h3 className="text-xl sm:text-2xl font-bold text-[#1a1c1b] mb-1">{userName}</h3>
+          <h3 className="text-xl sm:text-2xl font-semibold text-[#1a1c1b] mb-1">{userName}</h3>
           <p className="text-sm text-[#6F6F6F] mb-4">{userEmail}</p>
           <div className="flex justify-center sm:justify-start gap-3">
             <button className="bg-[#F1F2F0] hover:bg-[#E8E8E8] text-[#1a1c1b] px-5 py-2 rounded-full text-xs font-semibold transition-colors border-none cursor-pointer flex items-center gap-2">
@@ -179,7 +179,7 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
         {/* Left Column: Navigation/Sections List */}
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-white rounded-[24px] p-2 card-shadow flex flex-col">
-            <div className="p-3 text-xs font-bold text-[#6F6F6F] uppercase tracking-wider">Navigasi Pengaturan</div>
+            <div className="p-3 text-xs font-semibold text-[#6F6F6F] uppercase tracking-wider">Navigasi Pengaturan</div>
             <a href="#info" className="flex items-center gap-3 p-3 rounded-xl hover:bg-[#F1F2F0] transition-colors text-[#1a1c1b] font-semibold text-sm">
               <span className="material-symbols-outlined text-[#6F6F6F]">manage_accounts</span>
               Informasi Akun
@@ -212,7 +212,7 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
           
           {/* Informasi Akun */}
           <section id="info" className="bg-white rounded-[28px] p-6 sm:p-8 card-shadow scroll-mt-24">
-            <h3 className="text-lg font-bold text-[#1a1c1b] mb-6 flex items-center gap-2">
+            <h3 className="text-lg font-semibold text-[#1a1c1b] mb-6 flex items-center gap-2">
               <span className="material-symbols-outlined text-[#4e6700]">manage_accounts</span>
               Informasi Akun
             </h3>
@@ -231,7 +231,7 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
                 <label className="block text-xs font-semibold text-[#6F6F6F] mb-1.5">Email Utama</label>
                 <div className="relative">
                   <input type="email" defaultValue={userEmail} disabled className="w-full bg-[#F1F2F0] opacity-70 border-none rounded-xl py-3 px-4 text-sm font-medium text-[#1a1c1b] cursor-not-allowed" />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-[#5FCF6A]">Terverifikasi</span>
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#5FCF6A]">Terverifikasi</span>
                 </div>
               </div>
               <button onClick={handleSaveProfile} className="bg-[#4e6700] hover:bg-[#3a4d00] text-white px-6 py-2.5 rounded-full text-xs font-semibold transition-colors border-none cursor-pointer mt-2">
@@ -242,7 +242,7 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
 
           {/* Keamanan Akun */}
           <section id="security" className="bg-white rounded-[28px] p-6 sm:p-8 card-shadow scroll-mt-24">
-            <h3 className="text-lg font-bold text-[#1a1c1b] mb-6 flex items-center gap-2">
+            <h3 className="text-lg font-semibold text-[#1a1c1b] mb-6 flex items-center gap-2">
               <span className="material-symbols-outlined text-[#4e6700]">security</span>
               Keamanan Akun
             </h3>
@@ -316,7 +316,7 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
 
           {/* Preferensi Aplikasi */}
           <section id="preferences" className="bg-white rounded-[28px] p-6 sm:p-8 card-shadow scroll-mt-24">
-            <h3 className="text-lg font-bold text-[#1a1c1b] mb-6 flex items-center gap-2">
+            <h3 className="text-lg font-semibold text-[#1a1c1b] mb-6 flex items-center gap-2">
               <span className="material-symbols-outlined text-[#4e6700]">tune</span>
               Preferensi Aplikasi
             </h3>
@@ -326,11 +326,11 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
               ) : (
                 <>
                   <div className="rounded-2xl bg-[#F8F9F6] p-4">
-                    <div className="text-xs font-bold text-[#6F6F6F] uppercase tracking-wider mb-2">Dikirim melalui</div>
+                    <div className="text-xs font-semibold text-[#6F6F6F] uppercase tracking-wider mb-2">Dikirim melalui</div>
                     {notificationPreferences.active_channels.length > 0 ? (
                       <div className="flex flex-wrap gap-2">
                         {notificationPreferences.active_channels.map((channel) => (
-                          <span key={channel} className="rounded-full bg-[#E9F8D0] px-3 py-1 text-xs font-bold text-[#4e6700] capitalize">
+                          <span key={channel} className="rounded-full bg-[#E9F8D0] px-3 py-1 text-xs font-semibold text-[#4e6700] capitalize">
                             {channel}
                           </span>
                         ))}
@@ -349,7 +349,7 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
 
                   <div className="border-t border-[#E8E8E8] pt-6 flex items-center justify-between gap-4">
                     <div>
-                      <div className="text-sm font-bold text-[#1a1c1b] mb-1">Jam pengingat harian</div>
+                      <div className="text-sm font-semibold text-[#1a1c1b] mb-1">Jam pengingat harian</div>
                       <div className="text-xs text-[#6F6F6F]">Mengikuti zona waktu yang dipilih.</div>
                     </div>
                     <input
@@ -382,7 +382,7 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
 
                   <div className="border-t border-[#E8E8E8] pt-6 flex items-center justify-between gap-4">
                     <div>
-                      <div className="text-sm font-bold text-[#1a1c1b] mb-1">Zona waktu</div>
+                      <div className="text-sm font-semibold text-[#1a1c1b] mb-1">Zona waktu</div>
                       <div className="text-xs text-[#6F6F6F]">Dipakai untuk semua jadwal notifikasi.</div>
                     </div>
                     <select
@@ -413,7 +413,7 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
               )}
               <div className="flex items-center justify-between border-t border-[#E8E8E8] pt-6">
                 <div>
-                  <div className="text-sm font-bold text-[#1a1c1b] mb-1">Mode Gelap (Dark Mode)</div>
+                  <div className="text-sm font-semibold text-[#1a1c1b] mb-1">Mode Gelap (Dark Mode)</div>
                   <div className="text-xs text-[#6F6F6F]">Ganti tema aplikasi menjadi gelap.</div>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
@@ -423,7 +423,7 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
               </div>
               <div className="flex items-center justify-between border-t border-[#E8E8E8] pt-6">
                 <div>
-                  <div className="text-sm font-bold text-[#1a1c1b] mb-1">Mata Uang Default</div>
+                  <div className="text-sm font-semibold text-[#1a1c1b] mb-1">Mata Uang Default</div>
                   <div className="text-xs text-[#6F6F6F]">Pilih mata uang yang digunakan untuk laporan.</div>
                 </div>
                 <select disabled className="bg-[#F1F2F0] opacity-70 border-none rounded-xl py-2 px-4 text-xs font-semibold text-[#1a1c1b] cursor-not-allowed">
@@ -437,7 +437,7 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
           {/* Privasi & Bantuan */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <section id="privacy" className="bg-white rounded-[28px] p-6 card-shadow scroll-mt-24">
-              <h3 className="text-lg font-bold text-[#1a1c1b] mb-4 flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-[#1a1c1b] mb-4 flex items-center gap-2">
                 <span className="material-symbols-outlined text-[#4e6700]">shield_lock</span>
                 Privasi
               </h3>
@@ -448,7 +448,7 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
             </section>
 
             <section id="help" className="bg-white rounded-[28px] p-6 card-shadow scroll-mt-24">
-              <h3 className="text-lg font-bold text-[#1a1c1b] mb-4 flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-[#1a1c1b] mb-4 flex items-center gap-2">
                 <span className="material-symbols-outlined text-[#4e6700]">help</span>
                 Bantuan
               </h3>
@@ -461,7 +461,7 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
 
           {/* Aksi Akun (Danger Zone) */}
           <section id="actions" className="bg-red-50 rounded-[28px] p-6 sm:p-8 border border-red-100 scroll-mt-24">
-            <h3 className="text-lg font-bold text-red-600 mb-2 flex items-center gap-2">
+            <h3 className="text-lg font-semibold text-red-600 mb-2 flex items-center gap-2">
               <span className="material-symbols-outlined">warning</span>
               Aksi Akun (Danger Zone)
             </h3>
@@ -472,7 +472,7 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
             <div className="space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-white/60">
                 <div>
-                  <div className="text-sm font-bold text-[#1a1c1b]">Keluar (Sign Out)</div>
+                  <div className="text-sm font-semibold text-[#1a1c1b]">Keluar (Sign Out)</div>
                   <div className="text-xs text-[#6F6F6F]">Keluar dari sesi ini pada perangkat Anda.</div>
                 </div>
                 <button onClick={() => setModalOpen("logout")} className="bg-white border border-[#E8E8E8] hover:bg-neutral-50 text-[#1a1c1b] px-5 py-2 rounded-full text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap">
@@ -482,7 +482,7 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
 
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-white/60">
                 <div>
-                  <div className="text-sm font-bold text-[#1a1c1b]">Nonaktifkan Akun</div>
+                  <div className="text-sm font-semibold text-[#1a1c1b]">Nonaktifkan Akun</div>
                   <div className="text-xs text-[#6F6F6F]">Sembunyikan akun Anda untuk sementara waktu.</div>
                 </div>
                 <button disabled className="bg-white opacity-60 border border-orange-200 text-orange-600 px-5 py-2 rounded-full text-xs font-semibold cursor-not-allowed whitespace-nowrap">
@@ -492,7 +492,7 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
 
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-white/60">
                 <div>
-                  <div className="text-sm font-bold text-red-600">Hapus Akun Permanen</div>
+                  <div className="text-sm font-semibold text-red-600">Hapus Akun Permanen</div>
                   <div className="text-xs text-[#6F6F6F]">Hapus seluruh data transaksi dan akun selamanya.</div>
                 </div>
                 <button disabled className="bg-red-600 opacity-60 text-white px-5 py-2 rounded-full text-xs font-semibold border-none cursor-not-allowed whitespace-nowrap">
@@ -516,7 +516,7 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
               </span>
             </div>
             
-            <h3 className="text-lg font-bold text-center text-[#1a1c1b] mb-2">
+            <h3 className="text-lg font-semibold text-center text-[#1a1c1b] mb-2">
               {modalOpen === "delete" ? "Hapus Akun Permanen?" : modalOpen === "deactivate" ? "Nonaktifkan Akun?" : "Keluar dari Akun?"}
             </h3>
             <p className="text-sm text-center text-[#6F6F6F] mb-8">
@@ -528,14 +528,14 @@ export function SettingsTab({ userName, userEmail, userPhone, onClose }: Setting
             </p>
             
             <div className="flex flex-col gap-3">
-              <button onClick={handleConfirmAction} className={`w-full py-3 rounded-full text-sm font-bold border-none cursor-pointer transition-colors ${
+              <button onClick={handleConfirmAction} className={`w-full py-3 rounded-full text-sm font-semibold border-none cursor-pointer transition-colors ${
                 modalOpen === "delete" ? "bg-red-600 hover:bg-red-700 text-white" : 
                 modalOpen === "deactivate" ? "bg-orange-500 hover:bg-orange-600 text-white" : 
                 "bg-[#1a1c1b] hover:bg-black text-white"
               }`}>
                 Ya, {modalOpen === "delete" ? "Hapus" : modalOpen === "deactivate" ? "Nonaktifkan" : "Sign Out"}
               </button>
-              <button onClick={() => setModalOpen("none")} className="w-full py-3 bg-white border border-[#E8E8E8] text-[#1a1c1b] rounded-full text-sm font-bold hover:bg-[#F1F2F0] transition-colors cursor-pointer">
+              <button onClick={() => setModalOpen("none")} className="w-full py-3 bg-white border border-[#E8E8E8] text-[#1a1c1b] rounded-full text-sm font-semibold hover:bg-[#F1F2F0] transition-colors cursor-pointer">
                 Batal
               </button>
             </div>
@@ -561,7 +561,7 @@ function NotificationToggle({
   return (
     <div className="flex items-center justify-between gap-4 border-t border-[#E8E8E8] pt-6 first:border-0 first:pt-0">
       <div>
-        <div className="text-sm font-bold text-[#1a1c1b] mb-1">{title}</div>
+        <div className="text-sm font-semibold text-[#1a1c1b] mb-1">{title}</div>
         <div className="text-xs text-[#6F6F6F]">{description}</div>
       </div>
       <label className="relative inline-flex items-center cursor-pointer shrink-0">

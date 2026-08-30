@@ -137,7 +137,7 @@ export function TransactionModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold text-[#1a1c1b]">
+          <h2 className="text-xl font-semibold text-[#1a1c1b]">
             {mode === "edit" 
               ? `Edit ${type === "expense" ? "Pengeluaran" : "Pemasukan"}` 
               : `Tambah ${type === "expense" ? "Pengeluaran" : "Pemasukan"}`}
@@ -204,7 +204,7 @@ export function TransactionModal({
                           setIsDropdownOpen(false); 
                           setSearchQuery("");
                         }}
-                        className={`px-4 py-3 text-sm cursor-pointer transition-colors flex items-center justify-between ${categoryId === "" ? 'bg-[#F1F2F0] text-[#151f00] font-bold' : 'text-[#1a1c1b] hover:bg-[#F1F2F0]'}`}
+                        className={`px-4 py-3 text-sm cursor-pointer transition-colors flex items-center justify-between ${categoryId === "" ? 'bg-[#F1F2F0] text-[#151f00] font-semibold' : 'text-[#1a1c1b] hover:bg-[#F1F2F0]'}`}
                       >
                         Lainnya (Tanpa Kategori)
                         {categoryId === "" && <span className="material-symbols-outlined text-[16px]">check</span>}
@@ -219,7 +219,7 @@ export function TransactionModal({
                             setIsDropdownOpen(false); 
                             setSearchQuery("");
                           }}
-                          className={`px-4 py-3 text-sm cursor-pointer transition-colors flex items-center justify-between ${categoryId === c.id ? 'bg-[#F1F2F0] text-[#151f00] font-bold' : 'text-[#1a1c1b] hover:bg-[#F1F2F0]'}`}
+                          className={`px-4 py-3 text-sm cursor-pointer transition-colors flex items-center justify-between ${categoryId === c.id ? 'bg-[#F1F2F0] text-[#151f00] font-semibold' : 'text-[#1a1c1b] hover:bg-[#F1F2F0]'}`}
                         >
                           {c.name}
                           {categoryId === c.id && <span className="material-symbols-outlined text-[16px]">check</span>}
@@ -259,7 +259,7 @@ export function TransactionModal({
             />
           </div>
 
-          <button type="submit" className="w-full bg-[#1a1c1b] hover:bg-black text-white py-3.5 rounded-full text-sm font-bold transition-colors border-none cursor-pointer mt-2 shadow-md">
+          <button type="submit" className="w-full bg-[#1a1c1b] hover:bg-black text-white py-3.5 rounded-full text-sm font-semibold transition-colors border-none cursor-pointer mt-2 shadow-md">
             {mode === "edit" ? "Simpan Perubahan" : "Simpan Transaksi"}
           </button>
         </form>

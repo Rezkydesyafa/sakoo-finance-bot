@@ -239,7 +239,7 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
       {/* SideNavBar */}
       <nav className="hidden md:flex fixed left-0 top-0 h-screen w-[240px] bg-white flex-col py-8 border-r border-[#E8E8E8] z-50">
         <div className="px-8 mb-8">
-          <h1 className="text-xl font-bold text-[#1a1c1b]">Sakoo</h1>
+          <h1 className="text-xl font-semibold text-[#1a1c1b]">Sakoo</h1>
           <p className="text-xs text-[#6F6F6F] mt-1">{isAdmin ? "Admin Console" : "Finance Bot"}</p>
         </div>
         
@@ -308,7 +308,7 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
         </div>
 
         <div className="flex sm:hidden items-center">
-          <h1 className="text-lg font-bold text-[#1a1c1b]">Sakoo</h1>
+          <h1 className="text-lg font-semibold text-[#1a1c1b]">Sakoo</h1>
         </div>
 
         <div className="flex items-center gap-4 ml-auto sm:ml-0">
@@ -324,7 +324,7 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               className="flex items-center gap-2 focus:outline-none border-none bg-transparent cursor-pointer"
             >
-              <div className="w-10 h-10 rounded-full bg-[#c7ff00] flex items-center justify-center font-bold text-[#151f00] shadow-sm overflow-hidden">
+              <div className="w-10 h-10 rounded-full bg-[#c7ff00] flex items-center justify-center font-semibold text-[#151f00] shadow-sm overflow-hidden">
                 {profileImage ? (
                   <img 
                     src={profileImage}
@@ -465,7 +465,7 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
             >
               <span className="material-symbols-outlined text-[#1a1c1b]">arrow_back</span>
             </button>
-            <h1 className="text-base font-bold text-[#1a1c1b]">Receipt Scan</h1>
+            <h1 className="text-base font-semibold text-[#1a1c1b]">Receipt Scan</h1>
             <div className="w-10"></div>
           </header>
 
@@ -546,7 +546,7 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
             {/* Extracted Data Form */}
             <div className="bg-white rounded-[24px] p-5 shadow-sm space-y-4 border border-[#E8E8E8]">
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-bold text-[#1a1c1b]">Scan Results</h2>
+                <h2 className="text-sm font-semibold text-[#1a1c1b]">Scan Results</h2>
                 {scanStatus === "scanning" && (
                   <span className="relative flex h-2.5 w-2.5">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#F6C85F] opacity-75"></span>
@@ -568,7 +568,7 @@ function DashboardShellContent({ children }: { children: ReactNode }) {
               {/* Total Amount Highlight */}
               <div className="flex flex-col items-center justify-center py-4 bg-[#F1F2F0] rounded-2xl">
                 <span className="text-[10px] font-semibold text-[#6F6F6F] mb-1">Total Amount</span>
-                <span className={`text-2xl font-bold text-[#1a1c1b] ${scanStatus !== "completed" ? "opacity-30" : ""}`}>
+                <span className={`text-2xl font-semibold text-[#1a1c1b] ${scanStatus !== "completed" ? "opacity-30" : ""}`}>
                   {scanStatus === "completed" ? formatCurrency(scannedData.amount) : "Rp 0"}
                 </span>
               </div>
@@ -674,7 +674,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
     <Suspense fallback={
       <div className="min-h-screen bg-[#f9f9f7] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-12 w-12 rounded-2xl bg-[#c7ff00] flex items-center justify-center font-bold text-[#151f00] animate-pulse shadow-lg text-xl">
+          <div className="h-12 w-12 rounded-2xl bg-[#c7ff00] flex items-center justify-center font-semibold text-[#151f00] animate-pulse shadow-lg text-xl">
             S
           </div>
           <p className="text-sm font-semibold text-[#6F6F6F]">Loading Sakoo...</p>

@@ -65,7 +65,7 @@ export function ReceiptScanTab({
       <div className="hidden lg:block space-y-6">
         {/* Page Header */}
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-[#1a1c1b] mb-2">Receipt Scan</h2>
+          <h2 className="text-2xl font-semibold text-[#1a1c1b] mb-2">Receipt Scan</h2>
           <p className="text-sm text-[#6F6F6F] max-w-2xl">Upload your receipt and Sakoo will automatically extract the details for you using advanced OCR.</p>
         </div>
 
@@ -74,7 +74,7 @@ export function ReceiptScanTab({
           {/* Left Column: Upload Zone */}
           <div className="col-span-7">
             <div className="bg-white rounded-2xl p-6 card-shadow h-full flex flex-col">
-              <h3 className="text-sm font-bold text-[#1a1c1b] mb-6">Upload Document</h3>
+              <h3 className="text-sm font-semibold text-[#1a1c1b] mb-6">Upload Document</h3>
               <div 
                 onClick={() => document.getElementById("receipt-file-input-gallery")?.click()}
                 className="flex-1 border-2 border-dashed border-[#c7ff00] bg-[#f9f9f7]/30 hover:bg-[#F1F2F0]/50 rounded-xl flex flex-col items-center justify-center p-8 transition-colors cursor-pointer group min-h-[380px]"
@@ -96,7 +96,7 @@ export function ReceiptScanTab({
           <div className="col-span-5">
             <div className="bg-white rounded-2xl p-6 card-shadow h-full flex flex-col">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-sm font-bold text-[#1a1c1b]">Scan Preview</h3>
+                <h3 className="text-sm font-semibold text-[#1a1c1b]">Scan Preview</h3>
                 {scanStatus === "scanning" && (
                   <span className="bg-[#F1F2F0] text-[#6F6F6F] px-3 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-[#F6C85F] animate-pulse"></span> Processing
@@ -190,7 +190,7 @@ export function ReceiptScanTab({
                     <label className="block text-xs font-semibold text-[#6F6F6F] mb-1.5">Total Amount</label>
                     <div className="bg-[#F1F2F0] rounded-xl px-4 py-3 flex items-center justify-between">
                       <span className="text-xs font-semibold text-[#6F6F6F]">IDR</span>
-                      <span className={`text-xl font-bold text-[#1a1c1b] ${scanStatus !== "completed" ? "opacity-30" : ""}`}>
+                      <span className={`text-xl font-semibold text-[#1a1c1b] ${scanStatus !== "completed" ? "opacity-30" : ""}`}>
                         {scanStatus === "completed" ? formatCurrency(scannedData.amount) : "Rp 0"}
                       </span>
                     </div>
@@ -226,7 +226,7 @@ export function ReceiptScanTab({
       {/* 📱 MOBILE VIEW (Visible below lg) */}
       {/* ========================================================================= */}
       <div className="block lg:hidden space-y-6 max-w-md mx-auto">
-        <h2 className="text-lg font-bold text-[#1a1c1b] px-1">Receipt Scan</h2>
+        <h2 className="text-lg font-semibold text-[#1a1c1b] px-1">Receipt Scan</h2>
 
         {/* Scan Area view finder */}
         <div className="relative w-full aspect-[3/4] bg-neutral-900 rounded-[28px] overflow-hidden shadow-lg border border-neutral-800">
@@ -283,7 +283,7 @@ export function ReceiptScanTab({
         {/* Extracted Data Form (Scan Results) */}
         <div className="bg-white rounded-[24px] p-5 shadow-sm space-y-4 border border-[#E8E8E8]">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-[#1a1c1b]">Scan Results</h2>
+            <h2 className="text-sm font-semibold text-[#1a1c1b]">Scan Results</h2>
             {scanStatus === "scanning" && (
               <span className="relative flex h-2.5 w-2.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#F6C85F] opacity-75"></span>
@@ -305,7 +305,7 @@ export function ReceiptScanTab({
           {/* Total Amount Highlight */}
           <div className="flex flex-col items-center justify-center py-4 bg-[#F1F2F0] rounded-2xl">
             <span className="text-[10px] font-semibold text-[#6F6F6F] mb-1">Total Amount</span>
-            <span className={`text-2xl font-bold text-[#1a1c1b] ${scanStatus !== "completed" ? "opacity-30" : ""}`}>
+            <span className={`text-2xl font-semibold text-[#1a1c1b] ${scanStatus !== "completed" ? "opacity-30" : ""}`}>
               {scanStatus === "completed" ? formatCurrency(scannedData.amount) : "Rp 0"}
             </span>
           </div>
