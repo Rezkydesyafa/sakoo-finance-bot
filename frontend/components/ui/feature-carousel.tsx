@@ -20,7 +20,7 @@ const FEATURES = [
     label: "Chat Transaction AI",
     icon: AiChat01Icon,
     image:
-      "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?q=80&w=1200",
+      "/brand/chat-demo.jpg",
     description: "Catat pengeluaran & pemasukan secepat chatting di WhatsApp / Telegram.",
   },
   {
