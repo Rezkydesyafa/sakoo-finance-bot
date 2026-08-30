@@ -84,13 +84,13 @@ const config: Config = {
       fontFamily: {
         "label-button": ["Plus Jakarta Sans", "sans-serif"],
         "display-balance": ["Plus Jakarta Sans", "sans-serif"],
-        "label-muted": ["Inter", "sans-serif"],
-        "body-main": ["Inter", "sans-serif"],
+        "label-muted": ["Plus Jakarta Sans", "sans-serif"],
+        "body-main": ["Plus Jakarta Sans", "sans-serif"],
         "title-card": ["Plus Jakarta Sans", "sans-serif"],
         "headline-hero": ["Plus Jakarta Sans", "sans-serif"],
         "headline-section": ["Plus Jakarta Sans", "sans-serif"],
         "headline-hero-mobile": ["Plus Jakarta Sans", "sans-serif"],
-        "body-strong": ["Inter", "sans-serif"]
+        "body-strong": ["Plus Jakarta Sans", "sans-serif"]
       },
       fontSize: {
         "label-button": ["13px", { lineHeight: "1.2", fontWeight: "600" }],

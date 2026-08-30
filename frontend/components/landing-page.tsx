@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef } from "react";
+import { BrandMark } from "@/components/brand-mark";
 
 const revealSelector = "[data-scroll-reveal]";
 
@@ -31,7 +32,20 @@ export function LandingPage() {
   const rootRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
+    const root = rootRef.current;
     const nodes = Array.from(document.querySelectorAll<HTMLElement>(revealSelector));
+    const viewportHeight = window.innerHeight;
+
+    nodes.forEach((node) => {
+      const bounds = node.getBoundingClientRect();
+      if (bounds.top < viewportHeight && bounds.bottom > 0) {
+        node.classList.add("is-visible");
+      }
+    });
+
+    if (!("IntersectionObserver" in window)) return;
+    root?.classList.add("landing-motion-ready");
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -44,8 +58,11 @@ export function LandingPage() {
       { rootMargin: "0px 0px -12% 0px", threshold: 0.16 },
     );
 
-    nodes.forEach((node) => observer.observe(node));
-    return () => observer.disconnect();
+    nodes.filter((node) => !node.classList.contains("is-visible")).forEach((node) => observer.observe(node));
+    return () => {
+      observer.disconnect();
+      root?.classList.remove("landing-motion-ready");
+    };
   }, []);
 
   useEffect(() => {
@@ -82,8 +99,9 @@ export function LandingPage() {
 
       <nav className="landing-nav fixed inset-x-0 top-0 z-50 border-b border-white/40 bg-white/70 backdrop-blur-xl transition-all duration-300">
         <div className="mx-auto flex h-20 max-w-[1440px] items-center justify-between px-5 md:px-8">
-          <Link href="/" className="text-2xl font-extrabold tracking-tight">
-            Sakoo.
+          <Link href="/" className="flex items-center gap-2.5 text-2xl font-extrabold tracking-tight" aria-label="Sakoo home">
+            <BrandMark priority className="h-9 w-9 drop-shadow-[0_5px_10px_rgba(0,0,0,0.16)]" />
+            <span>Sakoo.</span>
           </Link>
           <div className="hidden items-center gap-8 md:flex">
             {[
@@ -111,8 +129,10 @@ export function LandingPage() {
       <section className="px-4 pb-16 pt-28 md:px-8">
         <div className="mx-auto grid min-h-[720px] max-w-[1500px] items-center gap-12 overflow-hidden rounded-[40px] bg-[#202020] p-8 text-white shadow-[0_28px_80px_rgba(0,0,0,0.22)] md:p-16 lg:grid-cols-[1fr_620px] lg:p-20">
           <div data-scroll-reveal="rise" className="scroll-reveal relative z-10">
-            <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 backdrop-blur-sm">
-              <span className="material-symbols-outlined text-sm text-[#c7ff00]">smart_toy</span>
+            <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-2 pr-4 backdrop-blur-sm">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white p-1">
+                <BrandMark className="h-full w-full" />
+              </span>
               <span className="text-sm font-semibold text-white/90">AI finance assistant made easy</span>
             </div>
             <h1 className="max-w-3xl text-5xl font-extrabold leading-[1.04] tracking-[-0.03em] md:text-7xl">
@@ -346,7 +366,10 @@ export function LandingPage() {
         <div className="mx-auto max-w-[1440px]">
           <div className="mb-12 grid gap-8 md:grid-cols-4">
             <div className="md:col-span-2">
-              <div className="mb-4 text-2xl font-extrabold">Sakoo.</div>
+              <div className="mb-4 flex items-center gap-2.5 text-2xl font-extrabold">
+                <BrandMark className="h-9 w-9" />
+                <span>Sakoo.</span>
+              </div>
               <p className="max-w-sm text-sm leading-7 text-[#6f6f6f]">
                 The easiest way to track expenses and manage personal finances through conversational AI.
               </p>

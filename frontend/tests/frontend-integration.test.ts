@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
   buildLlmProviderUpdatePayload,
@@ -87,4 +88,17 @@ test("fetched provider models preserve a valid selection or choose the first", (
   assert.equal(chooseFetchedModel("model-b", ["model-a", "model-b"]), "model-b");
   assert.equal(chooseFetchedModel("missing", ["model-a", "model-b"]), "model-a");
   assert.equal(chooseFetchedModel("manual", []), "manual");
+});
+
+test("Sakoo branding is shared by the landing and authentication pages", () => {
+  const landing = readFileSync(new URL("../components/landing-page.tsx", import.meta.url), "utf8");
+  const authForm = readFileSync(new URL("../components/auth-form.tsx", import.meta.url), "utf8");
+  const authLayout = readFileSync(new URL("../app/(auth)/layout.tsx", import.meta.url), "utf8");
+  const styles = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
+
+  assert.match(landing, /<BrandMark priority/);
+  assert.match(authForm, /<BrandMark priority/);
+  assert.match(authLayout, /<BrandMark priority/);
+  assert.match(styles, /Plus Jakarta Sans/);
+  assert.doesNotMatch(styles, /family=Inter|['\"]Inter['\"]/);
 });

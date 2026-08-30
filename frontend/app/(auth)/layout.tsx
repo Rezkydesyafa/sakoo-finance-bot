@@ -1,55 +1,40 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { BrandMark } from "@/components/brand-mark";
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="bg-surface min-h-screen flex flex-col relative font-body-main text-body-main text-text-primary overflow-x-hidden">
-      {/* Atmospheric Glow Background */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-        <div className="absolute top-0 left-0 w-[600px] h-[600px] bg-glow-blue rounded-full mix-blend-multiply filter blur-[120px] opacity-70 transform -translate-x-1/4 -translate-y-1/4"></div>
-        <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-glow-pink rounded-full mix-blend-multiply filter blur-[120px] opacity-60 transform translate-x-1/4 translate-y-1/4"></div>
-        <div className="absolute top-1/2 left-1/2 w-[800px] h-[400px] bg-glow-purple rounded-full mix-blend-multiply filter blur-[150px] opacity-50 transform -translate-x-1/2 -translate-y-1/2"></div>
+    <div className="relative flex min-h-screen flex-col overflow-hidden bg-[#f7f7f0] font-sans text-[#191919]">
+      <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
+        <div className="absolute -left-32 -top-36 h-[32rem] w-[32rem] rounded-full bg-[#c7ff00]/20 blur-[120px]" />
+        <div className="absolute -bottom-56 -right-36 h-[34rem] w-[34rem] rounded-full bg-[#202020]/8 blur-[130px]" />
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#202020]/15 to-transparent" />
       </div>
 
-      {/* TopAppBar */}
-      <header className="bg-surface/80 backdrop-blur-md sticky top-0 full-width bg-transparent z-50">
-        <div className="flex justify-between items-center w-full px-outer-margin py-stack-md max-w-container-max mx-auto">
-          <Link href="/" className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity active:scale-95">
-            <span className="material-symbols-outlined text-primary text-[28px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-              finance_chip
-            </span>
-            <h1 className="font-headline-section text-headline-section font-bold text-primary tracking-tight">
-              Sakoo Finance
-            </h1>
+      <header className="relative z-10 border-b border-[#202020]/8 bg-[#f7f7f0]/80 backdrop-blur-xl">
+        <div className="mx-auto flex h-20 w-full max-w-[1440px] items-center justify-between px-5 md:px-8">
+          <Link href="/" className="flex items-center gap-2.5 text-xl font-extrabold tracking-tight transition-opacity hover:opacity-70" aria-label="Sakoo home">
+            <BrandMark priority className="h-9 w-9 drop-shadow-[0_5px_10px_rgba(0,0,0,0.12)]" />
+            <span>Sakoo.</span>
           </Link>
-          <div className="flex items-center">
-            <button disabled title="Pusat bantuan belum tersedia" className="opacity-50 flex items-center justify-center p-2 rounded-full text-secondary cursor-not-allowed">
-              <span className="material-symbols-outlined">help_outline</span>
-            </button>
-          </div>
+          <Link href="/" className="hidden items-center gap-1.5 text-sm font-bold text-[#6f6f6f] transition-colors hover:text-[#191919] sm:flex">
+            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+            Back to home
+          </Link>
         </div>
       </header>
 
-      {/* Main Canvas */}
-      <main className="flex-grow flex items-center justify-center p-outer-margin relative z-10 w-full max-w-container-max mx-auto">
+      <main className="relative z-10 flex flex-1 items-center justify-center px-5 py-12 sm:px-8 sm:py-16">
         {children}
       </main>
 
-      {/* Footer */}
-      <footer className="bg-transparent w-full z-10 relative mt-auto">
-        <div className="flex flex-col md:flex-row justify-between items-center w-full px-outer-margin py-stack-lg gap-stack-md max-w-container-max mx-auto">
-          <div className="font-label-muted text-label-muted text-text-muted text-center md:text-left">
-            © 2024 Sakoo Finance Bot. Securely encrypted.
-          </div>
-          <div className="flex flex-wrap justify-center gap-6">
-            <span className="font-label-muted text-label-muted text-text-muted opacity-60">Privacy Policy</span>
-            <span className="font-label-muted text-label-muted text-text-muted opacity-60">Terms of Service</span>
-            <span className="font-label-muted text-label-muted text-text-muted opacity-60">Security</span>
-          </div>
-          <div className="font-label-button text-label-button text-text-primary opacity-50 flex items-center gap-1 mt-4 md:mt-0">
-            <span className="material-symbols-outlined text-[16px]">finance_chip</span>
-            Sakoo
-          </div>
+      <footer className="relative z-10 border-t border-[#202020]/8 px-5 py-5 sm:px-8">
+        <div className="mx-auto flex max-w-[1440px] flex-col items-center justify-between gap-2 text-center text-xs font-medium text-[#6f6f6f] sm:flex-row sm:text-left">
+          <span>© 2026 Sakoo Finance Bot. Securely encrypted.</span>
+          <span className="flex items-center gap-1.5">
+            <BrandMark className="h-4 w-4" />
+            Personal finance, made simple.
+          </span>
         </div>
       </footer>
     </div>
