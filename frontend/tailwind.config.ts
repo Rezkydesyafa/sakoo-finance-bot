@@ -82,26 +82,27 @@ const config: Config = {
         "card": "24px",
       },
       fontFamily: {
-        "label-button": ["Plus Jakarta Sans", "sans-serif"],
-        "display-balance": ["Plus Jakarta Sans", "sans-serif"],
-        "label-muted": ["Plus Jakarta Sans", "sans-serif"],
-        "body-main": ["Plus Jakarta Sans", "sans-serif"],
-        "title-card": ["Plus Jakarta Sans", "sans-serif"],
-        "headline-hero": ["Plus Jakarta Sans", "sans-serif"],
-        "headline-section": ["Plus Jakarta Sans", "sans-serif"],
-        "headline-hero-mobile": ["Plus Jakarta Sans", "sans-serif"],
-        "body-strong": ["Plus Jakarta Sans", "sans-serif"]
+        sans: ["var(--font-plus-jakarta)", "sans-serif"],
+        "label-button": ["var(--font-plus-jakarta)", "sans-serif"],
+        "display-balance": ["var(--font-plus-jakarta)", "sans-serif"],
+        "label-muted": ["var(--font-plus-jakarta)", "sans-serif"],
+        "body-main": ["var(--font-plus-jakarta)", "sans-serif"],
+        "title-card": ["var(--font-plus-jakarta)", "sans-serif"],
+        "headline-hero": ["var(--font-plus-jakarta)", "sans-serif"],
+        "headline-section": ["var(--font-plus-jakarta)", "sans-serif"],
+        "headline-hero-mobile": ["var(--font-plus-jakarta)", "sans-serif"],
+        "body-strong": ["var(--font-plus-jakarta)", "sans-serif"]
       },
       fontSize: {
-        "label-button": ["13px", { lineHeight: "1.2", fontWeight: "600" }],
-        "display-balance": ["42px", { lineHeight: "1.0", letterSpacing: "-0.04em", fontWeight: "800" }],
+        "label-button": ["13px", { lineHeight: "1.2", fontWeight: "500" }],
+        "display-balance": ["42px", { lineHeight: "1.0", letterSpacing: "-0.04em", fontWeight: "600" }],
         "label-muted": ["12px", { lineHeight: "1.4", fontWeight: "400" }],
         "body-main": ["14px", { lineHeight: "1.5", fontWeight: "400" }],
-        "title-card": ["15px", { lineHeight: "1.3", fontWeight: "600" }],
-        "headline-hero": ["32px", { lineHeight: "1.1", letterSpacing: "-0.02em", fontWeight: "700" }],
-        "headline-section": ["20px", { lineHeight: "1.25", fontWeight: "700" }],
-        "headline-hero-mobile": ["26px", { lineHeight: "1.2", fontWeight: "700" }],
-        "body-strong": ["14px", { lineHeight: "1.5", fontWeight: "600" }]
+        "title-card": ["15px", { lineHeight: "1.3", fontWeight: "500" }],
+        "headline-hero": ["32px", { lineHeight: "1.1", letterSpacing: "-0.02em", fontWeight: "600" }],
+        "headline-section": ["20px", { lineHeight: "1.25", fontWeight: "600" }],
+        "headline-hero-mobile": ["26px", { lineHeight: "1.2", fontWeight: "600" }],
+        "body-strong": ["14px", { lineHeight: "1.5", fontWeight: "500" }]
       },
       keyframes: {
         "pulse-glow": {

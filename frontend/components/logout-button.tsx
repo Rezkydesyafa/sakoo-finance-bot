@@ -39,7 +39,7 @@ export function LogoutButton({ className }: { className?: string }) {
               </span>
             </div>
             
-            <h3 className="text-lg font-bold text-center text-[#1a1c1b] mb-2">
+            <h3 className="text-lg font-semibold text-center text-[#1a1c1b] mb-2">
               Keluar dari Akun?
             </h3>
             <p className="text-sm text-center text-[#6F6F6F] mb-8">
@@ -47,10 +47,10 @@ export function LogoutButton({ className }: { className?: string }) {
             </p>
             
             <div className="flex flex-col gap-3">
-              <button onClick={handleLogout} className="w-full py-3 rounded-full text-sm font-bold border-none cursor-pointer transition-colors bg-[#1a1c1b] hover:bg-black text-white">
+              <button onClick={handleLogout} className="w-full py-3 rounded-full text-sm font-semibold border-none cursor-pointer transition-colors bg-[#1a1c1b] hover:bg-black text-white">
                 Ya, Sign Out
               </button>
-              <button onClick={() => setShowModal(false)} className="w-full py-3 bg-white border border-[#E8E8E8] text-[#1a1c1b] rounded-full text-sm font-bold hover:bg-[#F1F2F0] transition-colors cursor-pointer">
+              <button onClick={() => setShowModal(false)} className="w-full py-3 bg-white border border-[#E8E8E8] text-[#1a1c1b] rounded-full text-sm font-semibold hover:bg-[#F1F2F0] transition-colors cursor-pointer">
                 Batal
               </button>
             </div>

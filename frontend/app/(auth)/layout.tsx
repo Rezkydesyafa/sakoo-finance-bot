@@ -17,7 +17,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
             <BrandMark priority className="h-9 w-9 drop-shadow-[0_5px_10px_rgba(0,0,0,0.12)]" />
             <span>Sakoo.</span>
           </Link>
-          <Link href="/" className="hidden items-center gap-1.5 text-sm font-bold text-[#6f6f6f] transition-colors hover:text-[#191919] sm:flex">
+          <Link href="/" className="hidden items-center gap-1.5 text-sm font-semibold text-[#6f6f6f] transition-colors hover:text-[#191919] sm:flex">
             <span className="material-symbols-outlined text-[18px]">arrow_back</span>
             Back to home
           </Link>

@@ -187,7 +187,7 @@ export function TransactionsTab({
       {/* Left Column */}
       <div className="col-span-12 xl:col-span-8 space-y-6 min-w-0">
         <div className="flex flex-row items-center justify-between gap-3">
-          <h2 className="text-xl font-bold text-[#1a1c1b]">Daftar Transaksi</h2>
+          <h2 className="text-xl font-semibold text-[#1a1c1b]">Daftar Transaksi</h2>
           <div className="flex gap-2">
             <div className="relative">
               <button 
@@ -233,7 +233,7 @@ export function TransactionsTab({
               </div>
               <span className="text-[11px] sm:text-sm font-semibold text-[#6F6F6F] leading-tight">This Month&apos;s Spending</span>
             </div>
-            <div className="text-[15px] sm:text-2xl font-bold text-[#1a1c1b] truncate">{formatCurrency(thisMonthSpending)}</div>
+            <div className="text-[15px] sm:text-2xl font-semibold text-[#1a1c1b] truncate">{formatCurrency(thisMonthSpending)}</div>
           </div>
 
           <div className="bg-white p-4 sm:p-6 rounded-[24px] card-shadow flex flex-col justify-between hover:-translate-y-1 transition-transform duration-300">
@@ -243,7 +243,7 @@ export function TransactionsTab({
               </div>
               <span className="text-[11px] sm:text-sm font-semibold text-[#6F6F6F] leading-tight">Total Savings</span>
             </div>
-            <div className="text-[15px] sm:text-2xl font-bold text-[#1a1c1b] truncate">{formatCurrency(totalSavings)}</div>
+            <div className="text-[15px] sm:text-2xl font-semibold text-[#1a1c1b] truncate">{formatCurrency(totalSavings)}</div>
           </div>
         </div>
 
@@ -300,7 +300,7 @@ export function TransactionsTab({
       <div className="col-span-12 xl:col-span-4 space-y-6 min-w-0">
         {/* Quick Action Card */}
         <div className="bg-white p-6 rounded-[24px] card-shadow">
-          <h3 className="text-base font-bold text-[#1a1c1b] mb-4">Quick Action</h3>
+          <h3 className="text-base font-semibold text-[#1a1c1b] mb-4">Quick Action</h3>
           <div className="grid grid-cols-2 gap-3 mb-4">
             <button onClick={handleQuickAddIncome} disabled={quickActionLoading !== null} className="bg-[#c7ff00] text-[#151f00] py-3 rounded-xl text-[13px] font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity border-none cursor-pointer disabled:opacity-50">
               <span className="material-symbols-outlined text-[18px]">add</span> Income
@@ -322,7 +322,7 @@ export function TransactionsTab({
         {/* Budget Progress Card */}
         <div className="bg-white p-6 rounded-[24px] card-shadow">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-base font-bold text-[#1a1c1b]">Budget Progress</h3>
+            <h3 className="text-base font-semibold text-[#1a1c1b]">Budget Progress</h3>
             <Link aria-label="Kelola budget" href="/?tab=budgets" className="w-8 h-8 rounded-full hover:bg-[#F1F2F0] flex items-center justify-center transition-colors">
               <span className="material-symbols-outlined text-[#5f5e5e] text-[20px]">more_horiz</span>
             </Link>
@@ -361,7 +361,7 @@ export function TransactionsTab({
 
         {/* Export Data Card */}
         <div className="bg-white p-6 rounded-[24px] card-shadow">
-          <h3 className="text-base font-bold text-[#1a1c1b] mb-4">Export Data</h3>
+          <h3 className="text-base font-semibold text-[#1a1c1b] mb-4">Export Data</h3>
           <p className="text-sm text-[#6F6F6F] mb-4">Download your transaction history for accounting purposes.</p>
           <div className="flex gap-3">
             <button onClick={handleDownloadPDF} disabled={isExporting} className="flex-1 border border-[#E8E8E8] text-[#1a1c1b] py-2 rounded-xl text-[13px] font-semibold flex items-center justify-center gap-2 hover:bg-[#F1F2F0] transition-colors border-solid bg-transparent cursor-pointer">

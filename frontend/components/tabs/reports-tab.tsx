@@ -143,7 +143,7 @@ export function ReportsTab({
   return (
     <div className="space-y-6">
       <div className="flex flex-row justify-between items-center gap-4">
-        <h2 className="text-2xl font-bold text-[#1a1c1b]">Financial Report</h2>
+        <h2 className="text-2xl font-semibold text-[#1a1c1b]">Financial Report</h2>
         <div className="relative">
           <button 
             onClick={() => setIsTimeDropdownOpen(!isTimeDropdownOpen)}
@@ -189,7 +189,7 @@ export function ReportsTab({
                 </div>
                 <span className="text-[11px] sm:text-sm font-semibold text-[#6F6F6F] leading-tight">Total Pemasukan</span>
               </div>
-              <div className="text-[15px] sm:text-2xl font-bold text-[#1a1c1b] mb-2 truncate">{formatCurrency(displayIncome)}</div>
+              <div className="text-[15px] sm:text-2xl font-semibold text-[#1a1c1b] mb-2 truncate">{formatCurrency(displayIncome)}</div>
               <div className="inline-flex items-center gap-1 bg-[#5FCF6A]/10 text-[#5FCF6A] px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold w-fit">
                 <span className="material-symbols-outlined text-[11px] sm:text-[13px]">receipt_long</span> {incomeCount} transaksi
               </div>
@@ -202,7 +202,7 @@ export function ReportsTab({
                 </div>
                 <span className="text-[11px] sm:text-sm font-semibold text-[#6F6F6F] leading-tight">Total Pengeluaran</span>
               </div>
-              <div className="text-[15px] sm:text-2xl font-bold text-[#1a1c1b] mb-2 truncate">{formatCurrency(displayExpense)}</div>
+              <div className="text-[15px] sm:text-2xl font-semibold text-[#1a1c1b] mb-2 truncate">{formatCurrency(displayExpense)}</div>
               <div className="inline-flex items-center gap-1 bg-[#EF6B6B]/10 text-[#EF6B6B] px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold w-fit">
                 <span className="material-symbols-outlined text-[11px] sm:text-[13px]">receipt_long</span> {expenseCount} transaksi
               </div>
@@ -219,7 +219,7 @@ export function ReportsTab({
                     <circle className="text-neutral-700" cx="18" cy="18" r="16" fill="transparent" stroke="currentColor" strokeWidth="3" />
                     <circle className="text-[#c7ff00]" cx="18" cy="18" r="16" fill="transparent" stroke="currentColor" strokeWidth="3" strokeDasharray={strokeDash} strokeLinecap="round" />
                   </svg>
-                  <span className="absolute text-[9px] sm:text-[10px] font-bold text-white">{savingRateClamped}%</span>
+                  <span className="absolute text-[9px] sm:text-[10px] font-semibold text-white">{savingRateClamped}%</span>
                 </div>
                 <div className="min-w-0">
                   <div className="text-[10px] sm:text-[11px] font-semibold text-white truncate">Saving Rate</div>
@@ -231,7 +231,7 @@ export function ReportsTab({
 
           <div className="bg-white rounded-[24px] p-6 card-shadow">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-sm font-bold text-[#1a1c1b]">Money Flow</h3>
+              <h3 className="text-sm font-semibold text-[#1a1c1b]">Money Flow</h3>
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[#c7ff00]" /><span className="text-xs text-[#6F6F6F]">Income</span></div>
                 <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-neutral-300" /><span className="text-xs text-[#6F6F6F]">Expense</span></div>
@@ -274,7 +274,7 @@ export function ReportsTab({
                 <div className="absolute top-0 right-0 w-3 h-3 bg-[#c7ff00] rounded-full border-2 border-white animate-pulse"></div>
               </div>
               <div>
-                <h4 className="text-sm font-bold text-[#1a1c1b] mb-1">Sakoo Insight</h4>
+                <h4 className="text-sm font-semibold text-[#1a1c1b] mb-1">Sakoo Insight</h4>
                 <p className="text-xs text-[#6F6F6F] leading-relaxed">
                   {reportCategories[0]
                     ? <>Kategori pengeluaran terbesar: <strong className="text-[#1a1c1b]">{reportCategories[0].name}</strong>.</>
@@ -303,7 +303,7 @@ export function ReportsTab({
                         </div>
                       </div>
                       <div className="text-right">
-                        <span className="text-[15px] font-bold text-[#1a1c1b]">{c.displayValue}</span>
+                        <span className="text-[15px] font-semibold text-[#1a1c1b]">{c.displayValue}</span>
                       </div>
                     </div>
                     <div className="w-full bg-[#F1F2F0] rounded-full h-2">
@@ -329,7 +329,7 @@ export function ReportsTab({
       </div>
 
       <div className="w-full">
-        <h3 className="text-sm font-bold text-[#1a1c1b] mb-4 text-center md:text-left">Export Options</h3>
+        <h3 className="text-sm font-semibold text-[#1a1c1b] mb-4 text-center md:text-left">Export Options</h3>
         <div className="flex flex-wrap justify-center md:justify-start gap-3">
           <button onClick={handleDownloadPDF} disabled={isExporting} className="bg-[#2A2A2A] text-white px-5 py-2.5 rounded-full text-xs font-semibold flex items-center gap-1.5 hover:opacity-90 transition-opacity border-none cursor-pointer">
             <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>
