@@ -6,6 +6,7 @@ import { FormEvent, useState, useEffect } from "react";
 import { ApiError, apiClient, buildApiUrl } from "@/lib/api";
 import { saveAuthToken, getStoredAuthToken } from "@/lib/auth-storage";
 import { resolvePostLoginPath } from "@/lib/frontend-utils";
+import { BrandMark } from "@/components/brand-mark";
 
 type AuthMode = "login" | "register";
 
@@ -71,21 +72,20 @@ export function AuthForm({ mode }: AuthFormProps) {
   }
 
   return (
-    <div className="bg-surface-white w-full max-w-[480px] p-card-padding sm:p-10 relative overflow-hidden transition-all duration-300 hover:-translate-y-1 group" style={{ borderRadius: '28px', boxShadow: '0 10px 30px rgba(0,0,0,0.06)' }}>
+    <div className="group relative w-full max-w-[480px] overflow-hidden rounded-[32px] border border-[#202020]/10 bg-white/90 p-6 shadow-[0_24px_70px_rgba(0,0,0,0.12)] backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 sm:p-10">
+      <div className="pointer-events-none absolute inset-x-12 top-0 h-px bg-gradient-to-r from-transparent via-[#c7ff00] to-transparent" />
       <div className="relative z-10 flex flex-col items-center w-full">
         {/* Logo & Greeting */}
         <div className="flex justify-center mb-6">
-          <div className="w-16 h-16 bg-surface-muted rounded-full flex items-center justify-center text-primary group-hover:scale-105 transition-transform duration-300">
-            <span className="material-symbols-outlined text-[32px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-              robot_2
-            </span>
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#f1f2f0] p-3 shadow-inner transition-transform duration-300 group-hover:scale-105">
+            <BrandMark priority className="h-full w-full drop-shadow-[0_5px_8px_rgba(0,0,0,0.12)]" />
           </div>
         </div>
         
         <h2 className="font-headline-hero text-headline-hero text-center text-inverse-surface mb-2">
           {isRegister ? "Create Account" : "Welcome Back"}
         </h2>
-        <p className="font-body-main text-body-main text-text-muted text-center mb-8 px-4">
+        <p className="font-sans text-body-main text-text-muted text-center mb-8 px-4">
           {isRegister ? "Sign up to start using your smart financial assistant." : "Log in to manage your smart financial assistant."}
         </p>
 
