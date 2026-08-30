@@ -126,7 +126,7 @@ export function LandingPage() {
         <div className="mx-auto grid min-h-[720px] max-w-[1500px] items-center gap-12 overflow-hidden rounded-[40px] bg-[#202020] p-8 text-white shadow-[0_28px_80px_rgba(0,0,0,0.22)] md:p-16 lg:grid-cols-[1fr_620px] lg:p-20">
           <div data-scroll-reveal="rise" className="scroll-reveal relative z-10">
             <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-2 pr-4 backdrop-blur-sm">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white p-1">
+              <span className="flex h-6 w-6 items-center justify-center p-0">
                 <BrandMark className="h-full w-full" />
               </span>
               <span className="text-sm font-semibold text-white/90">AI finance assistant made easy</span>

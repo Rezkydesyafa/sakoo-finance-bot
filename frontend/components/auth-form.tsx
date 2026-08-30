@@ -77,8 +77,8 @@ export function AuthForm({ mode }: AuthFormProps) {
       <div className="relative z-10 flex flex-col items-center w-full">
         {/* Logo & Greeting */}
         <div className="flex justify-center mb-6">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#f1f2f0] p-3 shadow-inner transition-transform duration-300 group-hover:scale-105">
-            <BrandMark priority className="h-full w-full drop-shadow-[0_5px_8px_rgba(0,0,0,0.12)]" />
+          <div className="flex h-16 w-16 items-center justify-center transition-transform duration-300 group-hover:scale-105">
+            <BrandMark priority className="h-full w-full " />
           </div>
         </div>
         
