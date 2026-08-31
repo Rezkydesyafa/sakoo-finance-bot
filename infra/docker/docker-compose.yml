@@ -6,8 +6,9 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     env_file:
-      - ../../.env
+      - .env
     environment:
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-rezkydesyafa@gmail.com,admin@lab-sigma.web.id}
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}
       LLM_PROVIDER_ENCRYPTION_KEY: ${LLM_PROVIDER_ENCRYPTION_KEY:-AU7vswntYIbGPVP2ckOAUuf7pbazg5VU7hyzPPFf1Uk=}
       REDIS_URL: redis://redis:6379/0
@@ -75,19 +76,20 @@ services:
       timeout: 5s
       retries: 10
 
-  celery_worker:
+  celery-worker:
     image: ghcr.io/rezkydesyafa/sakoo-backend:latest
     restart: unless-stopped
     command: celery -A app.workers.celery_app.celery_app worker --loglevel=info --concurrency=${CELERY_CONCURRENCY:-1}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     env_file:
-      - ../../.env
+      - .env
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-rezkydesyafa@gmail.com,admin@lab-sigma.web.id}
       WAHA_BASE_URL: http://waha:3000
       WAHA_API_KEY: ${WAHA_API_KEY:?WAHA_API_KEY is required}
       WAHA_SESSION_NAME: ${WAHA_SESSION_NAME:-default}
@@ -112,12 +114,13 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     env_file:
-      - ../../.env
+      - .env
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-rezkydesyafa@gmail.com,admin@lab-sigma.web.id}
     depends_on:
       postgres:
         condition: service_healthy
@@ -128,7 +131,7 @@ services:
     image: devlikeapro/waha:latest
     restart: unless-stopped
     env_file:
-      - ../../.env
+      - .env
     environment:
       WAHA_API_KEY: ${WAHA_API_KEY:?WAHA_API_KEY is required}
       WAHA_DASHBOARD_USERNAME: ${WAHA_DASHBOARD_USERNAME:?WAHA_DASHBOARD_USERNAME is required}
