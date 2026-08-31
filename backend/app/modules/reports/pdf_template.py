@@ -13,15 +13,12 @@ from app.modules.reports.schemas import (
 
 # Load the Sakoo official logo as base64 to embed it dynamically in the HTML template
 try:
-    with open("/app/public/brand/sakoo-mark.png", "rb") as f:
+    import os
+    logo_path = os.path.join(os.path.dirname(__file__), "sakoo-mark.png")
+    with open(logo_path, "rb") as f:
         LOGO_B64 = base64.b64encode(f.read()).decode("utf-8")
 except Exception:
-    # Fallback to absolute local path outside docker if run via virtualenv or local dev
-    try:
-        with open("/home/kinar/dev/sakoo-deploy-pull-fix/frontend/public/brand/sakoo-mark.png", "rb") as f:
-            LOGO_B64 = base64.b64encode(f.read()).decode("utf-8")
-    except Exception:
-        LOGO_B64 = ""
+    LOGO_B64 = ""
 
 MONTH_LABELS = {
     1: "Jan",
