@@ -116,7 +116,7 @@ def render_report_pdf_html(
     .brand-name {{
       display: inline-block;
       font-size: 14px;
-      font-weight: 800;
+      font-weight: 700;
       letter-spacing: -0.01em;
       vertical-align: middle;
       color: #202020;
@@ -125,13 +125,13 @@ def render_report_pdf_html(
       color: #6f6f6f;
       display: block;
       font-size: 8.5px;
-      font-weight: 500;
+      font-weight: 400;
       margin-top: 1px;
     }}
     h1 {{
       color: #202020;
       font-size: 26px;
-      font-weight: 800;
+      font-weight: 700;
       letter-spacing: -0.02em;
       line-height: 1.08;
       margin: 12px 0 14px;
@@ -146,7 +146,7 @@ def render_report_pdf_html(
     }}
     .meta-label {{
       color: #6f6f6f;
-      font-weight: 700;
+      font-weight: 500;
       width: 60px;
     }}
     .header-note {{
@@ -162,7 +162,7 @@ def render_report_pdf_html(
     .section-title {{
       color: #202020;
       font-size: 13px;
-      font-weight: 800;
+      font-weight: 700;
       letter-spacing: -0.01em;
       margin: 0 0 10px;
       border-bottom: 1.5px solid #202020;
@@ -198,14 +198,14 @@ def render_report_pdf_html(
     .metric-label {{
       color: #6f6f6f;
       font-size: 8px;
-      font-weight: 800;
+      font-weight: 500;
       letter-spacing: .08em;
       text-transform: uppercase;
     }}
     .metric-value {{
       color: #202020;
       font-size: 16px;
-      font-weight: 800;
+      font-weight: 700;
       letter-spacing: -0.01em;
       margin-top: 4px;
       white-space: nowrap;
@@ -230,7 +230,7 @@ def render_report_pdf_html(
     .panel-title {{
       color: #202020;
       font-size: 11.5px;
-      font-weight: 800;
+      font-weight: 700;
       margin-bottom: 12px;
       border-bottom: 1px solid #e2e8f0;
       padding-bottom: 4px;
@@ -248,14 +248,14 @@ def render_report_pdf_html(
     .category-name {{
       display: table-cell;
       font-size: 10px;
-      font-weight: 800;
+      font-weight: 600;
       padding-right: 8px;
       color: #202020;
     }}
     .category-total {{
       display: table-cell;
       font-size: 10px;
-      font-weight: 800;
+      font-weight: 600;
       text-align: right;
       white-space: nowrap;
       color: #202020;
@@ -297,7 +297,7 @@ def render_report_pdf_html(
       border-bottom: 2px solid #202020;
       color: #202020;
       font-size: 8.5px;
-      font-weight: 800;
+      font-weight: 600;
       letter-spacing: .05em;
       padding: 10px 8px;
       text-align: left;
