@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 from datetime import datetime
 from decimal import Decimal
 from html import escape
@@ -9,6 +10,18 @@ from app.modules.reports.schemas import (
     ReportSummaryResponse,
     ReportTransactionItem,
 )
+
+# Load the Sakoo official logo as base64 to embed it dynamically in the HTML template
+try:
+    with open("/app/public/brand/sakoo-mark.png", "rb") as f:
+        LOGO_B64 = base64.b64encode(f.read()).decode("utf-8")
+except Exception:
+    # Fallback to absolute local path outside docker if run via virtualenv or local dev
+    try:
+        with open("/home/kinar/dev/sakoo-deploy-pull-fix/frontend/public/brand/sakoo-mark.png", "rb") as f:
+            LOGO_B64 = base64.b64encode(f.read()).decode("utf-8")
+    except Exception:
+        LOGO_B64 = ""
 
 MONTH_LABELS = {
     1: "Jan",
@@ -39,11 +52,13 @@ def render_report_pdf_html(
     expense_rows = _render_category_rows(expense_categories, is_expense=True)
     income_rows = _render_category_rows(income_categories, is_expense=False)
 
+    logo_src = f"data:image/png;base64,{LOGO_B64}" if LOGO_B64 else ""
+
     return f"""<!doctype html>
 <html>
 <head>
   <meta charset="utf-8">
-  <title>SAKOO AI - Laporan Keuangan - {escape(period_label)}</title>
+  <title>Sakoo AI - Laporan Keuangan - {escape(period_label)}</title>
   <style>
     @page {{
       size: A4 portrait;
@@ -57,7 +72,7 @@ def render_report_pdf_html(
     * {{ box-sizing: border-box; }}
     body {{
       background: #ffffff;
-      color: #111111;
+      color: #202020;
       font-family: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
       font-size: 10.5px;
       line-height: 1.45;
@@ -94,26 +109,18 @@ def render_report_pdf_html(
       margin-bottom: 8px;
       white-space: nowrap;
     }}
-    .brand-mark {{
-      background: #202020;
-      color: #c7ff00;
-      border-radius: 6px;
+    .brand-logo-img {{
       display: inline-block;
-      font-size: 11px;
-      font-weight: 800;
-      height: 28px;
-      letter-spacing: 0.05em;
-      line-height: 28px;
-      margin-right: 10px;
-      text-align: center;
+      height: 32px;
+      width: 32px;
       vertical-align: middle;
-      width: 28px;
+      margin-right: 10px;
     }}
     .brand-name {{
       display: inline-block;
-      font-size: 13px;
+      font-size: 14px;
       font-weight: 800;
-      letter-spacing: .01em;
+      letter-spacing: -0.01em;
       vertical-align: middle;
       color: #202020;
     }}
@@ -181,12 +188,15 @@ def render_report_pdf_html(
     }}
     .metric.income {{
       border-left-color: #2e7d32;
+      background: #f1f8e9;
     }}
     .metric.expense {{
       border-left-color: #d32f2f;
+      background: #ffebee;
     }}
     .metric.balance {{
       border-left-color: #c7ff00;
+      background: #f9fbe7;
     }}
     .metric-label {{
       color: #6f6f6f;
@@ -287,36 +297,36 @@ def render_report_pdf_html(
       page-break-inside: avoid;
     }}
     table.data th {{
-      background: #202020;
-      border-bottom: 2px solid #c7ff00;
-      color: #ffffff;
-      font-size: 8px;
+      border-bottom: 2px solid #202020;
+      color: #202020;
+      font-size: 8.5px;
       font-weight: 800;
-      letter-spacing: .07em;
-      padding: 8px 7px;
+      letter-spacing: .05em;
+      padding: 10px 8px;
       text-align: left;
       text-transform: uppercase;
     }}
     table.data td {{
-      border-bottom: 1px solid #e2e8f0;
+      border-bottom: 1px solid #f1f2f0;
       color: #202020;
-      padding: 9px 7px;
+      padding: 10px 8px;
       vertical-align: middle;
+      font-size: 10px;
     }}
     table.data tbody tr:nth-child(even) td {{
-      background: #f7f7f0/30;
+      background: #fafafa;
     }}
     .date-cell {{
       color: #6f6f6f;
       white-space: nowrap;
-      width: 76px;
+      width: 80px;
     }}
     .note-cell {{
       min-width: 150px;
     }}
     .note-main {{
       color: #202020;
-      font-weight: 700;
+      font-weight: 600;
     }}
     .note-source {{
       color: #6f6f6f;
@@ -326,38 +336,44 @@ def render_report_pdf_html(
     }}
     .category-cell {{
       color: #202020;
-      font-weight: 700;
-      width: 86px;
+      font-weight: 600;
+      width: 90px;
     }}
     .type-cell {{
-      width: 82px;
+      width: 80px;
     }}
     .amount {{
-      font-weight: 800;
+      font-weight: 700;
       text-align: right;
       white-space: nowrap;
-      width: 92px;
+      width: 100px;
+    }}
+    .amount.income {{
+      color: #2e7d32;
+    }}
+    .amount.expense {{
+      color: #d32f2f;
     }}
     .pill {{
-      border-radius: 999px;
+      border-radius: 6px;
       display: inline-block;
       font-size: 7.8px;
       font-weight: 800;
       line-height: 1;
       min-width: 58px;
-      padding: 4px 7px;
+      padding: 4px 6px;
       text-align: center;
       white-space: nowrap;
     }}
     .pill.income {{
-      background: #c7ff00;
-      border: 1px solid #b2e600;
-      color: #151f00;
+      background: #e8f5e9;
+      border: 1px solid #c8e6c9;
+      color: #2e7d32;
     }}
     .pill.expense {{
-      background: #f1f2f0;
-      border: 1px solid #d2d2d2;
-      color: #202020;
+      background: #ffeedd;
+      border: 1px solid #ffe0b2;
+      color: #e65100;
     }}
     .empty {{
       background: #f7f7f0;
@@ -389,7 +405,7 @@ def render_report_pdf_html(
         <td>
           <div class="brand-label">SAKOO AI FINANCE REPORT</div>
           <div class="brand-row">
-            <span class="brand-mark">SA</span>
+            {f'<img class="brand-logo-img" src="{logo_src}" alt="Logo" />' if logo_src else '<span class="brand-mark" style="background:#202020; color:#c7ff00; border-radius:6px; display:inline-block; font-size:11px; font-weight:800; height:28px; line-height:28px; width:28px; text-align:center;">SA</span>'}
             <span class="brand-name">Sakoo. AI<span class="brand-subtitle">Personal Finance, Made Simple</span></span>
           </div>
           <h1>Laporan Keuangan</h1>
@@ -466,6 +482,7 @@ def _render_transaction_rows(transactions: list[ReportTransactionItem]) -> str:
 
     rows = []
     for item in transactions:
+        amount_class = "income" if item.type == "income" else "expense"
         rows.append(
             "<tr>"
             f'<td class="date-cell">{escape(_format_date(item.transaction_date))}</td>'
@@ -476,7 +493,7 @@ def _render_transaction_rows(transactions: list[ReportTransactionItem]) -> str:
             f'<td class="category-cell">{escape(item.category_name or "Tanpa kategori")}</td>'
             f'<td class="type-cell"><span class="pill {escape(item.type)}">'
             f"{escape(_type_label(item.type))}</span></td>"
-            f'<td class="amount">{escape(_format_rupiah(item.amount))}</td>'
+            f'<td class="amount {amount_class}">{escape(_format_rupiah(item.amount))}</td>'
             "</tr>"
         )
 
