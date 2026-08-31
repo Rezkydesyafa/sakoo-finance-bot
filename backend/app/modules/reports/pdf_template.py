@@ -36,8 +36,8 @@ def render_report_pdf_html(
 ) -> str:
     period_label = _period_label(summary)
     transaction_rows = _render_transaction_rows(summary.transactions)
-    expense_rows = _render_category_rows(expense_categories)
-    income_rows = _render_category_rows(income_categories)
+    expense_rows = _render_category_rows(expense_categories, is_expense=True)
+    income_rows = _render_category_rows(income_categories, is_expense=False)
 
     return f"""<!doctype html>
 <html>
@@ -64,13 +64,13 @@ def render_report_pdf_html(
       margin: 0;
     }}
     .topline {{
-      background: #111111;
-      height: 1.5px;
+      background: #c7ff00;
+      height: 4px;
       margin-bottom: 12px;
       width: 100%;
     }}
     .header {{
-      border-bottom: 1px solid #d6d6d6;
+      border-bottom: 1px solid #e2e8f0;
       margin-bottom: 14px;
       padding-bottom: 14px;
     }}
@@ -83,7 +83,7 @@ def render_report_pdf_html(
       vertical-align: top;
     }}
     .brand-label {{
-      color: #444444;
+      color: #6f6f6f;
       font-size: 8.5px;
       font-weight: 700;
       letter-spacing: .13em;
@@ -95,39 +95,42 @@ def render_report_pdf_html(
       white-space: nowrap;
     }}
     .brand-mark {{
-      border: 1px solid #111111;
+      background: #202020;
+      color: #c7ff00;
+      border-radius: 6px;
       display: inline-block;
-      font-size: 8px;
+      font-size: 11px;
       font-weight: 800;
-      height: 24px;
-      letter-spacing: .02em;
-      line-height: 24px;
-      margin-right: 8px;
+      height: 28px;
+      letter-spacing: 0.05em;
+      line-height: 28px;
+      margin-right: 10px;
       text-align: center;
       vertical-align: middle;
-      width: 24px;
+      width: 28px;
     }}
     .brand-name {{
       display: inline-block;
-      font-size: 12px;
+      font-size: 13px;
       font-weight: 800;
       letter-spacing: .01em;
       vertical-align: middle;
+      color: #202020;
     }}
     .brand-subtitle {{
-      color: #666666;
+      color: #6f6f6f;
       display: block;
       font-size: 8.5px;
       font-weight: 500;
       margin-top: 1px;
     }}
     h1 {{
-      color: #000000;
-      font-size: 30px;
+      color: #202020;
+      font-size: 26px;
       font-weight: 800;
-      letter-spacing: 0;
+      letter-spacing: -0.02em;
       line-height: 1.08;
-      margin: 8px 0 10px;
+      margin: 12px 0 14px;
     }}
     .meta {{
       border-collapse: collapse;
@@ -135,11 +138,12 @@ def render_report_pdf_html(
       font-size: 9.5px;
     }}
     .meta td {{
-      padding: 1px 12px 1px 0;
+      padding: 2px 12px 2px 0;
     }}
     .meta-label {{
-      color: #666666;
+      color: #6f6f6f;
       font-weight: 700;
+      width: 60px;
     }}
     .header-note {{
       color: #555555;
@@ -149,41 +153,54 @@ def render_report_pdf_html(
       white-space: nowrap;
     }}
     .section {{
-      margin-top: 14px;
+      margin-top: 16px;
     }}
     .section-title {{
-      color: #000000;
-      font-size: 14px;
+      color: #202020;
+      font-size: 13px;
       font-weight: 800;
-      letter-spacing: 0;
-      margin: 0 0 8px;
+      letter-spacing: -0.01em;
+      margin: 0 0 10px;
+      border-bottom: 1.5px solid #202020;
+      padding-bottom: 4px;
     }}
     .metrics {{
       border-collapse: separate;
       border-spacing: 8px 0;
       margin-left: -8px;
       width: calc(100% + 16px);
+      margin-bottom: 10px;
     }}
     .metric {{
-      background: #ffffff;
-      border: 1px solid #b8b8b8;
+      background: #f7f7f0;
+      border: 1px solid #e2e8f0;
+      border-left: 4px solid #202020;
       border-radius: 8px;
-      padding: 12px 10px;
+      padding: 10px 12px;
       width: 25%;
     }}
+    .metric.income {{
+      border-left-color: #2e7d32;
+    }}
+    .metric.expense {{
+      border-left-color: #d32f2f;
+    }}
+    .metric.balance {{
+      border-left-color: #c7ff00;
+    }}
     .metric-label {{
-      color: #555555;
+      color: #6f6f6f;
       font-size: 8px;
       font-weight: 800;
       letter-spacing: .08em;
       text-transform: uppercase;
     }}
     .metric-value {{
-      color: #000000;
-      font-size: 18px;
+      color: #202020;
+      font-size: 16px;
       font-weight: 800;
-      letter-spacing: 0;
-      margin-top: 5px;
+      letter-spacing: -0.01em;
+      margin-top: 4px;
       white-space: nowrap;
     }}
     .two-col {{
@@ -198,16 +215,18 @@ def render_report_pdf_html(
     }}
     .panel {{
       background: #ffffff;
-      border: 1px solid #d2d2d2;
+      border: 1px solid #e2e8f0;
       border-radius: 9px;
       min-height: 112px;
       padding: 12px;
     }}
     .panel-title {{
-      color: #000000;
-      font-size: 12px;
+      color: #202020;
+      font-size: 11.5px;
       font-weight: 800;
-      margin-bottom: 10px;
+      margin-bottom: 12px;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 4px;
     }}
     .category-row {{
       margin-bottom: 12px;
@@ -224,6 +243,7 @@ def render_report_pdf_html(
       font-size: 10px;
       font-weight: 800;
       padding-right: 8px;
+      color: #202020;
     }}
     .category-total {{
       display: table-cell;
@@ -231,27 +251,34 @@ def render_report_pdf_html(
       font-weight: 800;
       text-align: right;
       white-space: nowrap;
+      color: #202020;
     }}
     .category-meta {{
-      color: #666666;
+      color: #6f6f6f;
       font-size: 8.5px;
       margin-top: 1px;
     }}
     .bar {{
-      background: #e8e8e8;
+      background: #e2e8f0;
       border-radius: 999px;
-      height: 5px;
+      height: 6px;
       margin-top: 6px;
       overflow: hidden;
       width: 100%;
     }}
     .bar-fill {{
-      background: #111111;
-      height: 5px;
+      height: 6px;
+    }}
+    .bar-fill.expense {{
+      background: #d32f2f;
+    }}
+    .bar-fill.income {{
+      background: #2e7d32;
     }}
     table.data {{
       border-collapse: collapse;
       width: 100%;
+      margin-top: 4px;
     }}
     table.data thead {{
       display: table-header-group;
@@ -260,10 +287,10 @@ def render_report_pdf_html(
       page-break-inside: avoid;
     }}
     table.data th {{
-      background: #f1f1f1;
-      border-bottom: 1px solid #cfcfcf;
-      color: #333333;
-      font-size: 7.8px;
+      background: #202020;
+      border-bottom: 2px solid #c7ff00;
+      color: #ffffff;
+      font-size: 8px;
       font-weight: 800;
       letter-spacing: .07em;
       padding: 8px 7px;
@@ -271,16 +298,16 @@ def render_report_pdf_html(
       text-transform: uppercase;
     }}
     table.data td {{
-      border-bottom: 1px solid #e3e3e3;
-      color: #111111;
+      border-bottom: 1px solid #e2e8f0;
+      color: #202020;
       padding: 9px 7px;
-      vertical-align: top;
+      vertical-align: middle;
     }}
     table.data tbody tr:nth-child(even) td {{
-      background: #fafafa;
+      background: #f7f7f0/30;
     }}
     .date-cell {{
-      color: #333333;
+      color: #6f6f6f;
       white-space: nowrap;
       width: 76px;
     }}
@@ -288,17 +315,17 @@ def render_report_pdf_html(
       min-width: 150px;
     }}
     .note-main {{
-      color: #111111;
+      color: #202020;
       font-weight: 700;
     }}
     .note-source {{
-      color: #777777;
+      color: #6f6f6f;
       display: block;
       font-size: 8px;
       margin-top: 1px;
     }}
     .category-cell {{
-      color: #222222;
+      color: #202020;
       font-weight: 700;
       width: 86px;
     }}
@@ -323,32 +350,32 @@ def render_report_pdf_html(
       white-space: nowrap;
     }}
     .pill.income {{
-      background: #ffffff;
-      border: 1px solid #111111;
-      color: #000000;
+      background: #c7ff00;
+      border: 1px solid #b2e600;
+      color: #151f00;
     }}
     .pill.expense {{
-      background: #eeeeee;
-      border: 1px solid #bdbdbd;
-      color: #000000;
+      background: #f1f2f0;
+      border: 1px solid #d2d2d2;
+      color: #202020;
     }}
     .empty {{
-      background: #fafafa;
+      background: #f7f7f0;
       border: 1px dashed #c8c8c8;
       border-radius: 8px;
-      color: #666666;
+      color: #6f6f6f;
       padding: 16px;
       text-align: center;
     }}
     .footer-note {{
-      border-top: 1px solid #d8d8d8;
-      color: #777777;
+      border-top: 1px solid #e2e8f0;
+      color: #6f6f6f;
       font-size: 8.3px;
-      margin-top: 18px;
+      margin-top: 24px;
       padding-top: 9px;
     }}
     .footer-brand {{
-      color: #000000;
+      color: #202020;
       font-weight: 800;
       margin-right: 10px;
     }}
@@ -363,7 +390,7 @@ def render_report_pdf_html(
           <div class="brand-label">SAKOO AI FINANCE REPORT</div>
           <div class="brand-row">
             <span class="brand-mark">SA</span>
-            <span class="brand-name">SAKOO AI<span class="brand-subtitle">Finance Intelligence</span></span>
+            <span class="brand-name">Sakoo. AI<span class="brand-subtitle">Personal Finance, Made Simple</span></span>
           </div>
           <h1>Laporan Keuangan</h1>
           <table class="meta">
@@ -391,15 +418,15 @@ def render_report_pdf_html(
 
   <table class="metrics">
     <tr>
-      <td class="metric">
+      <td class="metric income">
         <div class="metric-label">Pemasukan</div>
         <div class="metric-value">{escape(_format_rupiah(summary.total_income))}</div>
       </td>
-      <td class="metric">
+      <td class="metric expense">
         <div class="metric-label">Pengeluaran</div>
         <div class="metric-value">{escape(_format_rupiah(summary.total_expense))}</div>
       </td>
-      <td class="metric">
+      <td class="metric balance">
         <div class="metric-label">Saldo Bersih</div>
         <div class="metric-value">{escape(_format_rupiah(summary.net_balance))}</div>
       </td>
@@ -426,8 +453,8 @@ def render_report_pdf_html(
   </div>
 
   <div class="footer-note">
-    <span class="footer-brand">SAKOO AI</span>
-    Laporan ini dibuat otomatis oleh SAKOO AI berdasarkan data transaksi yang tersimpan.
+    <span class="footer-brand">Sakoo. AI</span>
+    Laporan ini dibuat otomatis oleh Sakoo AI berdasarkan data transaksi yang tersimpan secara aman.
   </div>
 </body>
 </html>"""
@@ -466,10 +493,11 @@ def _render_transaction_rows(transactions: list[ReportTransactionItem]) -> str:
     )
 
 
-def _render_category_rows(category_response: ReportCategoryResponse) -> str:
+def _render_category_rows(category_response: ReportCategoryResponse, is_expense: bool = True) -> str:
     if not category_response.items:
         return '<div class="empty">Tidak ada data.</div>'
 
+    fill_class = "expense" if is_expense else "income"
     rows = []
     for item in category_response.items:
         width = max(0, min(float(item.percentage), 100))
@@ -483,7 +511,7 @@ def _render_category_rows(category_response: ReportCategoryResponse) -> str:
             f"{item.transaction_count} transaksi - {_format_percentage(item.percentage)}"
             "</div>"
             '<div class="bar">'
-            f'<div class="bar-fill" style="width: {width:.2f}%"></div>'
+            f'<div class="bar-fill {fill_class}" style="width: {width:.2f}%"></div>'
             "</div>"
             "</div>"
         )
