@@ -47,7 +47,7 @@ const FEATURES = [
     id: "smart-budgeting",
     label: "Smart Budgeting",
     icon: Wallet01Icon,
-    image: "/brand/dashboard-demo.jpg",
+    image: "/brand/mascot-budget.png",
     description: "Atur limit anggaran per kategori pengeluaran agar finansial tetap terjaga.",
   },
   {
