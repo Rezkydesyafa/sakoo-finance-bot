@@ -26,24 +26,21 @@ const FEATURES = [
     id: "receipt-ocr",
     label: "OCR Receipt Scanner",
     icon: AiScanIcon,
-    image:
-      "https://images.unsplash.com/photo-1554224154-26032ffc0d07?q=80&w=1200",
+    image: "/brand/mascot-ocr.png",
     description: "Foto struk belanja Anda, AI langsung mengekstrak item & nominal otomatis.",
   },
   {
     id: "voice-input",
     label: "Voice Note Logging",
     icon: AiMicIcon,
-    image:
-      "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?q=80&w=1200",
+    image: "/brand/mascot-voice.png",
     description: "Kirim rekaman suara singkat saat senggang untuk mencatat transaksi tanpa ketik.",
   },
   {
     id: "pdf-reports",
     label: "Automatic PDF Reports",
     icon: File01Icon,
-    image:
-      "https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=1200",
+    image: "/brand/mascot-pdf.png",
     description: "Ekspor laporan keuangan mingguan & bulanan rapi berformat PDF siap cetak.",
   },
   {
@@ -57,8 +54,7 @@ const FEATURES = [
     id: "wa-notifications",
     label: "Daily WhatsApp Alerts",
     icon: Notification01Icon,
-    image:
-      "https://images.unsplash.com/photo-1611746872915-64382b5c76da?q=80&w=1200",
+    image: "/brand/mascot-wa.png",
     description: "Notifikasi & pengingat pencatatan otomatis yang dikirim langsung ke WhatsApp.",
   },
 ];
