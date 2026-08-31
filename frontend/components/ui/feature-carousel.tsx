@@ -19,7 +19,7 @@ const FEATURES = [
     id: "chat-transaction",
     label: "Chat Transaction AI",
     icon: AiChat01Icon,
-    image: "/brand/chat-web-demo.jpg",
+    image: "/brand/mascot-chat.png",
     description: "Catat pengeluaran & pemasukan secepat chatting di WhatsApp / Telegram.",
   },
   {
@@ -47,7 +47,7 @@ const FEATURES = [
     id: "smart-budgeting",
     label: "Smart Budgeting",
     icon: Wallet01Icon,
-    image: "/brand/dashboard-demo.jpg",
+    image: "/brand/mascot-budget.png",
     description: "Atur limit anggaran per kategori pengeluaran agar finansial tetap terjaga.",
   },
   {

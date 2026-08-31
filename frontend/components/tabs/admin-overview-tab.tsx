@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { apiClient } from "@/lib/api";
 import { getStoredAuthToken } from "@/lib/auth-storage";
+import { LlmLogModal } from "@/components/modals/llm-log-modal";
 
 type AdminStats = {
   total_users: number;
@@ -22,6 +23,8 @@ type LlmLogItem = {
   intent: string | null;
   status: string;
   raw_message: string | null;
+  parsed_result: Record<string, unknown> | null;
+  error_message: string | null;
   created_at: string;
 };
 
@@ -40,6 +43,7 @@ export function AdminOverviewTab() {
   const [logs, setLogs] = useState<LlmLogItem[]>([]);
   const [users, setUsers] = useState<UserItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedLog, setSelectedLog] = useState<LlmLogItem | null>(null);
 
   useEffect(() => {
     async function loadAdminData() {
@@ -121,7 +125,11 @@ export function AdminOverviewTab() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {logs.slice(0, 10).map((log) => (
-                  <tr key={log.id} className="hover:bg-gray-50">
+                  <tr 
+                    key={log.id} 
+                    className="hover:bg-gray-50 cursor-pointer transition-colors"
+                    onClick={() => setSelectedLog(log)}
+                  >
                     <td className="px-4 py-3 text-[#1a1c1b] font-medium">
                       {log.user_name || "Unknown"}
                     </td>
@@ -185,6 +193,13 @@ export function AdminOverviewTab() {
           </div>
         </div>
       </div>
+
+      {selectedLog && (
+        <LlmLogModal 
+          log={selectedLog} 
+          onClose={() => setSelectedLog(null)} 
+        />
+      )}
     </div>
   );
 }
