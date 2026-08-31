@@ -43,6 +43,8 @@ class LlmLogItem(BaseModel):
     intent: str | None
     status: str
     raw_message: str | None
+    parsed_result: dict | None = None
+    error_message: str | None = None
     created_at: datetime
 
 
@@ -145,10 +147,12 @@ def get_llm_logs(
                 "user_email": u_email,
                 "platform": bot_log.platform,
                 "message_type": bot_log.message_type,
-                "provider": bot_log.provider,
-                "intent": bot_log.intent,
+                "provider": getattr(bot_log, "provider", "gemini-flash"),
+                "intent": getattr(bot_log, "intent", bot_log.message_type),
                 "status": bot_log.status,
                 "raw_message": bot_log.raw_message,
+                "parsed_result": bot_log.parsed_result,
+                "error_message": bot_log.error_message,
                 "created_at": bot_log.created_at,
             }
         )
